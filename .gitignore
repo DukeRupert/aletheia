@@ -1,0 +1,30 @@
+# Binaries for the current OS and architecture
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+
+# Build artifacts
+bin/
+pkg/
+
+# Test results
+*.test
+*.out
+
+# Editor/IDE specific files
+.idea/
+.vscode/
+*.swp
+*.bak
+*~
+
+# Dependency management
+vendor/ # If using Go Modules, this might not be needed if not committing vendor directory
+
+# Log files
+*.log
+
+# Environment variables
+.env
