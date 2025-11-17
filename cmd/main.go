@@ -5,6 +5,9 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/dukerupert/aletheia/internal/config"
@@ -84,5 +87,34 @@ func main() {
 		},
 	}))
 
-	e.Logger.Fatal(e.Start(":1323"))
+	// Start server in a goroutine
+	go func() {
+		logger.Info("starting server", slog.String("address", ":1323"))
+		if err := e.Start(":1323"); err != nil && err != http.ErrServerClosed {
+			logger.Error("server error", slog.String("err", err.Error()))
+			os.Exit(1)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("shutting down server...")
+
+	// Create shutdown context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Shutdown Echo server
+	if err := e.Shutdown(ctx); err != nil {
+		logger.Error("server forced to shutdown", slog.String("err", err.Error()))
+	}
+
+	// Close database pool
+	pool.Close()
+	logger.Info("database pool closed")
+
+	logger.Info("server exited gracefully")
 }
