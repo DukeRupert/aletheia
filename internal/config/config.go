@@ -12,21 +12,25 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
+	App      AppConfig
 	Database DatabaseConfig
 	Auth     AuthConfig
 	Session  SessionConfig
 	Logger   LoggerConfig
 }
 
-type ServerConfig struct {
+type AppConfig struct {
 	Host string
 	Port int
 	Env  string
 }
 
 type DatabaseConfig struct {
-	Path string
+	Username string
+	Password string
+	Host     string
+	Port     string
+	DbName   string
 }
 
 type AuthConfig struct {
@@ -56,7 +60,11 @@ func Load() (*Config, error) {
 	var flagPort = flag.Int("port", getEnvInt("SERVER_PORT", 8080), "server port")
 	var flagEnv = flag.String("env", getEnv("ENVIRONMENT", "prod"), "environment: prod, dev")
 	var flagLogLevel = flag.String("log_level", getEnv("LOG_LEVEL", "info"), "log level: debug, info, warn, error")
-	var flagDatabase = flag.String("database", getEnv("DATABASE_PATH", "sqlite.db"), "sqlite database file path")
+	var flagDbUser = flag.String("db_user", getEnv("DB_USER", "postgres"), "postgres database username")
+	var flagDbPassword = flag.String("db_password", getEnv("DB_PASSWORD", ""), "postgres database password")
+	var flagDbHost = flag.String("db_hostname", getEnv("DB_HOSTNAME", "localhost"), "postgres database hostname")
+	var flagDbPort = flag.String("db_port", getEnv("DB_PORT", "5432"), "postgres database port")
+	var flagDbName = flag.String("db_name", getEnv("DB_NAME", "postgres"), "postgres database name")
 	flag.Parse()
 
 	// Set up logging
@@ -73,13 +81,17 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Server: ServerConfig{
+		App: AppConfig{
 			Host: *flagHost,
 			Port: *flagPort,
 			Env:  *flagEnv,
 		},
 		Database: DatabaseConfig{
-			Path: *flagDatabase,
+			Username: *flagDbUser,
+			Password: *flagDbPassword,
+			Host:     *flagDbHost,
+			Port:     *flagDbPort,
+			DbName:   *flagDbName,
 		},
 		Auth: AuthConfig{
 			JWTSecret:     getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
@@ -96,7 +108,7 @@ func Load() (*Config, error) {
 	}
 
 	// Validate JWT secret in production
-	if (cfg.Server.Env == "prod" || cfg.Server.Env == "production") && cfg.Auth.JWTSecret == "your-secret-key-change-in-production" {
+	if (cfg.App.Env == "prod" || cfg.App.Env == "production") && cfg.Auth.JWTSecret == "your-secret-key-change-in-production" {
 		return nil, fmt.Errorf("JWT_SECRET must be set in production environment")
 	}
 
@@ -106,7 +118,7 @@ func Load() (*Config, error) {
 func (c *Config) GetLogger() slog.Handler {
 	var handler slog.Handler
 	logLevel := c.Logger.Level
-	switch c.Server.Env {
+	switch c.App.Env {
 	case "prod", "production":
 		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 			Level: logLevel,
@@ -121,6 +133,10 @@ func (c *Config) GetLogger() slog.Handler {
 		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
 	}
 	return handler
+}
+
+func (c *Config) GetConnectionString() string {
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", c.Database.Username, c.Database.Password, c.Database.Host, c.Database.Port, c.Database.DbName)
 }
 
 // Helper functions
