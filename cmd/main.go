@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/dukerupert/aletheia/internal/config"
+	"github.com/dukerupert/aletheia/internal/handlers"
+	"github.com/dukerupert/aletheia/internal/storage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -60,10 +62,25 @@ func main() {
 
 	logger.Info("database connection pool established")
 
+	// Initialize storage (local for now)
+	fileStorage, err := storage.NewLocalStorage("./uploads", "http://localhost:1323/uploads")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	e := echo.New()
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Hello, World!")
 	})
+
+	// Serve static files from uploads directory
+	e.Static("/uploads", "./uploads")
+
+	// Initialize handler
+	uploadHandler := handlers.NewUploadHandler(fileStorage)
+
+	// Routes
+	e.POST("/api/upload", uploadHandler.UploadImage)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,
