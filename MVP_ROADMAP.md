@@ -27,7 +27,7 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Create sqlc queries for photos
 - [x] Create sqlc queries for detected violations
 - [x] Create sqlc queries for safety codes
-- [ ] Create sqlc queries for reports
+- [x] Create sqlc queries for reports
 
 ## Phase 2: Authentication & User Management
 

@@ -17,6 +17,7 @@ type Querier interface {
 	CreateOrganization(ctx context.Context, name string) (Organization, error)
 	CreatePhoto(ctx context.Context, arg CreatePhotoParams) (Photo, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
+	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateSafetyCode(ctx context.Context, arg CreateSafetyCodeParams) (SafetyCode, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteDetectedViolation(ctx context.Context, id pgtype.UUID) error
@@ -24,6 +25,7 @@ type Querier interface {
 	DeleteOrganization(ctx context.Context, id pgtype.UUID) error
 	DeletePhoto(ctx context.Context, id pgtype.UUID) error
 	DeleteProject(ctx context.Context, id pgtype.UUID) error
+	DeleteReport(ctx context.Context, id pgtype.UUID) error
 	DeleteSafetyCode(ctx context.Context, id pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	GetDetectedViolation(ctx context.Context, id pgtype.UUID) (DetectedViolation, error)
@@ -33,6 +35,7 @@ type Querier interface {
 	GetOrganizationMemberByUserAndOrg(ctx context.Context, arg GetOrganizationMemberByUserAndOrgParams) (OrganizationMember, error)
 	GetPhoto(ctx context.Context, id pgtype.UUID) (Photo, error)
 	GetProject(ctx context.Context, id pgtype.UUID) (Project, error)
+	GetReport(ctx context.Context, id pgtype.UUID) (Report, error)
 	GetSafetyCode(ctx context.Context, id pgtype.UUID) (SafetyCode, error)
 	GetSafetyCodeByCode(ctx context.Context, code string) (SafetyCode, error)
 	GetUser(ctx context.Context, id pgtype.UUID) (User, error)
@@ -47,6 +50,7 @@ type Querier interface {
 	ListOrganizations(ctx context.Context) ([]Organization, error)
 	ListPhotos(ctx context.Context, inspectionID pgtype.UUID) ([]Photo, error)
 	ListProjects(ctx context.Context, organizationID pgtype.UUID) ([]Project, error)
+	ListReports(ctx context.Context, inspectionID pgtype.UUID) ([]Report, error)
 	ListSafetyCodes(ctx context.Context) ([]SafetyCode, error)
 	ListSafetyCodesByCountry(ctx context.Context, country pgtype.Text) ([]SafetyCode, error)
 	ListSafetyCodesByStateProvince(ctx context.Context, stateProvince pgtype.Text) ([]SafetyCode, error)
