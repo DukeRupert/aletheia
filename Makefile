@@ -13,3 +13,7 @@ migrate-up:
 .PHONY: migrate-down
 migrate-down:
 	goose down
+
+.PHONY: sqlc-generate
+sqlc-generate:
+	sqlc generate
