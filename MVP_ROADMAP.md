@@ -22,7 +22,7 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Create sqlc queries for users
 - [x] Create sqlc queries for organizations
 - [x] Create sqlc queries for organization members
-- [ ] Create sqlc queries for projects
+- [x] Create sqlc queries for projects
 - [ ] Create sqlc queries for inspections
 - [ ] Create sqlc queries for photos
 - [ ] Create sqlc queries for detected violations
