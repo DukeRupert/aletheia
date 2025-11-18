@@ -32,7 +32,7 @@ A construction safety inspection platform using AI to detect safety violations f
 ## Phase 2: Authentication & User Management
 
 ### User Registration & Login
-- [ ] Implement password hashing (bcrypt)
+- [x] Implement password hashing (bcrypt)
 - [ ] Create user registration endpoint
 - [ ] Create user login endpoint with JWT
 - [ ] Create JWT middleware for protected routes
