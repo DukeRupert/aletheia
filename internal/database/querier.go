@@ -12,12 +12,15 @@ import (
 
 type Querier interface {
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
+	CreateInspection(ctx context.Context, arg CreateInspectionParams) (Inspection, error)
 	CreateOrganization(ctx context.Context, name string) (Organization, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteInspection(ctx context.Context, id pgtype.UUID) error
 	DeleteOrganization(ctx context.Context, id pgtype.UUID) error
 	DeleteProject(ctx context.Context, id pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
+	GetInspection(ctx context.Context, id pgtype.UUID) (Inspection, error)
 	GetOrganization(ctx context.Context, id pgtype.UUID) (Organization, error)
 	GetOrganizationMember(ctx context.Context, id pgtype.UUID) (OrganizationMember, error)
 	GetOrganizationMemberByUserAndOrg(ctx context.Context, arg GetOrganizationMemberByUserAndOrgParams) (OrganizationMember, error)
@@ -25,6 +28,9 @@ type Querier interface {
 	GetUser(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	ListInspections(ctx context.Context, projectID pgtype.UUID) ([]Inspection, error)
+	ListInspectionsByInspector(ctx context.Context, inspectorID pgtype.UUID) ([]Inspection, error)
+	ListInspectionsByStatus(ctx context.Context, arg ListInspectionsByStatusParams) ([]Inspection, error)
 	ListOrganizationMembers(ctx context.Context, organizationID pgtype.UUID) ([]OrganizationMember, error)
 	ListOrganizations(ctx context.Context) ([]Organization, error)
 	ListProjects(ctx context.Context, organizationID pgtype.UUID) ([]Project, error)
@@ -32,6 +38,7 @@ type Querier interface {
 	ListUsers(ctx context.Context, status UserStatus) ([]User, error)
 	RemoveOrganizationMember(ctx context.Context, id pgtype.UUID) error
 	SearchOrganizationsByName(ctx context.Context, dollar_1 pgtype.Text) ([]Organization, error)
+	UpdateInspectionStatus(ctx context.Context, arg UpdateInspectionStatusParams) (Inspection, error)
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (OrganizationMember, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
