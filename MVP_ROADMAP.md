@@ -1,0 +1,231 @@
+# Aletheia MVP Roadmap
+
+A construction safety inspection platform using AI to detect safety violations from photos.
+
+## Phase 1: Core Data Layer
+
+### Database Operations
+- [ ] Create sqlc queries for organizations
+- [ ] Create sqlc queries for organization members
+- [ ] Create sqlc queries for projects
+- [ ] Create sqlc queries for inspections
+- [ ] Create sqlc queries for photos
+- [ ] Create sqlc queries for detected violations
+- [ ] Create sqlc queries for safety codes
+- [ ] Create sqlc queries for reports
+
+## Phase 2: Authentication & User Management
+
+### User Registration & Login
+- [ ] Implement password hashing (bcrypt)
+- [ ] Create user registration endpoint
+- [ ] Create user login endpoint with JWT
+- [ ] Create JWT middleware for protected routes
+- [ ] Implement email verification flow
+- [ ] Implement password reset flow
+- [ ] Create user profile endpoints (get, update)
+
+### Session Management
+- [ ] Configure session storage
+- [ ] Implement logout endpoint
+- [ ] Add token refresh mechanism
+
+## Phase 3: Organization & Project Management
+
+### Organization Setup
+- [ ] Create organization creation endpoint
+- [ ] Create organization retrieval endpoints
+- [ ] Create organization update endpoint
+- [ ] Implement organization member invitation flow
+- [ ] Create organization member management endpoints
+- [ ] Add role-based access control (admin, member, viewer)
+
+### Project Management
+- [ ] Create project creation endpoint
+- [ ] Create project listing endpoint (by organization)
+- [ ] Create project detail endpoint
+- [ ] Create project update endpoint
+- [ ] Create project deletion/archival endpoint
+
+## Phase 4: Inspection Workflow
+
+### Inspection Management
+- [ ] Create inspection creation endpoint
+- [ ] Create inspection listing endpoint (by project)
+- [ ] Create inspection detail endpoint
+- [ ] Create inspection update endpoint (status, notes)
+- [ ] Implement inspection status workflow (draft, in_progress, completed)
+
+### Photo Upload & Storage
+- [ ] Validate photo upload endpoint (already exists, verify functionality)
+- [ ] Associate photos with inspections
+- [ ] Create photo listing endpoint (by inspection)
+- [ ] Create photo detail endpoint
+- [ ] Implement photo deletion endpoint
+- [ ] Add thumbnail generation
+- [ ] Verify S3 storage integration for production
+
+## Phase 5: Safety Code Configuration
+
+### Safety Standards Management
+- [ ] Create safety code creation endpoint
+- [ ] Create safety code listing endpoint
+- [ ] Create safety code update endpoint
+- [ ] Seed database with common OSHA/safety standards
+- [ ] Add safety code categorization/tagging
+
+## Phase 6: AI Integration
+
+### AI Vision Processing
+- [ ] Choose AI provider (OpenAI Vision, Anthropic Claude, etc.)
+- [ ] Implement AI service client
+- [ ] Create prompt engineering for safety violation detection
+- [ ] Build photo analysis queue/job system
+- [ ] Create endpoint to trigger AI analysis on photos
+- [ ] Store detected violations in database
+- [ ] Map AI findings to safety codes
+- [ ] Add confidence scoring for violations
+
+### Violation Management
+- [ ] Create violation listing endpoint (by inspection)
+- [ ] Create violation detail endpoint
+- [ ] Implement violation confirmation/dismissal workflow
+- [ ] Add violation severity levels
+- [ ] Create violation update endpoint (add notes, change status)
+
+## Phase 7: Reporting
+
+### Report Generation
+- [ ] Design report template structure
+- [ ] Create report generation endpoint
+- [ ] Generate PDF reports with violations
+- [ ] Include photos in reports
+- [ ] Add report metadata (inspector, date, project info)
+- [ ] Create report listing endpoint
+- [ ] Create report download endpoint
+- [ ] Implement report sharing/export
+
+## Phase 8: Frontend Development
+
+### Authentication UI
+- [ ] Login page
+- [ ] Registration page
+- [ ] Email verification page
+- [ ] Password reset page
+- [ ] User profile page
+
+### Dashboard
+- [ ] Organization dashboard
+- [ ] Project listing view
+- [ ] Recent inspections view
+- [ ] Violation statistics/charts
+
+### Inspection Interface
+- [ ] Create new inspection form
+- [ ] Inspection detail view
+- [ ] Photo upload interface
+- [ ] Photo gallery view
+- [ ] Trigger AI analysis button
+- [ ] Violation review interface
+- [ ] Mark violations as confirmed/dismissed
+
+### Project Management UI
+- [ ] Create project form
+- [ ] Project detail view
+- [ ] Project settings page
+- [ ] Organization member management UI
+
+### Reports UI
+- [ ] Report generation form
+- [ ] Report preview
+- [ ] Report download/share
+- [ ] Report history view
+
+## Phase 9: Testing & Quality
+
+### Backend Testing
+- [ ] Write unit tests for handlers
+- [ ] Write integration tests for database operations
+- [ ] Write tests for AI service integration
+- [ ] Write tests for file storage
+- [ ] Test authentication flows
+- [ ] Test authorization/permissions
+
+### Frontend Testing
+- [ ] Component unit tests
+- [ ] Integration tests for key workflows
+- [ ] End-to-end tests for critical paths
+- [ ] Cross-browser testing
+- [ ] Mobile responsive testing
+
+## Phase 10: Deployment & Operations
+
+### Infrastructure Setup
+- [ ] Set up production PostgreSQL database
+- [ ] Configure S3 bucket and CloudFront
+- [ ] Set up environment variables/secrets management
+- [ ] Configure production logging
+- [ ] Set up error tracking (Sentry, etc.)
+- [ ] Configure backup strategy for database
+
+### Deployment
+- [ ] Create production build process
+- [ ] Set up CI/CD pipeline
+- [ ] Deploy backend to production environment
+- [ ] Deploy frontend to production environment
+- [ ] Run production migrations
+- [ ] Configure custom domain and SSL
+- [ ] Set up monitoring and alerts
+
+### Documentation
+- [ ] API documentation
+- [ ] User guide/documentation
+- [ ] Admin documentation
+- [ ] Deployment runbook
+
+## Phase 11: MVP Polish
+
+### User Experience
+- [ ] Add loading states and error messages
+- [ ] Implement proper form validation
+- [ ] Add success notifications
+- [ ] Improve error handling and user feedback
+- [ ] Add help text and tooltips
+
+### Performance
+- [ ] Optimize database queries
+- [ ] Add database indexes (verify existing)
+- [ ] Implement pagination for lists
+- [ ] Optimize image loading
+- [ ] Add caching where appropriate
+
+### Security Audit
+- [ ] Review authentication implementation
+- [ ] Test authorization on all endpoints
+- [ ] Validate input sanitization
+- [ ] Check for SQL injection vulnerabilities
+- [ ] Review file upload security
+- [ ] Test rate limiting
+- [ ] Review CORS configuration
+
+## Launch Checklist
+
+- [ ] All critical paths tested
+- [ ] Production database backed up
+- [ ] Monitoring and alerts configured
+- [ ] Error tracking operational
+- [ ] SSL certificates valid
+- [ ] Environment variables secured
+- [ ] Initial safety codes seeded
+- [ ] At least one test organization created
+- [ ] User documentation complete
+- [ ] Support contact information configured
+
+---
+
+## Notes
+
+- This roadmap is flexible - adjust as needed based on feedback and priorities
+- Some phases can be worked on in parallel (e.g., frontend while backend is being built)
+- Consider using feature flags for gradual rollout of AI features
+- MVP should focus on core workflow: Upload photos → AI detects violations → Generate report
