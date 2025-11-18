@@ -11,12 +11,18 @@ import (
 )
 
 type Querier interface {
+	CreateOrganization(ctx context.Context, name string) (Organization, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteOrganization(ctx context.Context, id pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
+	GetOrganization(ctx context.Context, id pgtype.UUID) (Organization, error)
 	GetUser(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	ListOrganizations(ctx context.Context) ([]Organization, error)
 	ListUsers(ctx context.Context, status UserStatus) ([]User, error)
+	SearchOrganizationsByName(ctx context.Context, dollar_1 pgtype.Text) ([]Organization, error)
+	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (User, error)
