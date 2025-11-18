@@ -2,9 +2,24 @@
 
 A construction safety inspection platform using AI to detect safety violations from photos.
 
+## Foundation (Completed)
+
+### Project Setup
+- [x] Go project structure established
+- [x] Echo web framework integrated
+- [x] PostgreSQL database with pgxpool connection
+- [x] Database migrations with Goose (all tables created)
+- [x] sqlc configured and integrated
+- [x] Configuration system (.env + command-line flags)
+- [x] Structured logging (slog)
+- [x] Docker Compose for local development
+- [x] Makefile with dev, build, and migration commands
+- [x] Storage abstraction layer (local + S3)
+
 ## Phase 1: Core Data Layer
 
 ### Database Operations
+- [x] Create sqlc queries for users
 - [ ] Create sqlc queries for organizations
 - [ ] Create sqlc queries for organization members
 - [ ] Create sqlc queries for projects
@@ -57,13 +72,14 @@ A construction safety inspection platform using AI to detect safety violations f
 - [ ] Implement inspection status workflow (draft, in_progress, completed)
 
 ### Photo Upload & Storage
-- [ ] Validate photo upload endpoint (already exists, verify functionality)
+- [x] Basic photo upload endpoint implemented
+- [x] Local storage implementation complete
+- [x] S3 storage implementation complete
 - [ ] Associate photos with inspections
 - [ ] Create photo listing endpoint (by inspection)
 - [ ] Create photo detail endpoint
 - [ ] Implement photo deletion endpoint
 - [ ] Add thumbnail generation
-- [ ] Verify S3 storage integration for production
 
 ## Phase 5: Safety Code Configuration
 
@@ -161,10 +177,11 @@ A construction safety inspection platform using AI to detect safety violations f
 ## Phase 10: Deployment & Operations
 
 ### Infrastructure Setup
+- [x] Set up development PostgreSQL database (Docker Compose)
+- [x] Configure environment variables management (.env + flags)
+- [x] Configure logging (slog with JSON/text modes)
 - [ ] Set up production PostgreSQL database
-- [ ] Configure S3 bucket and CloudFront
-- [ ] Set up environment variables/secrets management
-- [ ] Configure production logging
+- [ ] Configure S3 bucket and CloudFront for production
 - [ ] Set up error tracking (Sentry, etc.)
 - [ ] Configure backup strategy for database
 
