@@ -48,24 +48,46 @@ type LoggerConfig struct {
 	Level slog.Level
 }
 
+var (
+	flagsInitialized = false
+	flagHost         *string
+	flagPort         *int
+	flagEnv          *string
+	flagLogLevel     *string
+	flagDbUser       *string
+	flagDbPassword   *string
+	flagDbHost       *string
+	flagDbPort       *string
+	flagDbName       *string
+)
+
+func initFlags() {
+	if !flagsInitialized {
+		flagHost = flag.String("host", getEnv("SERVER_HOST", "localhost"), "server host")
+		flagPort = flag.Int("port", getEnvInt("SERVER_PORT", 8080), "server port")
+		flagEnv = flag.String("env", getEnv("ENVIRONMENT", "prod"), "environment: prod, dev")
+		flagLogLevel = flag.String("log_level", getEnv("LOG_LEVEL", "info"), "log level: debug, info, warn, error")
+		flagDbUser = flag.String("db_user", getEnv("DB_USER", "postgres"), "postgres database username")
+		flagDbPassword = flag.String("db_password", getEnv("DB_PASSWORD", ""), "postgres database password")
+		flagDbHost = flag.String("db_hostname", getEnv("DB_HOSTNAME", "localhost"), "postgres database hostname")
+		flagDbPort = flag.String("db_port", getEnv("DB_PORT", "5432"), "postgres database port")
+		flagDbName = flag.String("db_name", getEnv("DB_NAME", "postgres"), "postgres database name")
+		flagsInitialized = true
+	}
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+}
+
 // Load loads configuration from environment variables and command-line flags
 func Load() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Warning: .env file not found, using environment variables and defaults")
 	}
 
-	// Command-line flags
-	var flagHost = flag.String("host", getEnv("SERVER_HOST", "localhost"), "server host")
-	var flagPort = flag.Int("port", getEnvInt("SERVER_PORT", 8080), "server port")
-	var flagEnv = flag.String("env", getEnv("ENVIRONMENT", "prod"), "environment: prod, dev")
-	var flagLogLevel = flag.String("log_level", getEnv("LOG_LEVEL", "info"), "log level: debug, info, warn, error")
-	var flagDbUser = flag.String("db_user", getEnv("DB_USER", "postgres"), "postgres database username")
-	var flagDbPassword = flag.String("db_password", getEnv("DB_PASSWORD", ""), "postgres database password")
-	var flagDbHost = flag.String("db_hostname", getEnv("DB_HOSTNAME", "localhost"), "postgres database hostname")
-	var flagDbPort = flag.String("db_port", getEnv("DB_PORT", "5432"), "postgres database port")
-	var flagDbName = flag.String("db_name", getEnv("DB_NAME", "postgres"), "postgres database name")
-	flag.Parse()
+	// Initialize and parse flags
+	initFlags()
 
 	// Set up logging
 	var programLevel = new(slog.LevelVar) // Info by default

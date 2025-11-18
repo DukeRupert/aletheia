@@ -1,6 +1,6 @@
 .PHONY: build
 build:
-	go build -o bin/myapp ./cmd/myapp
+	go build -o bin/aletheia ./cmd
 
 .PHONY: dev
 dev:

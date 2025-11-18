@@ -33,7 +33,7 @@ A construction safety inspection platform using AI to detect safety violations f
 
 ### User Registration & Login
 - [x] Implement password hashing (bcrypt)
-- [ ] Create user registration endpoint
+- [x] Create user registration endpoint
 - [ ] Create user login endpoint with JWT
 - [ ] Create JWT middleware for protected routes
 - [ ] Implement email verification flow

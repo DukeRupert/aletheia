@@ -76,11 +76,13 @@ func main() {
 	// Serve static files from uploads directory
 	e.Static("/uploads", "./uploads")
 
-	// Initialize handler
+	// Initialize handlers
 	uploadHandler := handlers.NewUploadHandler(fileStorage)
+	authHandler := handlers.NewAuthHandler(pool, logger)
 
 	// Routes
 	e.POST("/api/upload", uploadHandler.UploadImage)
+	e.POST("/api/auth/register", authHandler.Register)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,
