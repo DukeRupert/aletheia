@@ -17,12 +17,14 @@ type Querier interface {
 	CreateOrganization(ctx context.Context, name string) (Organization, error)
 	CreatePhoto(ctx context.Context, arg CreatePhotoParams) (Photo, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
+	CreateSafetyCode(ctx context.Context, arg CreateSafetyCodeParams) (SafetyCode, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteDetectedViolation(ctx context.Context, id pgtype.UUID) error
 	DeleteInspection(ctx context.Context, id pgtype.UUID) error
 	DeleteOrganization(ctx context.Context, id pgtype.UUID) error
 	DeletePhoto(ctx context.Context, id pgtype.UUID) error
 	DeleteProject(ctx context.Context, id pgtype.UUID) error
+	DeleteSafetyCode(ctx context.Context, id pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	GetDetectedViolation(ctx context.Context, id pgtype.UUID) (DetectedViolation, error)
 	GetInspection(ctx context.Context, id pgtype.UUID) (Inspection, error)
@@ -31,6 +33,8 @@ type Querier interface {
 	GetOrganizationMemberByUserAndOrg(ctx context.Context, arg GetOrganizationMemberByUserAndOrgParams) (OrganizationMember, error)
 	GetPhoto(ctx context.Context, id pgtype.UUID) (Photo, error)
 	GetProject(ctx context.Context, id pgtype.UUID) (Project, error)
+	GetSafetyCode(ctx context.Context, id pgtype.UUID) (SafetyCode, error)
+	GetSafetyCodeByCode(ctx context.Context, code string) (SafetyCode, error)
 	GetUser(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
@@ -43,6 +47,9 @@ type Querier interface {
 	ListOrganizations(ctx context.Context) ([]Organization, error)
 	ListPhotos(ctx context.Context, inspectionID pgtype.UUID) ([]Photo, error)
 	ListProjects(ctx context.Context, organizationID pgtype.UUID) ([]Project, error)
+	ListSafetyCodes(ctx context.Context) ([]SafetyCode, error)
+	ListSafetyCodesByCountry(ctx context.Context, country pgtype.Text) ([]SafetyCode, error)
+	ListSafetyCodesByStateProvince(ctx context.Context, stateProvince pgtype.Text) ([]SafetyCode, error)
 	ListUserOrganizations(ctx context.Context, userID pgtype.UUID) ([]OrganizationMember, error)
 	ListUsers(ctx context.Context, status UserStatus) ([]User, error)
 	RemoveOrganizationMember(ctx context.Context, id pgtype.UUID) error
@@ -53,6 +60,7 @@ type Querier interface {
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (OrganizationMember, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
+	UpdateSafetyCode(ctx context.Context, arg UpdateSafetyCodeParams) (SafetyCode, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (User, error)
