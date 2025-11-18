@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -81,9 +82,22 @@ func initFlags() {
 
 // Load loads configuration from environment variables and command-line flags
 func Load() (*Config, error) {
+	// Try to load .env from current directory, then walk up to find it (max 2 levels)
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Warning: .env file not found, using environment variables and defaults")
+		// Walk up directories to find .env (max 2 parent directories)
+		dir, _ := os.Getwd()
+		found := false
+		for i := 0; i < 2; i++ {
+			dir = filepath.Join(dir, "..")
+			if err := godotenv.Load(filepath.Join(dir, ".env")); err == nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Println("Warning: .env file not found, using environment variables and defaults")
+		}
 	}
 
 	// Initialize and parse flags
