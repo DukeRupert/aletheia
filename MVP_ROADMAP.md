@@ -55,12 +55,12 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Create organization member management endpoints (list, add, update role, remove)
 - [x] Add role-based access control (owner, admin, member)
 
-### Project Management
-- [ ] Create project creation endpoint
-- [ ] Create project listing endpoint (by organization)
-- [ ] Create project detail endpoint
-- [ ] Create project update endpoint
-- [ ] Create project deletion/archival endpoint
+### Project Management (Completed ✓)
+- [x] Create project creation endpoint
+- [x] Create project listing endpoint (by organization)
+- [x] Create project detail endpoint
+- [x] Create project update endpoint
+- [x] Create project deletion/archival endpoint
 
 ## Phase 4: Inspection Workflow
 
