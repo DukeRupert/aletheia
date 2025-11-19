@@ -93,23 +93,24 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Seed database with common OSHA/safety standards (50+ construction safety codes)
 - [x] Add safety code categorization (country and state/province support)
 
-## Phase 6: AI Integration
+## Phase 6: AI Integration (In Progress)
 
-### AI Vision Processing
-- [ ] Choose AI provider (OpenAI Vision, Anthropic Claude, etc.)
-- [ ] Implement AI service client
-- [ ] Create prompt engineering for safety violation detection
+### AI Vision Processing (Partially Complete)
+- [x] Choose AI provider (Anthropic Claude selected)
+- [x] Implement AI service client (modular interface with Claude and mock implementations)
+- [x] Create prompt engineering for safety violation detection
+- [x] Add confidence scoring for violations
+- [x] Implement severity classification (critical/high/medium/low)
+- [x] Add location detection within images
 - [ ] Build photo analysis queue/job system
 - [ ] Create endpoint to trigger AI analysis on photos
 - [ ] Store detected violations in database
-- [ ] Map AI findings to safety codes
-- [ ] Add confidence scoring for violations
+- [ ] Map AI findings to safety codes automatically
 
 ### Violation Management
 - [ ] Create violation listing endpoint (by inspection)
 - [ ] Create violation detail endpoint
 - [ ] Implement violation confirmation/dismissal workflow
-- [ ] Add violation severity levels
 - [ ] Create violation update endpoint (add notes, change status)
 
 ## Phase 7: Reporting
