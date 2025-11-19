@@ -47,12 +47,12 @@ type SessionConfig struct {
 }
 
 type EmailConfig struct {
-	Provider         string // "mock" or "postmark"
-	PostmarkToken    string
-	PostmarkAccount  string
-	FromAddress      string
-	FromName         string
-	VerifyBaseURL    string // Base URL for verification links (e.g., "http://localhost:1323")
+	Provider        string // "mock" or "postmark"
+	PostmarkToken   string
+	PostmarkAccount string
+	FromAddress     string
+	FromName        string
+	VerifyBaseURL   string // Base URL for verification links (e.g., "http://localhost:1323")
 }
 
 type LoggerConfig struct {

@@ -92,6 +92,7 @@ func main() {
 	// Initialize handlers
 	uploadHandler := handlers.NewUploadHandler(fileStorage)
 	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
+	orgHandler := handlers.NewOrganizationHandler(pool, logger)
 
 	// Public routes
 	e.POST("/api/auth/register", authHandler.Register)
@@ -109,6 +110,19 @@ func main() {
 	protected.POST("/auth/logout", authHandler.Logout)
 	protected.GET("/auth/me", authHandler.Me)
 	protected.PUT("/auth/profile", authHandler.UpdateProfile)
+
+	// Organization routes
+	protected.POST("/organizations", orgHandler.CreateOrganization)
+	protected.GET("/organizations", orgHandler.ListOrganizations)
+	protected.GET("/organizations/:id", orgHandler.GetOrganization)
+	protected.PUT("/organizations/:id", orgHandler.UpdateOrganization)
+	protected.DELETE("/organizations/:id", orgHandler.DeleteOrganization)
+
+	// Organization member routes
+	protected.GET("/organizations/:id/members", orgHandler.ListOrganizationMembers)
+	protected.POST("/organizations/:id/members", orgHandler.AddOrganizationMember)
+	protected.PUT("/organizations/:id/members/:memberId", orgHandler.UpdateOrganizationMember)
+	protected.DELETE("/organizations/:id/members/:memberId", orgHandler.RemoveOrganizationMember)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,

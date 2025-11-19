@@ -47,13 +47,13 @@ A construction safety inspection platform using AI to detect safety violations f
 
 ## Phase 3: Organization & Project Management
 
-### Organization Setup
-- [ ] Create organization creation endpoint
-- [ ] Create organization retrieval endpoints
-- [ ] Create organization update endpoint
-- [ ] Implement organization member invitation flow
-- [ ] Create organization member management endpoints
-- [ ] Add role-based access control (admin, member, viewer)
+### Organization Setup (Completed ✓)
+- [x] Create organization creation endpoint
+- [x] Create organization retrieval endpoints (get, list)
+- [x] Create organization update endpoint
+- [x] Implement organization member invitation flow (add by email)
+- [x] Create organization member management endpoints (list, add, update role, remove)
+- [x] Add role-based access control (owner, admin, member)
 
 ### Project Management
 - [ ] Create project creation endpoint
