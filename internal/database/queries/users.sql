@@ -75,3 +75,27 @@ SET
   updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
 RETURNING *;
+
+-- name: SetPasswordResetToken :exec
+UPDATE users
+SET
+  reset_token = $2,
+  reset_token_expires_at = $3,
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = $1;
+
+-- name: GetUserByResetToken :one
+SELECT * FROM users
+WHERE reset_token = $1
+  AND reset_token_expires_at > CURRENT_TIMESTAMP
+LIMIT 1;
+
+-- name: ResetUserPassword :one
+UPDATE users
+SET
+  password_hash = $2,
+  reset_token = NULL,
+  reset_token_expires_at = NULL,
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING *;

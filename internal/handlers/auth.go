@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/dukerupert/aletheia/internal/auth"
 	"github.com/dukerupert/aletheia/internal/database"
@@ -490,5 +491,185 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "if that email exists and is not verified, a verification email has been sent",
+	})
+}
+
+type RequestPasswordResetRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+// RequestPasswordReset initiates the password reset flow
+func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
+	var req RequestPasswordResetRequest
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Email == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "email is required")
+	}
+
+	queries := database.New(h.db)
+
+	// Get user by email
+	user, err := queries.GetUserByEmail(c.Request().Context(), req.Email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			// Don't reveal if email exists or not for security
+			h.logger.Warn("password reset attempt for non-existent email", slog.String("email", req.Email))
+			return c.JSON(http.StatusOK, map[string]string{
+				"message": "if that email exists, a password reset link has been sent",
+			})
+		}
+		h.logger.Error("failed to get user", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to request password reset")
+	}
+
+	// Generate reset token
+	resetToken, err := auth.GenerateVerificationToken()
+	if err != nil {
+		h.logger.Error("failed to generate reset token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to request password reset")
+	}
+
+	// Set token expiration to 1 hour from now
+	expiresAt := pgtype.Timestamptz{
+		Time:  time.Now().Add(1 * time.Hour),
+		Valid: true,
+	}
+
+	// Save reset token to database
+	if err := queries.SetPasswordResetToken(c.Request().Context(), database.SetPasswordResetTokenParams{
+		ID:                    user.ID,
+		ResetToken:            pgtype.Text{String: resetToken, Valid: true},
+		ResetTokenExpiresAt:   expiresAt,
+	}); err != nil {
+		h.logger.Error("failed to set reset token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to request password reset")
+	}
+
+	// Send password reset email
+	if err := h.emailService.SendPasswordResetEmail(user.Email, resetToken); err != nil {
+		h.logger.Error("failed to send password reset email",
+			slog.String("user_id", user.ID.String()),
+			slog.String("err", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to send password reset email")
+	}
+
+	h.logger.Info("password reset email sent",
+		slog.String("user_id", user.ID.String()),
+		slog.String("email", user.Email),
+	)
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "if that email exists, a password reset link has been sent",
+	})
+}
+
+type VerifyResetTokenRequest struct {
+	Token string `json:"token" validate:"required"`
+}
+
+// VerifyResetToken verifies that a password reset token is valid
+func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
+	var req VerifyResetTokenRequest
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Token == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "reset token is required")
+	}
+
+	queries := database.New(h.db)
+
+	// Find user by reset token
+	user, err := queries.GetUserByResetToken(c.Request().Context(), pgtype.Text{
+		String: req.Token,
+		Valid:  true,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			h.logger.Warn("reset token verification failed", slog.String("token", req.Token))
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired reset token")
+		}
+		h.logger.Error("failed to get user by reset token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "token verification failed")
+	}
+
+	h.logger.Info("reset token verified",
+		slog.String("user_id", user.ID.String()),
+		slog.String("email", user.Email),
+	)
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "reset token is valid",
+	})
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}
+
+// ResetPassword resets a user's password using a valid reset token
+func (h *AuthHandler) ResetPassword(c echo.Context) error {
+	var req ResetPasswordRequest
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Token == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "reset token is required")
+	}
+
+	if len(req.NewPassword) < 8 {
+		return echo.NewHTTPError(http.StatusBadRequest, "password must be at least 8 characters")
+	}
+
+	queries := database.New(h.db)
+
+	// Find user by reset token
+	user, err := queries.GetUserByResetToken(c.Request().Context(), pgtype.Text{
+		String: req.Token,
+		Valid:  true,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			h.logger.Warn("password reset attempt with invalid token", slog.String("token", req.Token))
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired reset token")
+		}
+		h.logger.Error("failed to get user by reset token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "password reset failed")
+	}
+
+	// Hash new password
+	passwordHash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		h.logger.Error("failed to hash password", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to process password")
+	}
+
+	// Reset password and clear reset token
+	updatedUser, err := queries.ResetUserPassword(c.Request().Context(), database.ResetUserPasswordParams{
+		ID:           user.ID,
+		PasswordHash: passwordHash,
+	})
+	if err != nil {
+		h.logger.Error("failed to reset password", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "password reset failed")
+	}
+
+	h.logger.Info("password reset successfully",
+		slog.String("user_id", updatedUser.ID.String()),
+		slog.String("email", updatedUser.Email),
+	)
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "password reset successfully",
 	})
 }

@@ -45,6 +45,7 @@ type Querier interface {
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetUser(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByResetToken(ctx context.Context, resetToken pgtype.Text) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (User, error)
 	ListDetectedViolations(ctx context.Context, photoID pgtype.UUID) ([]DetectedViolation, error)
@@ -63,7 +64,9 @@ type Querier interface {
 	ListUserOrganizations(ctx context.Context, userID pgtype.UUID) ([]OrganizationMember, error)
 	ListUsers(ctx context.Context, status UserStatus) ([]User, error)
 	RemoveOrganizationMember(ctx context.Context, id pgtype.UUID) error
+	ResetUserPassword(ctx context.Context, arg ResetUserPasswordParams) (User, error)
 	SearchOrganizationsByName(ctx context.Context, dollar_1 pgtype.Text) ([]Organization, error)
+	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
 	UpdateDetectedViolationSafetyCode(ctx context.Context, arg UpdateDetectedViolationSafetyCodeParams) (DetectedViolation, error)
 	UpdateDetectedViolationStatus(ctx context.Context, arg UpdateDetectedViolationStatusParams) (DetectedViolation, error)

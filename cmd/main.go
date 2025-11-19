@@ -98,6 +98,9 @@ func main() {
 	e.POST("/api/auth/login", authHandler.Login)
 	e.POST("/api/auth/verify-email", authHandler.VerifyEmail)
 	e.POST("/api/auth/resend-verification", authHandler.ResendVerification)
+	e.POST("/api/auth/request-password-reset", authHandler.RequestPasswordReset)
+	e.POST("/api/auth/verify-reset-token", authHandler.VerifyResetToken)
+	e.POST("/api/auth/reset-password", authHandler.ResetPassword)
 
 	// Protected routes (require session)
 	protected := e.Group("/api")

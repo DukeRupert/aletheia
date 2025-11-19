@@ -29,21 +29,21 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Create sqlc queries for safety codes
 - [x] Create sqlc queries for reports
 
-## Phase 2: Authentication & User Management
+## Phase 2: Authentication & User Management (Completed ✓)
 
 ### User Registration & Login
 - [x] Implement password hashing (bcrypt)
 - [x] Create user registration endpoint
-- [ ] Create user login endpoint with JWT
-- [ ] Create JWT middleware for protected routes
-- [ ] Implement email verification flow
-- [ ] Implement password reset flow
-- [ ] Create user profile endpoints (get, update)
+- [x] Create user login endpoint with session-based auth
+- [x] Create session middleware for protected routes
+- [x] Implement email verification flow
+- [x] Implement password reset flow
+- [x] Create user profile endpoints (get, update)
 
 ### Session Management
-- [ ] Configure session storage
-- [ ] Implement logout endpoint
-- [ ] Add token refresh mechanism
+- [x] Configure session storage
+- [x] Implement logout endpoint
+- [ ] Add token refresh mechanism (optional - skipped for MVP)
 
 ## Phase 3: Organization & Project Management
 

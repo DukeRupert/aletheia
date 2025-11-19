@@ -1469,3 +1469,416 @@ func TestResendVerificationAlreadyVerified(t *testing.T) {
 	// Clean up
 	cleanupTestUser(t, pool, testEmail)
 }
+
+func TestRequestPasswordReset(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	testEmail := "resettest@example.com"
+	testUsername := "resettest"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register a user
+	regBody := RegisterRequest{
+		Email:    testEmail,
+		Username: testUsername,
+		Password: "securepassword123",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Request password reset
+	resetReq := RequestPasswordResetRequest{
+		Email: testEmail,
+	}
+	body, _ = json.Marshal(resetReq)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/request-password-reset", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.RequestPasswordReset(c); err != nil {
+		t.Fatalf("Failed to request password reset: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	// Verify reset token was set
+	queries := database.New(pool)
+	user, err := queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	if !user.ResetToken.Valid {
+		t.Fatal("Expected reset token to be set")
+	}
+
+	if !user.ResetTokenExpiresAt.Valid {
+		t.Fatal("Expected reset token expiration to be set")
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestRequestPasswordResetNonExistentEmail(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	// Request password reset for non-existent email
+	resetReq := RequestPasswordResetRequest{
+		Email: "nonexistent@example.com",
+	}
+	body, _ := json.Marshal(resetReq)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/request-password-reset", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.RequestPasswordReset(c); err != nil {
+		t.Fatalf("RequestPasswordReset should not error for non-existent email: %v", err)
+	}
+
+	// Should return 200 to avoid leaking whether email exists
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestVerifyResetToken(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	testEmail := "verifyreset@example.com"
+	testUsername := "verifyreset"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register a user
+	regBody := RegisterRequest{
+		Email:    testEmail,
+		Username: testUsername,
+		Password: "securepassword123",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Request password reset
+	resetReq := RequestPasswordResetRequest{
+		Email: testEmail,
+	}
+	body, _ = json.Marshal(resetReq)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/request-password-reset", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.RequestPasswordReset(c); err != nil {
+		t.Fatalf("Failed to request password reset: %v", err)
+	}
+
+	// Get the reset token from the database
+	queries := database.New(pool)
+	user, err := queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	// Verify reset token
+	verifyReq := VerifyResetTokenRequest{
+		Token: user.ResetToken.String,
+	}
+	body, _ = json.Marshal(verifyReq)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/verify-reset-token", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.VerifyResetToken(c); err != nil {
+		t.Fatalf("Failed to verify reset token: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestVerifyResetTokenInvalid(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	// Test with invalid token
+	verifyReq := VerifyResetTokenRequest{
+		Token: "invalid-token-12345",
+	}
+	body, _ := json.Marshal(verifyReq)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify-reset-token", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.VerifyResetToken(c)
+	if err == nil {
+		t.Fatal("Expected VerifyResetToken to fail with invalid token")
+	}
+
+	if he, ok := err.(*echo.HTTPError); ok {
+		if he.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d, got %d", http.StatusBadRequest, he.Code)
+		}
+	}
+}
+
+func TestResetPassword(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	testEmail := "resetpasswordtest@example.com"
+	testUsername := "resetpasswordtest"
+	oldPassword := "securepassword123"
+	newPassword := "newsecurepassword456"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register a user
+	regBody := RegisterRequest{
+		Email:    testEmail,
+		Username: testUsername,
+		Password: oldPassword,
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Request password reset
+	resetReq := RequestPasswordResetRequest{
+		Email: testEmail,
+	}
+	body, _ = json.Marshal(resetReq)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/request-password-reset", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.RequestPasswordReset(c); err != nil {
+		t.Fatalf("Failed to request password reset: %v", err)
+	}
+
+	// Get the reset token from the database
+	queries := database.New(pool)
+	user, err := queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	resetToken := user.ResetToken.String
+
+	// Reset password with new password
+	resetPasswordReq := ResetPasswordRequest{
+		Token:       resetToken,
+		NewPassword: newPassword,
+	}
+	body, _ = json.Marshal(resetPasswordReq)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.ResetPassword(c); err != nil {
+		t.Fatalf("Failed to reset password: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	// Verify reset token was cleared
+	user, err = queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	if user.ResetToken.Valid {
+		t.Error("Expected reset token to be cleared")
+	}
+
+	if user.ResetTokenExpiresAt.Valid {
+		t.Error("Expected reset token expiration to be cleared")
+	}
+
+	// Try to login with old password - should fail
+	loginReq := LoginRequest{
+		Email:    testEmail,
+		Password: oldPassword,
+	}
+	body, _ = json.Marshal(loginReq)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	err = handler.Login(c)
+	if err == nil {
+		t.Fatal("Expected login with old password to fail")
+	}
+
+	// Try to login with new password - should succeed
+	loginReq.Password = newPassword
+	body, _ = json.Marshal(loginReq)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.Login(c); err != nil {
+		t.Fatalf("Failed to login with new password: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected login to succeed with new password. Status: %d", rec.Code)
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestResetPasswordInvalidToken(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	// Try to reset password with invalid token
+	resetPasswordReq := ResetPasswordRequest{
+		Token:       "invalid-token-12345",
+		NewPassword: "newsecurepassword456",
+	}
+	body, _ := json.Marshal(resetPasswordReq)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.ResetPassword(c)
+	if err == nil {
+		t.Fatal("Expected ResetPassword to fail with invalid token")
+	}
+
+	if he, ok := err.(*echo.HTTPError); ok {
+		if he.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d, got %d", http.StatusBadRequest, he.Code)
+		}
+	}
+}
