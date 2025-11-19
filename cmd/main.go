@@ -102,6 +102,7 @@ func main() {
 	orgHandler := handlers.NewOrganizationHandler(pool, logger)
 	projectHandler := handlers.NewProjectHandler(pool, logger)
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)
+	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
 
 	// Public routes
 	e.POST("/api/auth/register", authHandler.Register)
@@ -150,6 +151,13 @@ func main() {
 	protected.GET("/inspections/:inspectionId/photos", uploadHandler.ListPhotos)
 	protected.GET("/photos/:id", uploadHandler.GetPhoto)
 	protected.DELETE("/photos/:id", uploadHandler.DeletePhoto)
+
+	// Safety code routes
+	protected.POST("/safety-codes", safetyCodeHandler.CreateSafetyCode)
+	protected.GET("/safety-codes", safetyCodeHandler.ListSafetyCodes)
+	protected.GET("/safety-codes/:id", safetyCodeHandler.GetSafetyCode)
+	protected.PUT("/safety-codes/:id", safetyCodeHandler.UpdateSafetyCode)
+	protected.DELETE("/safety-codes/:id", safetyCodeHandler.DeleteSafetyCode)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,
