@@ -75,9 +75,9 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Basic photo upload endpoint implemented
 - [x] Local storage implementation complete
 - [x] S3 storage implementation complete
-- [ ] Associate photos with inspections
-- [ ] Create photo listing endpoint (by inspection)
-- [ ] Create photo detail endpoint
+- [x] Associate photos with inspections
+- [x] Create photo listing endpoint (by inspection)
+- [x] Create photo detail endpoint
 - [ ] Implement photo deletion endpoint
 - [ ] Add thumbnail generation
 

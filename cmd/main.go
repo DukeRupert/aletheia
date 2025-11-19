@@ -90,7 +90,7 @@ func main() {
 	e.Static("/uploads", "./uploads")
 
 	// Initialize handlers
-	uploadHandler := handlers.NewUploadHandler(fileStorage)
+	uploadHandler := handlers.NewUploadHandler(fileStorage, pool, logger)
 	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
 	orgHandler := handlers.NewOrganizationHandler(pool, logger)
 	projectHandler := handlers.NewProjectHandler(pool, logger)
@@ -138,6 +138,10 @@ func main() {
 	protected.GET("/inspections/:id", inspectionHandler.GetInspection)
 	protected.GET("/projects/:projectId/inspections", inspectionHandler.ListInspections)
 	protected.PUT("/inspections/:id/status", inspectionHandler.UpdateInspectionStatus)
+
+	// Photo routes
+	protected.GET("/inspections/:inspectionId/photos", uploadHandler.ListPhotos)
+	protected.GET("/photos/:id", uploadHandler.GetPhoto)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,
