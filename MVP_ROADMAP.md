@@ -62,7 +62,7 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Create project update endpoint
 - [x] Create project deletion/archival endpoint
 
-## Phase 4: Inspection Workflow
+## Phase 4: Inspection Workflow (Completed ✓)
 
 ### Inspection Management (Completed ✓)
 - [x] Create inspection creation endpoint
@@ -71,15 +71,16 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Create inspection update endpoint (status)
 - [x] Implement inspection status workflow (draft, in_progress, completed)
 
-### Photo Upload & Storage
+### Photo Upload & Storage (Completed ✓)
 - [x] Basic photo upload endpoint implemented
 - [x] Local storage implementation complete
 - [x] S3 storage implementation complete
+- [x] Storage service made modular/configurable (local or S3 via env var)
 - [x] Associate photos with inspections
 - [x] Create photo listing endpoint (by inspection)
 - [x] Create photo detail endpoint
-- [ ] Implement photo deletion endpoint
-- [ ] Add thumbnail generation
+- [x] Implement photo deletion endpoint
+- [x] Add thumbnail generation (abstracted interface for local/S3)
 
 ## Phase 5: Safety Code Configuration
 
