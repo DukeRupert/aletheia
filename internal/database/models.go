@@ -249,6 +249,14 @@ type SafetyCode struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Session struct {
+	ID        int32              `json:"id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	Token     string             `json:"token"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type User struct {
 	ID                  pgtype.UUID        `json:"id"`
 	Email               string             `json:"email"`

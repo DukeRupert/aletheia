@@ -12,6 +12,7 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/dukerupert/aletheia/internal/handlers"
+	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -80,9 +81,16 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(fileStorage)
 	authHandler := handlers.NewAuthHandler(pool, logger)
 
-	// Routes
-	e.POST("/api/upload", uploadHandler.UploadImage)
+	// Public routes
 	e.POST("/api/auth/register", authHandler.Register)
+	e.POST("/api/auth/login", authHandler.Login)
+
+	// Protected routes (require session)
+	protected := e.Group("/api")
+	protected.Use(session.SessionMiddleware(pool))
+	protected.POST("/upload", uploadHandler.UploadImage)
+	protected.POST("/auth/logout", authHandler.Logout)
+	protected.GET("/auth/me", authHandler.Me)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,

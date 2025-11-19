@@ -19,15 +19,19 @@ type Querier interface {
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateSafetyCode(ctx context.Context, arg CreateSafetyCodeParams) (SafetyCode, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteDetectedViolation(ctx context.Context, id pgtype.UUID) error
+	DeleteExpiredSessions(ctx context.Context) error
 	DeleteInspection(ctx context.Context, id pgtype.UUID) error
 	DeleteOrganization(ctx context.Context, id pgtype.UUID) error
 	DeletePhoto(ctx context.Context, id pgtype.UUID) error
 	DeleteProject(ctx context.Context, id pgtype.UUID) error
 	DeleteReport(ctx context.Context, id pgtype.UUID) error
 	DeleteSafetyCode(ctx context.Context, id pgtype.UUID) error
+	DeleteSession(ctx context.Context, token string) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
+	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
 	GetDetectedViolation(ctx context.Context, id pgtype.UUID) (DetectedViolation, error)
 	GetInspection(ctx context.Context, id pgtype.UUID) (Inspection, error)
 	GetOrganization(ctx context.Context, id pgtype.UUID) (Organization, error)
@@ -38,6 +42,7 @@ type Querier interface {
 	GetReport(ctx context.Context, id pgtype.UUID) (Report, error)
 	GetSafetyCode(ctx context.Context, id pgtype.UUID) (SafetyCode, error)
 	GetSafetyCodeByCode(ctx context.Context, code string) (SafetyCode, error)
+	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetUser(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
