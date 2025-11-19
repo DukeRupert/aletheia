@@ -82,14 +82,16 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Implement photo deletion endpoint
 - [x] Add thumbnail generation (abstracted interface for local/S3)
 
-## Phase 5: Safety Code Configuration
+## Phase 5: Safety Code Configuration (Completed ✓)
 
-### Safety Standards Management
-- [ ] Create safety code creation endpoint
-- [ ] Create safety code listing endpoint
-- [ ] Create safety code update endpoint
-- [ ] Seed database with common OSHA/safety standards
-- [ ] Add safety code categorization/tagging
+### Safety Standards Management (Completed ✓)
+- [x] Create safety code creation endpoint
+- [x] Create safety code listing endpoint (with optional country/state filtering)
+- [x] Create safety code retrieval endpoint
+- [x] Create safety code update endpoint
+- [x] Create safety code deletion endpoint
+- [x] Seed database with common OSHA/safety standards (50+ construction safety codes)
+- [x] Add safety code categorization (country and state/province support)
 
 ## Phase 6: AI Integration
 
