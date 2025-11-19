@@ -53,3 +53,25 @@ WHERE id = $1;
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE id = $1;
+
+-- name: SetVerificationToken :exec
+UPDATE users
+SET
+  verification_token = $2,
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = $1;
+
+-- name: GetUserByVerificationToken :one
+SELECT * FROM users
+WHERE verification_token = $1
+  AND verified_at IS NULL
+LIMIT 1;
+
+-- name: VerifyUserEmail :one
+UPDATE users
+SET
+  verified_at = CURRENT_TIMESTAMP,
+  verification_token = NULL,
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING *;

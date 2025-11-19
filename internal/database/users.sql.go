@@ -155,6 +155,36 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserByVerificationToken = `-- name: GetUserByVerificationToken :one
+SELECT id, email, username, password_hash, first_name, last_name, status, status_reason, created_at, updated_at, last_login_at, verified_at, verification_token, reset_token, reset_token_expires_at FROM users
+WHERE verification_token = $1
+  AND verified_at IS NULL
+LIMIT 1
+`
+
+func (q *Queries) GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByVerificationToken, verificationToken)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.FirstName,
+		&i.LastName,
+		&i.Status,
+		&i.StatusReason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastLoginAt,
+		&i.VerifiedAt,
+		&i.VerificationToken,
+		&i.ResetToken,
+		&i.ResetTokenExpiresAt,
+	)
+	return i, err
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, email, username, password_hash, first_name, last_name, status, status_reason, created_at, updated_at, last_login_at, verified_at, verification_token, reset_token, reset_token_expires_at FROM users
 WHERE status = $1
@@ -195,6 +225,24 @@ func (q *Queries) ListUsers(ctx context.Context, status UserStatus) ([]User, err
 		return nil, err
 	}
 	return items, nil
+}
+
+const setVerificationToken = `-- name: SetVerificationToken :exec
+UPDATE users
+SET
+  verification_token = $2,
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type SetVerificationTokenParams struct {
+	ID                pgtype.UUID `json:"id"`
+	VerificationToken pgtype.Text `json:"verification_token"`
+}
+
+func (q *Queries) SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error {
+	_, err := q.db.Exec(ctx, setVerificationToken, arg.ID, arg.VerificationToken)
+	return err
 }
 
 const updateUser = `-- name: UpdateUser :one
@@ -265,6 +313,39 @@ type UpdateUserStatusParams struct {
 
 func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUserStatus, arg.ID, arg.Status, arg.StatusReason)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.FirstName,
+		&i.LastName,
+		&i.Status,
+		&i.StatusReason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastLoginAt,
+		&i.VerifiedAt,
+		&i.VerificationToken,
+		&i.ResetToken,
+		&i.ResetTokenExpiresAt,
+	)
+	return i, err
+}
+
+const verifyUserEmail = `-- name: VerifyUserEmail :one
+UPDATE users
+SET
+  verified_at = CURRENT_TIMESTAMP,
+  verification_token = NULL,
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING id, email, username, password_hash, first_name, last_name, status, status_reason, created_at, updated_at, last_login_at, verified_at, verification_token, reset_token, reset_token_expires_at
+`
+
+func (q *Queries) VerifyUserEmail(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, verifyUserEmail, id)
 	var i User
 	err := row.Scan(
 		&i.ID,

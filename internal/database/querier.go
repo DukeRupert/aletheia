@@ -46,6 +46,7 @@ type Querier interface {
 	GetUser(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (User, error)
 	ListDetectedViolations(ctx context.Context, photoID pgtype.UUID) ([]DetectedViolation, error)
 	ListDetectedViolationsByStatus(ctx context.Context, arg ListDetectedViolationsByStatusParams) ([]DetectedViolation, error)
 	ListInspections(ctx context.Context, projectID pgtype.UUID) ([]Inspection, error)
@@ -63,6 +64,7 @@ type Querier interface {
 	ListUsers(ctx context.Context, status UserStatus) ([]User, error)
 	RemoveOrganizationMember(ctx context.Context, id pgtype.UUID) error
 	SearchOrganizationsByName(ctx context.Context, dollar_1 pgtype.Text) ([]Organization, error)
+	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
 	UpdateDetectedViolationSafetyCode(ctx context.Context, arg UpdateDetectedViolationSafetyCodeParams) (DetectedViolation, error)
 	UpdateDetectedViolationStatus(ctx context.Context, arg UpdateDetectedViolationStatusParams) (DetectedViolation, error)
 	UpdateInspectionStatus(ctx context.Context, arg UpdateInspectionStatusParams) (Inspection, error)
@@ -73,6 +75,7 @@ type Querier interface {
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (User, error)
+	VerifyUserEmail(ctx context.Context, id pgtype.UUID) (User, error)
 }
 
 var _ Querier = (*Queries)(nil)

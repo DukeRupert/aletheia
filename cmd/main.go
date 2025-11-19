@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dukerupert/aletheia/internal/config"
+	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/handlers"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
@@ -69,6 +70,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Initialize email service (mock for development)
+	emailService := email.NewMockEmailService(logger)
+
 	e := echo.New()
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Hello, World!")
@@ -79,11 +83,13 @@ func main() {
 
 	// Initialize handlers
 	uploadHandler := handlers.NewUploadHandler(fileStorage)
-	authHandler := handlers.NewAuthHandler(pool, logger)
+	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
 
 	// Public routes
 	e.POST("/api/auth/register", authHandler.Register)
 	e.POST("/api/auth/login", authHandler.Login)
+	e.POST("/api/auth/verify-email", authHandler.VerifyEmail)
+	e.POST("/api/auth/resend-verification", authHandler.ResendVerification)
 
 	// Protected routes (require session)
 	protected := e.Group("/api")

@@ -12,6 +12,7 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/dukerupert/aletheia/internal/database"
+	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -60,7 +61,8 @@ func TestRegister(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -121,7 +123,8 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -183,7 +186,8 @@ func TestRegisterValidation(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -257,7 +261,8 @@ func TestLogin(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -345,7 +350,8 @@ func TestLoginInvalidPassword(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -405,7 +411,8 @@ func TestLoginNonExistentUser(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -439,7 +446,8 @@ func TestLogout(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -542,7 +550,8 @@ func TestLogoutWithoutSession(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -570,7 +579,8 @@ func TestMeEndpoint(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -683,7 +693,8 @@ func TestMeEndpointWithoutSession(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -711,7 +722,8 @@ func TestUpdateProfile(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -843,7 +855,8 @@ func TestUpdateProfilePartial(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -941,7 +954,8 @@ func TestUpdateProfileWithoutSession(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	handler := NewAuthHandler(pool, logger)
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
 
@@ -967,4 +981,396 @@ func TestUpdateProfileWithoutSession(t *testing.T) {
 			t.Errorf("Expected status %d, got %d", http.StatusUnauthorized, he.Code)
 		}
 	}
+}
+
+func TestVerifyEmail(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	testEmail := "verifytest@example.com"
+	testUsername := "verifytest"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register a user
+	regBody := RegisterRequest{
+		Email:    testEmail,
+		Username: testUsername,
+		Password: "securepassword123",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Get the verification token from the database
+	queries := database.New(pool)
+	user, err := queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	if !user.VerificationToken.Valid {
+		t.Fatal("Expected verification token to be set")
+	}
+
+	// Verify the user is not yet verified
+	if user.VerifiedAt.Valid {
+		t.Fatal("Expected user to not be verified yet")
+	}
+
+	// Test successful verification
+	verifyBody := VerifyEmailRequest{
+		Token: user.VerificationToken.String,
+	}
+	body, _ = json.Marshal(verifyBody)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/verify-email", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.VerifyEmail(c); err != nil {
+		t.Fatalf("Failed to verify email: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	// Verify the user is now verified
+	user, err = queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	if !user.VerifiedAt.Valid {
+		t.Fatal("Expected user to be verified")
+	}
+
+	if user.VerificationToken.Valid {
+		t.Fatal("Expected verification token to be cleared")
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestVerifyEmailInvalidToken(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	// Test with invalid token
+	verifyBody := VerifyEmailRequest{
+		Token: "invalid-token-12345",
+	}
+	body, _ := json.Marshal(verifyBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/verify-email", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.VerifyEmail(c)
+	if err == nil {
+		t.Fatal("Expected VerifyEmail to fail with invalid token")
+	}
+
+	if he, ok := err.(*echo.HTTPError); ok {
+		if he.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d, got %d", http.StatusBadRequest, he.Code)
+		}
+	}
+}
+
+func TestVerifyEmailAlreadyVerified(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	testEmail := "alreadyverified@example.com"
+	testUsername := "alreadyverified"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register a user
+	regBody := RegisterRequest{
+		Email:    testEmail,
+		Username: testUsername,
+		Password: "securepassword123",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Get the verification token
+	queries := database.New(pool)
+	user, err := queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	token := user.VerificationToken.String
+
+	// Verify once
+	verifyBody := VerifyEmailRequest{
+		Token: token,
+	}
+	body, _ = json.Marshal(verifyBody)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/verify-email", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.VerifyEmail(c); err != nil {
+		t.Fatalf("Failed to verify email: %v", err)
+	}
+
+	// Try to verify again with the same token
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/verify-email", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	err = handler.VerifyEmail(c)
+	if err == nil {
+		t.Fatal("Expected VerifyEmail to fail when already verified")
+	}
+
+	if he, ok := err.(*echo.HTTPError); ok {
+		if he.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d, got %d", http.StatusBadRequest, he.Code)
+		}
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestResendVerification(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	testEmail := "resendtest@example.com"
+	testUsername := "resendtest"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register a user
+	regBody := RegisterRequest{
+		Email:    testEmail,
+		Username: testUsername,
+		Password: "securepassword123",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Get the original verification token
+	queries := database.New(pool)
+	user, err := queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	originalToken := user.VerificationToken.String
+
+	// Resend verification email
+	resendBody := ResendVerificationRequest{
+		Email: testEmail,
+	}
+	body, _ = json.Marshal(resendBody)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/resend-verification", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.ResendVerification(c); err != nil {
+		t.Fatalf("Failed to resend verification: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	// Verify that a new token was generated
+	user, err = queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	if !user.VerificationToken.Valid {
+		t.Fatal("Expected verification token to be set")
+	}
+
+	if user.VerificationToken.String == originalToken {
+		t.Error("Expected new verification token to be different from original")
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestResendVerificationNonExistentEmail(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	// Test with non-existent email
+	resendBody := ResendVerificationRequest{
+		Email: "nonexistent@example.com",
+	}
+	body, _ := json.Marshal(resendBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/resend-verification", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.ResendVerification(c); err != nil {
+		t.Fatalf("ResendVerification should not error for non-existent email: %v", err)
+	}
+
+	// Should return 200 to avoid leaking whether email exists
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestResendVerificationAlreadyVerified(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	emailService := email.NewMockEmailService(logger)
+	handler := NewAuthHandler(pool, logger, emailService)
+
+	e := echo.New()
+
+	testEmail := "alreadyverifiedresend@example.com"
+	testUsername := "alreadyverifiedresend"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register a user
+	regBody := RegisterRequest{
+		Email:    testEmail,
+		Username: testUsername,
+		Password: "securepassword123",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Get the verification token and verify
+	queries := database.New(pool)
+	user, err := queries.GetUserByEmail(context.Background(), testEmail)
+	if err != nil {
+		t.Fatalf("Failed to get user: %v", err)
+	}
+
+	verifyBody := VerifyEmailRequest{
+		Token: user.VerificationToken.String,
+	}
+	body, _ = json.Marshal(verifyBody)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/verify-email", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.VerifyEmail(c); err != nil {
+		t.Fatalf("Failed to verify email: %v", err)
+	}
+
+	// Try to resend verification for already verified user
+	resendBody := ResendVerificationRequest{
+		Email: testEmail,
+	}
+	body, _ = json.Marshal(resendBody)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/resend-verification", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.ResendVerification(c); err != nil {
+		t.Fatalf("ResendVerification should not error for verified user: %v", err)
+	}
+
+	// Should return 200 to avoid leaking verification status
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/auth"
 	"github.com/dukerupert/aletheia/internal/database"
+	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -14,14 +15,16 @@ import (
 )
 
 type AuthHandler struct {
-	db     *pgxpool.Pool
-	logger *slog.Logger
+	db           *pgxpool.Pool
+	logger       *slog.Logger
+	emailService email.EmailService
 }
 
-func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger) *AuthHandler {
+func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger, emailService email.EmailService) *AuthHandler {
 	return &AuthHandler{
-		db:     db,
-		logger: logger,
+		db:           db,
+		logger:       logger,
+		emailService: emailService,
 	}
 }
 
@@ -96,6 +99,31 @@ func (h *AuthHandler) Register(c echo.Context) error {
 
 		h.logger.Error("failed to create user", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create user")
+	}
+
+	// Generate verification token
+	verificationToken, err := auth.GenerateVerificationToken()
+	if err != nil {
+		h.logger.Error("failed to generate verification token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create user")
+	}
+
+	// Save verification token to database
+	if err := queries.SetVerificationToken(c.Request().Context(), database.SetVerificationTokenParams{
+		ID:                user.ID,
+		VerificationToken: pgtype.Text{String: verificationToken, Valid: true},
+	}); err != nil {
+		h.logger.Error("failed to set verification token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create user")
+	}
+
+	// Send verification email
+	if err := h.emailService.SendVerificationEmail(user.Email, verificationToken); err != nil {
+		h.logger.Error("failed to send verification email",
+			slog.String("user_id", user.ID.String()),
+			slog.String("err", err.Error()),
+		)
+		// Don't fail registration if email fails - user can request resend
 	}
 
 	h.logger.Info("user registered successfully",
@@ -336,4 +364,131 @@ func (h *AuthHandler) UpdateProfile(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, resp)
+}
+
+type VerifyEmailRequest struct {
+	Token string `json:"token" validate:"required"`
+}
+
+// VerifyEmail verifies a user's email address using the verification token
+func (h *AuthHandler) VerifyEmail(c echo.Context) error {
+	var req VerifyEmailRequest
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Token == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "verification token is required")
+	}
+
+	queries := database.New(h.db)
+
+	// Find user by verification token
+	user, err := queries.GetUserByVerificationToken(c.Request().Context(), pgtype.Text{
+		String: req.Token,
+		Valid:  true,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			h.logger.Warn("verification attempt with invalid token", slog.String("token", req.Token))
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired verification token")
+		}
+		h.logger.Error("failed to get user by verification token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "verification failed")
+	}
+
+	// Verify the user's email
+	verifiedUser, err := queries.VerifyUserEmail(c.Request().Context(), user.ID)
+	if err != nil {
+		h.logger.Error("failed to verify user email", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "verification failed")
+	}
+
+	h.logger.Info("user email verified successfully",
+		slog.String("user_id", verifiedUser.ID.String()),
+		slog.String("email", verifiedUser.Email),
+	)
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "email verified successfully",
+	})
+}
+
+type ResendVerificationRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+// ResendVerification resends the verification email to a user
+func (h *AuthHandler) ResendVerification(c echo.Context) error {
+	var req ResendVerificationRequest
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Email == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "email is required")
+	}
+
+	queries := database.New(h.db)
+
+	// Get user by email
+	user, err := queries.GetUserByEmail(c.Request().Context(), req.Email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			// Don't reveal if email exists or not for security
+			h.logger.Warn("resend verification attempt for non-existent email", slog.String("email", req.Email))
+			return c.JSON(http.StatusOK, map[string]string{
+				"message": "if that email exists and is not verified, a verification email has been sent",
+			})
+		}
+		h.logger.Error("failed to get user", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resend verification email")
+	}
+
+	// Check if user is already verified
+	if user.VerifiedAt.Valid {
+		h.logger.Info("resend verification attempt for already verified user",
+			slog.String("user_id", user.ID.String()),
+			slog.String("email", user.Email),
+		)
+		return c.JSON(http.StatusOK, map[string]string{
+			"message": "if that email exists and is not verified, a verification email has been sent",
+		})
+	}
+
+	// Generate new verification token
+	verificationToken, err := auth.GenerateVerificationToken()
+	if err != nil {
+		h.logger.Error("failed to generate verification token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resend verification email")
+	}
+
+	// Save verification token to database
+	if err := queries.SetVerificationToken(c.Request().Context(), database.SetVerificationTokenParams{
+		ID:                user.ID,
+		VerificationToken: pgtype.Text{String: verificationToken, Valid: true},
+	}); err != nil {
+		h.logger.Error("failed to set verification token", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resend verification email")
+	}
+
+	// Send verification email
+	if err := h.emailService.SendVerificationEmail(user.Email, verificationToken); err != nil {
+		h.logger.Error("failed to send verification email",
+			slog.String("user_id", user.ID.String()),
+			slog.String("err", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to send verification email")
+	}
+
+	h.logger.Info("verification email resent",
+		slog.String("user_id", user.ID.String()),
+		slog.String("email", user.Email),
+	)
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "if that email exists and is not verified, a verification email has been sent",
+	})
 }
