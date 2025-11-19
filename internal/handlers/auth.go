@@ -265,3 +265,75 @@ func (h *AuthHandler) Me(c echo.Context) error {
 		"status":     user.Status,
 	})
 }
+
+type UpdateProfileRequest struct {
+	FirstName *string `json:"first_name"`
+	LastName  *string `json:"last_name"`
+}
+
+type UpdateProfileResponse struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+// UpdateProfile updates the current user's profile information
+func (h *AuthHandler) UpdateProfile(c echo.Context) error {
+	// Get user ID from context (set by session middleware)
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	var req UpdateProfileRequest
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	// Build update parameters
+	queries := database.New(h.db)
+
+	// Convert to pgtype.Text for nullable fields
+	var firstName, lastName pgtype.Text
+	if req.FirstName != nil {
+		firstName = pgtype.Text{String: *req.FirstName, Valid: true}
+	}
+	if req.LastName != nil {
+		lastName = pgtype.Text{String: *req.LastName, Valid: true}
+	}
+
+	// Update user
+	user, err := queries.UpdateUser(c.Request().Context(), database.UpdateUserParams{
+		ID:        pgtype.UUID{Bytes: userID, Valid: true},
+		FirstName: firstName,
+		LastName:  lastName,
+	})
+	if err != nil {
+		h.logger.Error("failed to update user", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update profile")
+	}
+
+	h.logger.Info("user profile updated",
+		slog.String("user_id", user.ID.String()),
+		slog.String("email", user.Email),
+	)
+
+	// Return updated user info
+	resp := UpdateProfileResponse{
+		ID:       user.ID.String(),
+		Email:    user.Email,
+		Username: user.Username,
+	}
+
+	if user.FirstName.Valid {
+		resp.FirstName = user.FirstName.String
+	}
+	if user.LastName.Valid {
+		resp.LastName = user.LastName.String
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}

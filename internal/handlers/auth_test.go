@@ -702,3 +702,269 @@ func TestMeEndpointWithoutSession(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateProfile(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	handler := NewAuthHandler(pool, logger)
+
+	e := echo.New()
+
+	testEmail := "updateprofile@example.com"
+	testPassword := "securepassword123"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register user
+	regBody := RegisterRequest{
+		Email:     testEmail,
+		Username:  "updateprofile",
+		Password:  testPassword,
+		FirstName: "Original",
+		LastName:  "Name",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Login to get session
+	loginBody := LoginRequest{
+		Email:    testEmail,
+		Password: testPassword,
+	}
+	body, _ = json.Marshal(loginBody)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.Login(c); err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	// Get session cookie
+	var sessionCookie *http.Cookie
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == session.SessionCookieName {
+			sessionCookie = cookie
+			break
+		}
+	}
+
+	if sessionCookie == nil {
+		t.Fatal("No session cookie found after login")
+	}
+
+	// Get session and set context
+	sess, err := session.GetSession(context.Background(), pool, sessionCookie.Value)
+	if err != nil {
+		t.Fatalf("Failed to get session: %v", err)
+	}
+
+	// Update profile
+	newFirstName := "Updated"
+	newLastName := "Profile"
+	updateBody := UpdateProfileRequest{
+		FirstName: &newFirstName,
+		LastName:  &newLastName,
+	}
+	body, _ = json.Marshal(updateBody)
+	req = httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	// Set user ID in context (simulating middleware)
+	c.Set(string(session.UserIDKey), sess.UserID.Bytes)
+
+	if err := handler.UpdateProfile(c); err != nil {
+		t.Fatalf("UpdateProfile failed: %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var updateResp UpdateProfileResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &updateResp); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	if updateResp.FirstName != newFirstName {
+		t.Errorf("Expected first_name %s, got %s", newFirstName, updateResp.FirstName)
+	}
+
+	if updateResp.LastName != newLastName {
+		t.Errorf("Expected last_name %s, got %s", newLastName, updateResp.LastName)
+	}
+
+	// Verify the update persisted by calling /me
+	req = httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.AddCookie(sessionCookie)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.Set(string(session.UserIDKey), sess.UserID.Bytes)
+
+	if err := handler.Me(c); err != nil {
+		t.Fatalf("Me endpoint failed: %v", err)
+	}
+
+	var meResp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &meResp); err != nil {
+		t.Fatalf("Failed to unmarshal me response: %v", err)
+	}
+
+	if meResp["first_name"] != newFirstName {
+		t.Errorf("Profile update did not persist. Expected first_name %s, got %v", newFirstName, meResp["first_name"])
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestUpdateProfilePartial(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	handler := NewAuthHandler(pool, logger)
+
+	e := echo.New()
+
+	testEmail := "partialupdate@example.com"
+	testPassword := "securepassword123"
+
+	// Clean up before test
+	cleanupTestUser(t, pool, testEmail)
+
+	// Register user
+	regBody := RegisterRequest{
+		Email:     testEmail,
+		Username:  "partialupdate",
+		Password:  testPassword,
+		FirstName: "Original",
+		LastName:  "Name",
+	}
+	body, _ := json.Marshal(regBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := handler.Register(c); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Login
+	loginBody := LoginRequest{
+		Email:    testEmail,
+		Password: testPassword,
+	}
+	body, _ = json.Marshal(loginBody)
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+
+	if err := handler.Login(c); err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	var sessionCookie *http.Cookie
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == session.SessionCookieName {
+			sessionCookie = cookie
+			break
+		}
+	}
+
+	sess, err := session.GetSession(context.Background(), pool, sessionCookie.Value)
+	if err != nil {
+		t.Fatalf("Failed to get session: %v", err)
+	}
+
+	// Update only first name
+	newFirstName := "OnlyFirst"
+	updateBody := UpdateProfileRequest{
+		FirstName: &newFirstName,
+	}
+	body, _ = json.Marshal(updateBody)
+	req = httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.Set(string(session.UserIDKey), sess.UserID.Bytes)
+
+	if err := handler.UpdateProfile(c); err != nil {
+		t.Fatalf("UpdateProfile failed: %v", err)
+	}
+
+	var updateResp UpdateProfileResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &updateResp); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	if updateResp.FirstName != newFirstName {
+		t.Errorf("Expected first_name %s, got %s", newFirstName, updateResp.FirstName)
+	}
+
+	// Last name should remain unchanged
+	if updateResp.LastName != "Name" {
+		t.Errorf("Expected last_name to remain 'Name', got %s", updateResp.LastName)
+	}
+
+	// Clean up
+	cleanupTestUser(t, pool, testEmail)
+}
+
+func TestUpdateProfileWithoutSession(t *testing.T) {
+	pool := getTestDB(t)
+	if pool == nil {
+		return
+	}
+	defer pool.Close()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	handler := NewAuthHandler(pool, logger)
+
+	e := echo.New()
+
+	newFirstName := "Should"
+	newLastName := "Fail"
+	updateBody := UpdateProfileRequest{
+		FirstName: &newFirstName,
+		LastName:  &newLastName,
+	}
+	body, _ := json.Marshal(updateBody)
+	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile", bytes.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err := handler.UpdateProfile(c)
+	if err == nil {
+		t.Fatal("Expected UpdateProfile to fail without session")
+	}
+
+	if he, ok := err.(*echo.HTTPError); ok {
+		if he.Code != http.StatusUnauthorized {
+			t.Errorf("Expected status %d, got %d", http.StatusUnauthorized, he.Code)
+		}
+	}
+}

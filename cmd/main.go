@@ -91,6 +91,7 @@ func main() {
 	protected.POST("/upload", uploadHandler.UploadImage)
 	protected.POST("/auth/logout", authHandler.Logout)
 	protected.GET("/auth/me", authHandler.Me)
+	protected.PUT("/auth/profile", authHandler.UpdateProfile)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,
