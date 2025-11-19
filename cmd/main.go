@@ -149,6 +149,7 @@ func main() {
 	// Photo routes
 	protected.GET("/inspections/:inspectionId/photos", uploadHandler.ListPhotos)
 	protected.GET("/photos/:id", uploadHandler.GetPhoto)
+	protected.DELETE("/photos/:id", uploadHandler.DeletePhoto)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,

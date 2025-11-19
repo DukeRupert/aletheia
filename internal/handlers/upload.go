@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"path/filepath"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
@@ -281,4 +282,85 @@ func (h *UploadHandler) GetPhoto(c echo.Context) error {
 		StorageURL:   photo.StorageUrl,
 		CreatedAt:    photo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 	})
+}
+
+// DeletePhoto deletes a photo by ID
+func (h *UploadHandler) DeletePhoto(c echo.Context) error {
+	// Get authenticated user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	photoID := c.Param("id")
+	if photoID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "photo id is required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Parse photo ID
+	photoUUID, err := parseUUID(photoID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid photo id")
+	}
+
+	// Get photo to verify access and get storage URL
+	photo, err := queries.GetPhoto(c.Request().Context(), photoUUID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "photo not found")
+	}
+
+	// Get inspection to verify access
+	inspection, err := queries.GetInspection(c.Request().Context(), photo.InspectionID)
+	if err != nil {
+		h.logger.Error("failed to get inspection for photo", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to verify access")
+	}
+
+	// Get project to find its organization
+	project, err := queries.GetProject(c.Request().Context(), inspection.ProjectID)
+	if err != nil {
+		h.logger.Error("failed to get project for inspection", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to verify access")
+	}
+
+	// Verify user is a member of the organization
+	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+		OrganizationID: project.OrganizationID,
+		UserID:         uuidToPgUUID(userID),
+	})
+	if err != nil {
+		h.logger.Warn("user not authorized to delete photo",
+			slog.String("user_id", userID.String()),
+			slog.String("photo_id", photoID))
+		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this photo's organization")
+	}
+
+	// Extract filename from storage URL
+	// The URL is like "http://localhost:1323/uploads/filename.jpg" or "https://cdn.example.com/filename.jpg"
+	filename := filepath.Base(photo.StorageUrl)
+
+	// Delete file from storage
+	if err := h.storage.Delete(c.Request().Context(), filename); err != nil {
+		h.logger.Error("failed to delete file from storage",
+			slog.String("err", err.Error()),
+			slog.String("photo_id", photoID),
+			slog.String("filename", filename))
+		// Continue with database deletion even if storage deletion fails
+		// This prevents orphaned database records
+	}
+
+	// Delete photo record from database
+	if err := queries.DeletePhoto(c.Request().Context(), photoUUID); err != nil {
+		h.logger.Error("failed to delete photo from database", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete photo")
+	}
+
+	h.logger.Info("photo deleted",
+		slog.String("photo_id", photoID),
+		slog.String("user_id", userID.String()))
+
+	return c.NoContent(http.StatusNoContent)
 }
