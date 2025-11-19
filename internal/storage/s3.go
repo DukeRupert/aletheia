@@ -17,16 +17,23 @@ import (
 	"mime/multipart"
 )
 
+// S3ClientInterface defines the S3 operations we need for storage
+type S3ClientInterface interface {
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+}
+
 // S3Storage implements FileStorage for AWS S3
 type S3Storage struct {
-	client  *s3.Client
+	client  S3ClientInterface
 	bucket  string
 	region  string
 	baseURL string // CloudFront or S3 URL
 }
 
 // NewS3Storage creates a new S3 storage instance
-func NewS3Storage(client *s3.Client, bucket, region, baseURL string) *S3Storage {
+func NewS3Storage(client S3ClientInterface, bucket, region, baseURL string) *S3Storage {
 	return &S3Storage{
 		client:  client,
 		bucket:  bucket,
