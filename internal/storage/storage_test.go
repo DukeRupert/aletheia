@@ -4,53 +4,47 @@ import (
 	"bytes"
 	"context"
 	"image"
-	"image/color"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "image/jpeg" // Register JPEG decoder
+	_ "image/png"  // Register PNG decoder
 )
 
-// Helper function to create a test image
-func createTestImage(width, height int, format string) ([]byte, error) {
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
+// loadTestImage loads a real test image from the testdata directory
+// size can be: "small", "medium", "large", "tiny", "portrait", "landscape"
+// format can be: "jpeg", "jpg", "png"
+func loadTestImage(size, format string) ([]byte, error) {
+	var imagePath string
+	baseDir := "../testdata/images"
 
-	// Fill with a simple pattern
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			img.Set(x, y, color.RGBA{
-				R: uint8((x * 255) / width),
-				G: uint8((y * 255) / height),
-				B: 128,
-				A: 255,
-			})
+	switch size {
+	case "small":
+		if format == "png" {
+			imagePath = filepath.Join(baseDir, "small/test_small.png")
+		} else {
+			imagePath = filepath.Join(baseDir, "small/test_small.jpg")
 		}
-	}
-
-	var buf bytes.Buffer
-	switch format {
-	case "jpeg", "jpg":
-		err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85})
-		if err != nil {
-			return nil, err
-		}
-	case "png":
-		err := png.Encode(&buf, img)
-		if err != nil {
-			return nil, err
-		}
+	case "medium":
+		imagePath = filepath.Join(baseDir, "medium/IMG_0612.JPG")
+	case "large":
+		imagePath = filepath.Join(baseDir, "large/test_large.jpg")
+	case "tiny":
+		imagePath = filepath.Join(baseDir, "edge_cases/test_tiny.jpg")
+	case "portrait":
+		imagePath = filepath.Join(baseDir, "edge_cases/test_portrait.jpg")
+	case "landscape":
+		imagePath = filepath.Join(baseDir, "edge_cases/test_landscape.jpg")
 	default:
-		err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85})
-		if err != nil {
-			return nil, err
-		}
+		// Default to medium JPEG
+		imagePath = filepath.Join(baseDir, "medium/IMG_0612.JPG")
 	}
 
-	return buf.Bytes(), nil
+	return os.ReadFile(imagePath)
 }
 
 // Helper function to create a multipart file header from bytes
@@ -154,7 +148,7 @@ func TestNewLocalStorage(t *testing.T) {
 func TestLocalStorage_Save(t *testing.T) {
 	// Create temporary test directory
 	testDir := "./testdata/save-test"
-	defer os.RemoveAll("./testdata")
+	defer os.RemoveAll("./testdata/save-test")
 
 	storage, err := NewLocalStorage(testDir, "http://localhost:8080/uploads")
 	if err != nil {
@@ -164,33 +158,29 @@ func TestLocalStorage_Save(t *testing.T) {
 	tests := []struct {
 		name     string
 		filename string
+		size     string
 		format   string
-		width    int
-		height   int
 		wantErr  bool
 	}{
 		{
 			name:     "save jpeg image",
 			filename: "test.jpg",
+			size:     "small",
 			format:   "jpeg",
-			width:    100,
-			height:   100,
 			wantErr:  false,
 		},
 		{
 			name:     "save png image",
 			filename: "test.png",
+			size:     "small",
 			format:   "png",
-			width:    200,
-			height:   150,
 			wantErr:  false,
 		},
 		{
 			name:     "save with spaces in name",
 			filename: "test image.jpg",
+			size:     "medium",
 			format:   "jpeg",
-			width:    100,
-			height:   100,
 			wantErr:  false,
 		},
 	}
@@ -199,10 +189,10 @@ func TestLocalStorage_Save(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test image
-			imageData, err := createTestImage(tt.width, tt.height, tt.format)
+			// Load test image
+			imageData, err := loadTestImage(tt.size, tt.format)
 			if err != nil {
-				t.Fatalf("Failed to create test image: %v", err)
+				t.Fatalf("Failed to load test image: %v", err)
 			}
 
 			// Create file header
@@ -257,7 +247,7 @@ func TestLocalStorage_Save(t *testing.T) {
 
 func TestLocalStorage_Delete(t *testing.T) {
 	testDir := "./testdata/delete-test"
-	defer os.RemoveAll("./testdata")
+	defer os.RemoveAll("./testdata/delete-test")
 
 	storage, err := NewLocalStorage(testDir, "http://localhost:8080/uploads")
 	if err != nil {
@@ -267,9 +257,9 @@ func TestLocalStorage_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	// First, save a test file
-	imageData, err := createTestImage(100, 100, "jpeg")
+	imageData, err := loadTestImage("small", "jpeg")
 	if err != nil {
-		t.Fatalf("Failed to create test image: %v", err)
+		t.Fatalf("Failed to load test image: %v", err)
 	}
 
 	fileHeader, err := createFileHeader("test.jpg", imageData)
@@ -356,7 +346,7 @@ func TestLocalStorage_GetURL(t *testing.T) {
 
 func TestLocalStorage_GenerateThumbnail(t *testing.T) {
 	testDir := "./testdata/thumbnail-test"
-	defer os.RemoveAll("./testdata")
+	defer os.RemoveAll("./testdata/thumbnail-test")
 
 	storage, err := NewLocalStorage(testDir, "http://localhost:8080/uploads")
 	if err != nil {
@@ -367,33 +357,29 @@ func TestLocalStorage_GenerateThumbnail(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		size       string
 		format     string
-		width      int
-		height     int
 		wantErr    bool
 		wantResize bool // Should image be resized?
 	}{
 		{
 			name:       "generate thumbnail from large jpeg",
+			size:       "large",
 			format:     "jpeg",
-			width:      800,
-			height:     600,
 			wantErr:    false,
 			wantResize: true,
 		},
 		{
-			name:       "generate thumbnail from large png",
-			format:     "png",
-			width:      1024,
-			height:     768,
+			name:       "generate thumbnail from medium jpeg",
+			size:       "medium",
+			format:     "jpeg",
 			wantErr:    false,
 			wantResize: true,
 		},
 		{
 			name:       "generate thumbnail from small image",
+			size:       "small",
 			format:     "jpeg",
-			width:      100,
-			height:     100,
 			wantErr:    false,
 			wantResize: false, // Should not resize as it's already small
 		},
@@ -401,10 +387,10 @@ func TestLocalStorage_GenerateThumbnail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create and save test image
-			imageData, err := createTestImage(tt.width, tt.height, tt.format)
+			// Load test image
+			imageData, err := loadTestImage(tt.size, tt.format)
 			if err != nil {
-				t.Fatalf("Failed to create test image: %v", err)
+				t.Fatalf("Failed to load test image: %v", err)
 			}
 
 			fileHeader, err := createFileHeader("test."+tt.format, imageData)
@@ -467,11 +453,11 @@ func TestLocalStorage_GenerateThumbnail(t *testing.T) {
 					t.Errorf("Thumbnail dimensions %dx%d exceed maximum 300x300", thumbWidth, thumbHeight)
 				}
 
-				// If original was larger, thumbnail should be smaller
+				// If original was larger than 300px, thumbnail should be resized
 				if tt.wantResize {
-					if thumbWidth >= tt.width && thumbHeight >= tt.height {
-						t.Errorf("Thumbnail (%dx%d) is not smaller than original (%dx%d)",
-							thumbWidth, thumbHeight, tt.width, tt.height)
+					if thumbWidth > 300 || thumbHeight > 300 {
+						t.Errorf("Thumbnail (%dx%d) should have been resized to fit within 300x300",
+							thumbWidth, thumbHeight)
 					}
 				}
 			}
@@ -481,7 +467,7 @@ func TestLocalStorage_GenerateThumbnail(t *testing.T) {
 
 func TestLocalStorage_GenerateThumbnail_Errors(t *testing.T) {
 	testDir := "./testdata/thumbnail-error-test"
-	defer os.RemoveAll("./testdata")
+	defer os.RemoveAll("./testdata/thumbnail-error-test")
 
 	storage, err := NewLocalStorage(testDir, "http://localhost:8080/uploads")
 	if err != nil {

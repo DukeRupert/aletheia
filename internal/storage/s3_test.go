@@ -111,8 +111,8 @@ func TestS3Storage_Save(t *testing.T) {
 				baseURL: "https://test-bucket.s3.amazonaws.com",
 			}
 
-			// Create test file
-			imageData, err := createTestImage(100, 100, "jpeg")
+				// Load test file
+			imageData, err := loadTestImage("small", "jpeg")
 			assert.NoError(t, err)
 
 			fileHeader, err := createFileHeader(tt.filename, imageData)
@@ -257,9 +257,8 @@ func TestS3Storage_GenerateThumbnail(t *testing.T) {
 		name           string
 		bucket         string
 		originalFile   string
+		imageSize      string
 		imageFormat    string
-		imageWidth     int
-		imageHeight    int
 		setupMock      func(*MockS3Client, []byte)
 		wantErr        bool
 		errMessage     string
@@ -269,9 +268,8 @@ func TestS3Storage_GenerateThumbnail(t *testing.T) {
 			name:         "successful thumbnail generation - jpeg",
 			bucket:       "test-bucket",
 			originalFile: "test.jpg",
+			imageSize:    "large",
 			imageFormat:  "jpeg",
-			imageWidth:   800,
-			imageHeight:  600,
 			setupMock: func(m *MockS3Client, imageData []byte) {
 				// Mock GetObject for original image
 				m.On("GetObject", mock.Anything, mock.MatchedBy(func(input *s3.GetObjectInput) bool {
@@ -294,9 +292,8 @@ func TestS3Storage_GenerateThumbnail(t *testing.T) {
 			name:         "successful thumbnail generation - png",
 			bucket:       "test-bucket",
 			originalFile: "test.png",
+			imageSize:    "small",
 			imageFormat:  "png",
-			imageWidth:   1024,
-			imageHeight:  768,
 			setupMock: func(m *MockS3Client, imageData []byte) {
 				m.On("GetObject", mock.Anything, mock.Anything).Return(&s3.GetObjectOutput{
 					Body: mockReadCloser{bytes.NewReader(imageData)},
@@ -313,9 +310,8 @@ func TestS3Storage_GenerateThumbnail(t *testing.T) {
 			name:         "download failure - object not found",
 			bucket:       "test-bucket",
 			originalFile: "nonexistent.jpg",
+			imageSize:    "small",
 			imageFormat:  "jpeg",
-			imageWidth:   100,
-			imageHeight:  100,
 			setupMock: func(m *MockS3Client, imageData []byte) {
 				m.On("GetObject", mock.Anything, mock.Anything).
 					Return(nil, errors.New("NoSuchKey: The specified key does not exist"))
@@ -327,9 +323,8 @@ func TestS3Storage_GenerateThumbnail(t *testing.T) {
 			name:         "upload failure - thumbnail upload fails",
 			bucket:       "test-bucket",
 			originalFile: "test.jpg",
+			imageSize:    "large",
 			imageFormat:  "jpeg",
-			imageWidth:   800,
-			imageHeight:  600,
 			setupMock: func(m *MockS3Client, imageData []byte) {
 				m.On("GetObject", mock.Anything, mock.Anything).Return(&s3.GetObjectOutput{
 					Body: mockReadCloser{bytes.NewReader(imageData)},
@@ -345,8 +340,8 @@ func TestS3Storage_GenerateThumbnail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test image
-			imageData, err := createTestImage(tt.imageWidth, tt.imageHeight, tt.imageFormat)
+			// Load test image
+			imageData, err := loadTestImage(tt.imageSize, tt.imageFormat)
 			assert.NoError(t, err)
 
 			mockClient := new(MockS3Client)
