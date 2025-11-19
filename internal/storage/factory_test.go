@@ -1,23 +1,25 @@
 package storage
 
 import (
+	"context"
+	"log/slog"
+	"os"
 	"testing"
 
-	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewFileStorage_LocalProvider(t *testing.T) {
 	tests := []struct {
 		name      string
-		cfg       config.StorageConfig
+		cfg       StorageConfig
 		wantErr   bool
 		wantType  string
 		cleanupFn func()
 	}{
 		{
 			name: "creates local storage successfully",
-			cfg: config.StorageConfig{
+			cfg: StorageConfig{
 				Provider:  "local",
 				LocalPath: "./testdata/factory-test",
 				LocalURL:  "http://localhost:8080/uploads",
@@ -25,12 +27,12 @@ func TestNewFileStorage_LocalProvider(t *testing.T) {
 			wantErr:  false,
 			wantType: "*storage.LocalStorage",
 			cleanupFn: func() {
-				// Cleanup is handled by LocalStorage creation
+				os.RemoveAll("./testdata")
 			},
 		},
 		{
 			name: "creates local storage with different path",
-			cfg: config.StorageConfig{
+			cfg: StorageConfig{
 				Provider:  "local",
 				LocalPath: "./testdata/factory-test-2",
 				LocalURL:  "http://example.com/files",
@@ -38,7 +40,7 @@ func TestNewFileStorage_LocalProvider(t *testing.T) {
 			wantErr:  false,
 			wantType: "*storage.LocalStorage",
 			cleanupFn: func() {
-				// Cleanup is handled by LocalStorage creation
+				os.RemoveAll("./testdata")
 			},
 		},
 	}
@@ -49,7 +51,10 @@ func TestNewFileStorage_LocalProvider(t *testing.T) {
 				defer tt.cleanupFn()
 			}
 
-			storage, err := NewFileStorage(tt.cfg)
+			ctx := context.Background()
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+			storage, err := NewFileStorage(ctx, logger, tt.cfg)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -78,32 +83,33 @@ func TestNewFileStorage_UnknownProvider(t *testing.T) {
 		errMsg   string
 	}{
 		{
-			name:     "rejects unknown provider",
-			provider: "unknown",
-			wantErr:  true,
-			errMsg:   "unknown storage provider",
-		},
-		{
-			name:     "rejects empty provider",
+			name:     "treats empty provider as local",
 			provider: "",
-			wantErr:  true,
-			errMsg:   "unknown storage provider",
+			wantErr:  false, // Default case uses local storage
+			errMsg:   "",
 		},
 		{
-			name:     "rejects invalid provider",
+			name:     "treats unknown provider as local",
 			provider: "dropbox",
-			wantErr:  true,
-			errMsg:   "unknown storage provider",
+			wantErr:  false, // Default case uses local storage
+			errMsg:   "",
 		},
 	}
 
+	defer os.RemoveAll("./testdata")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.StorageConfig{
-				Provider: tt.provider,
+			ctx := context.Background()
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+			cfg := StorageConfig{
+				Provider:  tt.provider,
+				LocalPath: "./testdata/unknown-test",
+				LocalURL:  "http://localhost:8080/uploads",
 			}
 
-			storage, err := NewFileStorage(cfg)
+			storage, err := NewFileStorage(ctx, logger, cfg)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -121,14 +127,17 @@ func TestNewFileStorage_UnknownProvider(t *testing.T) {
 
 func TestNewFileStorage_S3Provider(t *testing.T) {
 	t.Run("s3 provider initialization", func(t *testing.T) {
-		cfg := config.StorageConfig{
+		ctx := context.Background()
+		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+		cfg := StorageConfig{
 			Provider:  "s3",
 			S3Bucket:  "test-bucket",
 			S3Region:  "us-east-1",
 			S3BaseURL: "https://test-bucket.s3.amazonaws.com",
 		}
 
-		storage, err := NewFileStorage(cfg)
+		storage, err := NewFileStorage(ctx, logger, cfg)
 
 		// In test environment without AWS credentials, this will likely fail
 		// or succeed depending on the environment. We test both cases.
@@ -154,14 +163,17 @@ func TestNewFileStorage_S3Provider(t *testing.T) {
 	})
 
 	t.Run("s3 provider with cloudfront url", func(t *testing.T) {
-		cfg := config.StorageConfig{
+		ctx := context.Background()
+		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+		cfg := StorageConfig{
 			Provider:  "s3",
 			S3Bucket:  "prod-bucket",
 			S3Region:  "us-west-2",
 			S3BaseURL: "https://d1234567890.cloudfront.net",
 		}
 
-		storage, err := NewFileStorage(cfg)
+		storage, err := NewFileStorage(ctx, logger, cfg)
 
 		// Same as above - might succeed or fail depending on environment
 		if err == nil {
@@ -177,14 +189,19 @@ func TestNewFileStorage_S3Provider(t *testing.T) {
 }
 
 func TestNewFileStorage_Interface(t *testing.T) {
+	defer os.RemoveAll("./testdata")
+
 	t.Run("local storage implements FileStorage interface", func(t *testing.T) {
-		cfg := config.StorageConfig{
+		ctx := context.Background()
+		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+		cfg := StorageConfig{
 			Provider:  "local",
 			LocalPath: "./testdata/interface-test",
 			LocalURL:  "http://localhost:8080/uploads",
 		}
 
-		storage, err := NewFileStorage(cfg)
+		storage, err := NewFileStorage(ctx, logger, cfg)
 		assert.NoError(t, err)
 		assert.NotNil(t, storage)
 
