@@ -64,12 +64,12 @@ A construction safety inspection platform using AI to detect safety violations f
 
 ## Phase 4: Inspection Workflow
 
-### Inspection Management
-- [ ] Create inspection creation endpoint
-- [ ] Create inspection listing endpoint (by project)
-- [ ] Create inspection detail endpoint
-- [ ] Create inspection update endpoint (status, notes)
-- [ ] Implement inspection status workflow (draft, in_progress, completed)
+### Inspection Management (Completed ✓)
+- [x] Create inspection creation endpoint
+- [x] Create inspection listing endpoint (by project)
+- [x] Create inspection detail endpoint
+- [x] Create inspection update endpoint (status)
+- [x] Implement inspection status workflow (draft, in_progress, completed)
 
 ### Photo Upload & Storage
 - [x] Basic photo upload endpoint implemented
