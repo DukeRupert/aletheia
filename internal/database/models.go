@@ -222,6 +222,7 @@ type Photo struct {
 	InspectionID pgtype.UUID        `json:"inspection_id"`
 	StorageUrl   string             `json:"storage_url"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ThumbnailUrl pgtype.Text        `json:"thumbnail_url"`
 }
 
 type Project struct {

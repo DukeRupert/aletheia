@@ -3,11 +3,15 @@ package storage
 import (
 	"context"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"log/slog"
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -20,6 +24,7 @@ type FileStorage interface {
 	Save(ctx context.Context, file *multipart.FileHeader) (string, error)
 	Delete(ctx context.Context, filename string) error
 	GetURL(filename string) string
+	GenerateThumbnail(ctx context.Context, originalFilename string) (thumbnailFilename string, err error)
 }
 
 // StorageConfig holds configuration for storage services
@@ -127,4 +132,96 @@ func (s *LocalStorage) Delete(ctx context.Context, filename string) error {
 // GetURL returns the URL to access the file
 func (s *LocalStorage) GetURL(filename string) string {
 	return fmt.Sprintf("%s/%s", s.baseURL, filename)
+}
+
+// GenerateThumbnail creates a thumbnail from the original image
+func (s *LocalStorage) GenerateThumbnail(ctx context.Context, originalFilename string) (string, error) {
+	// Open original file
+	originalPath := filepath.Join(s.basePath, originalFilename)
+	file, err := os.Open(originalPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open original file: %w", err)
+	}
+	defer file.Close()
+
+	// Decode image
+	img, format, err := image.Decode(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	// Resize to thumbnail (300x300 max, maintaining aspect ratio)
+	thumbnail := resizeImage(img, 300, 300)
+
+	// Generate thumbnail filename
+	ext := filepath.Ext(originalFilename)
+	nameWithoutExt := strings.TrimSuffix(originalFilename, ext)
+	thumbnailFilename := fmt.Sprintf("%s_thumb%s", nameWithoutExt, ext)
+	thumbnailPath := filepath.Join(s.basePath, thumbnailFilename)
+
+	// Create thumbnail file
+	thumbFile, err := os.Create(thumbnailPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create thumbnail file: %w", err)
+	}
+	defer thumbFile.Close()
+
+	// Encode thumbnail
+	switch format {
+	case "jpeg":
+		err = jpeg.Encode(thumbFile, thumbnail, &jpeg.Options{Quality: 85})
+	case "png":
+		err = png.Encode(thumbFile, thumbnail)
+	default:
+		// Default to JPEG for unknown formats
+		err = jpeg.Encode(thumbFile, thumbnail, &jpeg.Options{Quality: 85})
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to encode thumbnail: %w", err)
+	}
+
+	return thumbnailFilename, nil
+}
+
+// resizeImage resizes an image to fit within maxWidth x maxHeight while maintaining aspect ratio
+func resizeImage(img image.Image, maxWidth, maxHeight int) image.Image {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	// Calculate new dimensions maintaining aspect ratio
+	newWidth, newHeight := width, height
+	if width > maxWidth || height > maxHeight {
+		ratio := float64(width) / float64(height)
+		if width > height {
+			newWidth = maxWidth
+			newHeight = int(float64(maxWidth) / ratio)
+		} else {
+			newHeight = maxHeight
+			newWidth = int(float64(maxHeight) * ratio)
+		}
+	}
+
+	// If image is already smaller or equal, return original
+	if newWidth >= width && newHeight >= height {
+		return img
+	}
+
+	// Create new image
+	dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+
+	// Simple nearest-neighbor resizing using the standard library
+	xRatio := float64(width) / float64(newWidth)
+	yRatio := float64(height) / float64(newHeight)
+
+	for y := 0; y < newHeight; y++ {
+		for x := 0; x < newWidth; x++ {
+			srcX := int(float64(x) * xRatio)
+			srcY := int(float64(y) * yRatio)
+			dst.Set(x, y, img.At(srcX, srcY))
+		}
+	}
+
+	return dst
 }

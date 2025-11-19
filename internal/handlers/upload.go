@@ -8,6 +8,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -28,10 +29,11 @@ func NewUploadHandler(storage storage.FileStorage, pool *pgxpool.Pool, logger *s
 
 // UploadPhotoResponse is the response payload for photo upload
 type UploadPhotoResponse struct {
-	ID           string `json:"id"`
-	InspectionID string `json:"inspection_id"`
-	StorageURL   string `json:"storage_url"`
-	CreatedAt    string `json:"created_at"`
+	ID           string  `json:"id"`
+	InspectionID string  `json:"inspection_id"`
+	StorageURL   string  `json:"storage_url"`
+	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
+	CreatedAt    string  `json:"created_at"`
 }
 
 // UploadImage handles image upload and associates it with an inspection
@@ -109,10 +111,23 @@ func (h *UploadHandler) UploadImage(c echo.Context) error {
 	// Get public URL
 	url := h.storage.GetURL(filename)
 
+	// Generate thumbnail
+	thumbnailFilename, err := h.storage.GenerateThumbnail(c.Request().Context(), filename)
+	var thumbnailURL pgtype.Text
+	if err != nil {
+		h.logger.Error("failed to generate thumbnail", slog.String("err", err.Error()))
+		// Continue without thumbnail - it's not critical
+		thumbnailURL = pgtype.Text{Valid: false}
+	} else {
+		thumbURL := h.storage.GetURL(thumbnailFilename)
+		thumbnailURL = pgtype.Text{String: thumbURL, Valid: true}
+	}
+
 	// Create photo record in database
 	photo, err := queries.CreatePhoto(c.Request().Context(), database.CreatePhotoParams{
 		InspectionID: inspectionUUID,
 		StorageUrl:   url,
+		ThumbnailUrl: thumbnailURL,
 	})
 	if err != nil {
 		h.logger.Error("failed to create photo record", slog.String("err", err.Error()))
@@ -124,20 +139,27 @@ func (h *UploadHandler) UploadImage(c echo.Context) error {
 		slog.String("inspection_id", inspectionID),
 		slog.String("user_id", userID.String()))
 
-	return c.JSON(http.StatusCreated, UploadPhotoResponse{
+	// Prepare response with optional thumbnail URL
+	response := UploadPhotoResponse{
 		ID:           photo.ID.String(),
 		InspectionID: photo.InspectionID.String(),
 		StorageURL:   photo.StorageUrl,
 		CreatedAt:    photo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	}
+	if photo.ThumbnailUrl.Valid {
+		response.ThumbnailURL = &photo.ThumbnailUrl.String
+	}
+
+	return c.JSON(http.StatusCreated, response)
 }
 
 // PhotoSummary represents a photo in the list
 type PhotoSummary struct {
-	ID           string `json:"id"`
-	InspectionID string `json:"inspection_id"`
-	StorageURL   string `json:"storage_url"`
-	CreatedAt    string `json:"created_at"`
+	ID           string  `json:"id"`
+	InspectionID string  `json:"inspection_id"`
+	StorageURL   string  `json:"storage_url"`
+	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
+	CreatedAt    string  `json:"created_at"`
 }
 
 // ListPhotosResponse is the response payload for listing photos
@@ -201,12 +223,16 @@ func (h *UploadHandler) ListPhotos(c echo.Context) error {
 
 	photoSummaries := make([]PhotoSummary, len(photos))
 	for i, photo := range photos {
-		photoSummaries[i] = PhotoSummary{
+		summary := PhotoSummary{
 			ID:           photo.ID.String(),
 			InspectionID: photo.InspectionID.String(),
 			StorageURL:   photo.StorageUrl,
 			CreatedAt:    photo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 		}
+		if photo.ThumbnailUrl.Valid {
+			summary.ThumbnailURL = &photo.ThumbnailUrl.String
+		}
+		photoSummaries[i] = summary
 	}
 
 	return c.JSON(http.StatusOK, ListPhotosResponse{
@@ -216,10 +242,11 @@ func (h *UploadHandler) ListPhotos(c echo.Context) error {
 
 // GetPhotoResponse is the response payload for photo retrieval
 type GetPhotoResponse struct {
-	ID           string `json:"id"`
-	InspectionID string `json:"inspection_id"`
-	StorageURL   string `json:"storage_url"`
-	CreatedAt    string `json:"created_at"`
+	ID           string  `json:"id"`
+	InspectionID string  `json:"inspection_id"`
+	StorageURL   string  `json:"storage_url"`
+	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
+	CreatedAt    string  `json:"created_at"`
 }
 
 // GetPhoto retrieves a photo by ID
@@ -276,12 +303,17 @@ func (h *UploadHandler) GetPhoto(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this photo's organization")
 	}
 
-	return c.JSON(http.StatusOK, GetPhotoResponse{
+	response := GetPhotoResponse{
 		ID:           photo.ID.String(),
 		InspectionID: photo.InspectionID.String(),
 		StorageURL:   photo.StorageUrl,
 		CreatedAt:    photo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	}
+	if photo.ThumbnailUrl.Valid {
+		response.ThumbnailURL = &photo.ThumbnailUrl.String
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 // DeletePhoto deletes a photo by ID
@@ -350,6 +382,18 @@ func (h *UploadHandler) DeletePhoto(c echo.Context) error {
 			slog.String("filename", filename))
 		// Continue with database deletion even if storage deletion fails
 		// This prevents orphaned database records
+	}
+
+	// Delete thumbnail if it exists
+	if photo.ThumbnailUrl.Valid {
+		thumbnailFilename := filepath.Base(photo.ThumbnailUrl.String)
+		if err := h.storage.Delete(c.Request().Context(), thumbnailFilename); err != nil {
+			h.logger.Error("failed to delete thumbnail from storage",
+				slog.String("err", err.Error()),
+				slog.String("photo_id", photoID),
+				slog.String("thumbnail_filename", thumbnailFilename))
+			// Continue even if thumbnail deletion fails
+		}
 	}
 
 	// Delete photo record from database

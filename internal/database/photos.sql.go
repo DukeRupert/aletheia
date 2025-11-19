@@ -14,26 +14,29 @@ import (
 const createPhoto = `-- name: CreatePhoto :one
 INSERT INTO photos (
   inspection_id,
-  storage_url
+  storage_url,
+  thumbnail_url
 ) VALUES (
-  $1, $2
+  $1, $2, $3
 )
-RETURNING id, inspection_id, storage_url, created_at
+RETURNING id, inspection_id, storage_url, created_at, thumbnail_url
 `
 
 type CreatePhotoParams struct {
 	InspectionID pgtype.UUID `json:"inspection_id"`
 	StorageUrl   string      `json:"storage_url"`
+	ThumbnailUrl pgtype.Text `json:"thumbnail_url"`
 }
 
 func (q *Queries) CreatePhoto(ctx context.Context, arg CreatePhotoParams) (Photo, error) {
-	row := q.db.QueryRow(ctx, createPhoto, arg.InspectionID, arg.StorageUrl)
+	row := q.db.QueryRow(ctx, createPhoto, arg.InspectionID, arg.StorageUrl, arg.ThumbnailUrl)
 	var i Photo
 	err := row.Scan(
 		&i.ID,
 		&i.InspectionID,
 		&i.StorageUrl,
 		&i.CreatedAt,
+		&i.ThumbnailUrl,
 	)
 	return i, err
 }
@@ -49,7 +52,7 @@ func (q *Queries) DeletePhoto(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getPhoto = `-- name: GetPhoto :one
-SELECT id, inspection_id, storage_url, created_at FROM photos
+SELECT id, inspection_id, storage_url, created_at, thumbnail_url FROM photos
 WHERE id = $1 LIMIT 1
 `
 
@@ -61,12 +64,13 @@ func (q *Queries) GetPhoto(ctx context.Context, id pgtype.UUID) (Photo, error) {
 		&i.InspectionID,
 		&i.StorageUrl,
 		&i.CreatedAt,
+		&i.ThumbnailUrl,
 	)
 	return i, err
 }
 
 const listPhotos = `-- name: ListPhotos :many
-SELECT id, inspection_id, storage_url, created_at FROM photos
+SELECT id, inspection_id, storage_url, created_at, thumbnail_url FROM photos
 WHERE inspection_id = $1
 ORDER BY created_at DESC
 `
@@ -85,6 +89,7 @@ func (q *Queries) ListPhotos(ctx context.Context, inspectionID pgtype.UUID) ([]P
 			&i.InspectionID,
 			&i.StorageUrl,
 			&i.CreatedAt,
+			&i.ThumbnailUrl,
 		); err != nil {
 			return nil, err
 		}
