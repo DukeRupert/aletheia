@@ -28,7 +28,7 @@ func newClaudeService(logger *slog.Logger, config AIConfig) *claudeService {
 	)
 
 	return &claudeService{
-		client:      client,
+		client:      &client,
 		logger:      logger,
 		model:       config.ClaudeModel,
 		maxTokens:   config.MaxTokens,
@@ -49,31 +49,36 @@ func (s *claudeService) AnalyzePhoto(ctx context.Context, request AnalysisReques
 	userPrompt := s.buildUserPrompt(request.InspectionContext)
 
 	// Prepare image content
-	var imageContent anthropic.MessageParamContentUnion
-	if len(request.ImageData) > 0 {
-		// Use image data
-		base64Image := base64.StdEncoding.EncodeToString(request.ImageData)
-		imageContent = anthropic.NewImageBlockParam("base64", base64Image, anthropic.ImageBlockParamSourceMediaTypePng)
-	} else if request.ImageURL != "" {
-		// Use image URL (not directly supported by Claude SDK, would need to download first)
-		return nil, fmt.Errorf("image URL not yet supported - please provide ImageData")
-	} else {
+	if len(request.ImageData) == 0 && request.ImageURL == "" {
 		return nil, fmt.Errorf("either ImageData or ImageURL must be provided")
 	}
 
+	if request.ImageURL != "" {
+		// Use image URL (not directly supported by Claude SDK, would need to download first)
+		return nil, fmt.Errorf("image URL not yet supported - please provide ImageData")
+	}
+
+	// Use image data - encode as base64
+	base64Image := base64.StdEncoding.EncodeToString(request.ImageData)
+
+	// Determine media type (assume JPEG for now, could be enhanced)
+	mediaType := "image/jpeg"
+
 	// Create the message with vision
 	message, err := s.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.F(s.model),
-		MaxTokens: anthropic.Int(int64(s.maxTokens)),
-		System: anthropic.F([]anthropic.TextBlockParam{
-			anthropic.NewTextBlock(systemPrompt),
-		}),
-		Messages: anthropic.F([]anthropic.MessageParam{
+		Model:     anthropic.Model(s.model),
+		MaxTokens: int64(s.maxTokens),
+		System: []anthropic.TextBlockParam{
+			{
+				Text: systemPrompt,
+			},
+		},
+		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(
 				anthropic.NewTextBlock(userPrompt),
-				imageContent,
+				anthropic.NewImageBlockBase64(mediaType, base64Image),
 			),
-		}),
+		},
 		Temperature: anthropic.Float(s.temperature),
 	})
 
@@ -86,8 +91,8 @@ func (s *claudeService) AnalyzePhoto(ctx context.Context, request AnalysisReques
 	// Extract text response
 	var responseText string
 	for _, content := range message.Content {
-		if textBlock, ok := content.AsUnion().(anthropic.TextBlock); ok {
-			responseText = textBlock.Text
+		if content.Type == "text" {
+			responseText += content.Text
 		}
 	}
 
