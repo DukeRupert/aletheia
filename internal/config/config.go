@@ -19,6 +19,7 @@ type Config struct {
 	Session  SessionConfig
 	Email    EmailConfig
 	Storage  StorageConfig
+	AI       AIConfig
 	Logger   LoggerConfig
 }
 
@@ -63,6 +64,14 @@ type StorageConfig struct {
 	S3Bucket   string // S3 bucket name
 	S3Region   string // S3 region
 	S3BaseURL  string // CloudFront or S3 base URL
+}
+
+type AIConfig struct {
+	Provider     string  // "mock" or "claude"
+	ClaudeAPIKey string  // Anthropic API key
+	ClaudeModel  string  // Claude model to use
+	MaxTokens    int     // Maximum tokens for AI responses
+	Temperature  float64 // Temperature for AI responses (0.0 - 1.0)
 }
 
 type LoggerConfig struct {
@@ -174,6 +183,13 @@ func Load() (*Config, error) {
 			S3Region:  getEnv("STORAGE_S3_REGION", "us-east-1"),
 			S3BaseURL: getEnv("STORAGE_S3_BASE_URL", ""),
 		},
+		AI: AIConfig{
+			Provider:     getEnv("AI_PROVIDER", "mock"),
+			ClaudeAPIKey: getEnv("CLAUDE_API_KEY", ""),
+			ClaudeModel:  getEnv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022"),
+			MaxTokens:    getEnvInt("AI_MAX_TOKENS", 4096),
+			Temperature:  getEnvFloat("AI_TEMPERATURE", 0.3),
+		},
 		Logger: LoggerConfig{
 			Level: programLevel.Level(),
 		},
@@ -224,6 +240,16 @@ func getEnvInt(key string, defaultValue int) int {
 		var intValue int
 		if _, err := fmt.Sscanf(value, "%d", &intValue); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		var floatValue float64
+		if _, err := fmt.Sscanf(value, "%f", &floatValue); err == nil {
+			return floatValue
 		}
 	}
 	return defaultValue
