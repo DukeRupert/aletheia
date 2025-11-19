@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 )
 
@@ -17,6 +20,51 @@ type FileStorage interface {
 	Save(ctx context.Context, file *multipart.FileHeader) (string, error)
 	Delete(ctx context.Context, filename string) error
 	GetURL(filename string) string
+}
+
+// StorageConfig holds configuration for storage services
+type StorageConfig struct {
+	Provider  string // "local" or "s3"
+	LocalPath string // Path for local storage
+	LocalURL  string // Base URL for local storage
+	S3Bucket  string // S3 bucket name
+	S3Region  string // S3 region
+	S3BaseURL string // CloudFront or S3 base URL
+}
+
+// NewFileStorage creates a file storage instance based on the provider configuration
+func NewFileStorage(ctx context.Context, logger *slog.Logger, cfg StorageConfig) (FileStorage, error) {
+	switch cfg.Provider {
+	case "s3":
+		// Load AWS configuration
+		awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.S3Region))
+		if err != nil {
+			return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		}
+
+		// Create S3 client
+		s3Client := s3.NewFromConfig(awsCfg)
+
+		logger.Info("initialized S3 storage",
+			slog.String("bucket", cfg.S3Bucket),
+			slog.String("region", cfg.S3Region),
+		)
+
+		return NewS3Storage(s3Client, cfg.S3Bucket, cfg.S3Region, cfg.S3BaseURL), nil
+
+	default: // "local"
+		storage, err := NewLocalStorage(cfg.LocalPath, cfg.LocalURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create local storage: %w", err)
+		}
+
+		logger.Info("initialized local storage",
+			slog.String("path", cfg.LocalPath),
+			slog.String("url", cfg.LocalURL),
+		)
+
+		return storage, nil
+	}
 }
 
 // LocalStorage implements FileStorage for local disk storage

@@ -18,6 +18,7 @@ type Config struct {
 	Auth     AuthConfig
 	Session  SessionConfig
 	Email    EmailConfig
+	Storage  StorageConfig
 	Logger   LoggerConfig
 }
 
@@ -53,6 +54,15 @@ type EmailConfig struct {
 	FromAddress     string
 	FromName        string
 	VerifyBaseURL   string // Base URL for verification links (e.g., "http://localhost:1323")
+}
+
+type StorageConfig struct {
+	Provider   string // "local" or "s3"
+	LocalPath  string // Path for local storage
+	LocalURL   string // Base URL for local storage
+	S3Bucket   string // S3 bucket name
+	S3Region   string // S3 region
+	S3BaseURL  string // CloudFront or S3 base URL
 }
 
 type LoggerConfig struct {
@@ -155,6 +165,14 @@ func Load() (*Config, error) {
 			FromAddress:     getEnv("EMAIL_FROM_ADDRESS", "noreply@example.com"),
 			FromName:        getEnv("EMAIL_FROM_NAME", "Aletheia"),
 			VerifyBaseURL:   getEnv("EMAIL_VERIFY_BASE_URL", "http://localhost:1323"),
+		},
+		Storage: StorageConfig{
+			Provider:  getEnv("STORAGE_PROVIDER", "local"),
+			LocalPath: getEnv("STORAGE_LOCAL_PATH", "./uploads"),
+			LocalURL:  getEnv("STORAGE_LOCAL_URL", "http://localhost:1323/uploads"),
+			S3Bucket:  getEnv("STORAGE_S3_BUCKET", ""),
+			S3Region:  getEnv("STORAGE_S3_REGION", "us-east-1"),
+			S3BaseURL: getEnv("STORAGE_S3_BASE_URL", ""),
 		},
 		Logger: LoggerConfig{
 			Level: programLevel.Level(),

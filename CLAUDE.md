@@ -55,6 +55,15 @@ Configuration is loaded from `.env` file (required) and can be overridden with c
 - `LOG_LEVEL` - "debug", "info", "warn", "error"
 - `DB_USER`, `DB_PASSWORD`, `DB_HOSTNAME`, `DB_PORT`, `DB_NAME` - PostgreSQL connection
 - `JWT_SECRET` - Must be set in production (validation enforced)
+- `STORAGE_PROVIDER` - "local" or "s3" (default: "local")
+- `STORAGE_LOCAL_PATH` - Path for local storage (default: "./uploads")
+- `STORAGE_LOCAL_URL` - Base URL for local storage (default: "http://localhost:1323/uploads")
+- `STORAGE_S3_BUCKET` - S3 bucket name (required when using S3)
+- `STORAGE_S3_REGION` - S3 region (default: "us-east-1")
+- `STORAGE_S3_BASE_URL` - CloudFront or S3 base URL (required when using S3)
+- `EMAIL_PROVIDER` - "mock" or "postmark" (default: "mock")
+- `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` - Email sender configuration
+- `EMAIL_VERIFY_BASE_URL` - Base URL for verification links
 
 ## Architecture
 
@@ -80,7 +89,7 @@ The `storage.FileStorage` interface (`internal/storage/storage.go`) provides plu
 - **LocalStorage**: Development/testing - stores files in `./uploads` directory
 - **S3Storage**: Production - uploads to AWS S3 with CloudFront support
 
-To switch storage implementations, modify the initialization in `cmd/main.go:66`. See `notes.md` for S3 setup example.
+Storage is configured via the `STORAGE_PROVIDER` environment variable. The `storage.NewFileStorage()` factory function automatically initializes the appropriate storage implementation based on configuration (similar to the email service pattern). To switch between local and S3 storage, update the `STORAGE_PROVIDER` variable in your `.env` file.
 
 ### Request Flow
 

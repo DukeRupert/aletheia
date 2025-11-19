@@ -64,8 +64,15 @@ func main() {
 
 	logger.Info("database connection pool established")
 
-	// Initialize storage (local for now)
-	fileStorage, err := storage.NewLocalStorage("./uploads", "http://localhost:1323/uploads")
+	// Initialize storage service (configured via STORAGE_PROVIDER env var)
+	fileStorage, err := storage.NewFileStorage(context.Background(), logger, storage.StorageConfig{
+		Provider:  cfg.Storage.Provider,
+		LocalPath: cfg.Storage.LocalPath,
+		LocalURL:  cfg.Storage.LocalURL,
+		S3Bucket:  cfg.Storage.S3Bucket,
+		S3Region:  cfg.Storage.S3Region,
+		S3BaseURL: cfg.Storage.S3BaseURL,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
