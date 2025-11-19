@@ -61,7 +61,12 @@ func TestRegister(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -123,7 +128,12 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -186,7 +196,12 @@ func TestRegisterValidation(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -261,7 +276,12 @@ func TestLogin(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -350,7 +370,12 @@ func TestLoginInvalidPassword(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -411,7 +436,12 @@ func TestLoginNonExistentUser(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -446,7 +476,12 @@ func TestLogout(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -550,7 +585,12 @@ func TestLogoutWithoutSession(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -579,7 +619,12 @@ func TestMeEndpoint(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -693,7 +738,12 @@ func TestMeEndpointWithoutSession(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -722,7 +772,12 @@ func TestUpdateProfile(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -855,7 +910,12 @@ func TestUpdateProfilePartial(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -954,7 +1014,12 @@ func TestUpdateProfileWithoutSession(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -991,7 +1056,12 @@ func TestVerifyEmail(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -1078,7 +1148,12 @@ func TestVerifyEmailInvalidToken(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -1113,7 +1188,12 @@ func TestVerifyEmailAlreadyVerified(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -1192,7 +1272,12 @@ func TestResendVerification(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -1272,7 +1357,12 @@ func TestResendVerificationNonExistentEmail(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()
@@ -1305,7 +1395,12 @@ func TestResendVerificationAlreadyVerified(t *testing.T) {
 	defer pool.Close()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	emailService := email.NewMockEmailService(logger)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:      "mock",
+		FromAddress:   "test@example.com",
+		FromName:      "Test",
+		VerifyBaseURL: "http://localhost:1323",
+	})
 	handler := NewAuthHandler(pool, logger, emailService)
 
 	e := echo.New()

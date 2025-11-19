@@ -70,8 +70,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Initialize email service (mock for development)
-	emailService := email.NewMockEmailService(logger)
+	// Initialize email service (configured via EMAIL_PROVIDER env var)
+	emailService := email.NewEmailService(logger, email.EmailConfig{
+		Provider:        cfg.Email.Provider,
+		PostmarkToken:   cfg.Email.PostmarkToken,
+		PostmarkAccount: cfg.Email.PostmarkAccount,
+		FromAddress:     cfg.Email.FromAddress,
+		FromName:        cfg.Email.FromName,
+		VerifyBaseURL:   cfg.Email.VerifyBaseURL,
+	})
+	logger.Info("email service initialized", slog.String("provider", cfg.Email.Provider))
 
 	e := echo.New()
 	e.GET("/", func(c echo.Context) error {

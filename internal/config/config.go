@@ -17,6 +17,7 @@ type Config struct {
 	Database DatabaseConfig
 	Auth     AuthConfig
 	Session  SessionConfig
+	Email    EmailConfig
 	Logger   LoggerConfig
 }
 
@@ -43,6 +44,15 @@ type SessionConfig struct {
 	CookieName string
 	Duration   time.Duration
 	Secure     bool
+}
+
+type EmailConfig struct {
+	Provider         string // "mock" or "postmark"
+	PostmarkToken    string
+	PostmarkAccount  string
+	FromAddress      string
+	FromName         string
+	VerifyBaseURL    string // Base URL for verification links (e.g., "http://localhost:1323")
 }
 
 type LoggerConfig struct {
@@ -137,6 +147,14 @@ func Load() (*Config, error) {
 			CookieName: "session_token",
 			Duration:   24 * time.Hour * 7, // 7 days
 			Secure:     *flagEnv == "prod" || *flagEnv == "production",
+		},
+		Email: EmailConfig{
+			Provider:        getEnv("EMAIL_PROVIDER", "mock"),
+			PostmarkToken:   getEnv("POSTMARK_SERVER_TOKEN", ""),
+			PostmarkAccount: getEnv("POSTMARK_ACCOUNT_TOKEN", ""),
+			FromAddress:     getEnv("EMAIL_FROM_ADDRESS", "noreply@example.com"),
+			FromName:        getEnv("EMAIL_FROM_NAME", "Aletheia"),
+			VerifyBaseURL:   getEnv("EMAIL_VERIFY_BASE_URL", "http://localhost:1323"),
 		},
 		Logger: LoggerConfig{
 			Level: programLevel.Level(),
