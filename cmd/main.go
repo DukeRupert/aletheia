@@ -136,7 +136,7 @@ func main() {
 
 	// Initialize handlers
 	logger.Debug("initializing HTTP handlers")
-	pageHandler := handlers.NewPageHandler()
+	pageHandler := handlers.NewPageHandler(pool, logger)
 	uploadHandler := handlers.NewUploadHandler(fileStorage, pool, logger)
 	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
 	orgHandler := handlers.NewOrganizationHandler(pool, logger)
@@ -165,6 +165,8 @@ func main() {
 	protectedPages := e.Group("")
 	protectedPages.Use(session.SessionMiddleware(pool))
 	protectedPages.GET("/dashboard", pageHandler.DashboardPage)
+	protectedPages.GET("/projects", pageHandler.ProjectsPage)
+	protectedPages.GET("/projects/new", pageHandler.NewProjectPage)
 
 	// Protected API routes (require session)
 	protected := e.Group("/api")

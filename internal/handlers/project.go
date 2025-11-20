@@ -24,8 +24,8 @@ func NewProjectHandler(pool *pgxpool.Pool, logger *slog.Logger) *ProjectHandler 
 
 // CreateProjectRequest is the request payload for creating a project
 type CreateProjectRequest struct {
-	OrganizationID string `json:"organization_id" validate:"required"`
-	Name           string `json:"name" validate:"required,min=1,max=255"`
+	OrganizationID string `json:"organization_id" form:"organization_id" validate:"required"`
+	Name           string `json:"name" form:"name" validate:"required,min=1,max=255"`
 }
 
 // CreateProjectResponse is the response payload for project creation
@@ -98,6 +98,14 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 		slog.String("org_id", req.OrganizationID),
 		slog.String("user_id", userID.String()))
 
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - redirect to projects list
+		c.Response().Header().Set("HX-Redirect", "/projects")
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusCreated, CreateProjectResponse{
 		ID:             project.ID.String(),
 		OrganizationID: project.OrganizationID.String(),

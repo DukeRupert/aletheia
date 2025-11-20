@@ -1,0 +1,61 @@
+{{template "base" .}}
+
+{{define "title"}}New Project - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div style="max-width: 600px; margin: 3rem auto;">
+    <div class="card">
+      <h1>Create New Project</h1>
+      <p>Create a construction project for safety inspections.</p>
+
+      <form
+        hx-post="/api/projects"
+        hx-target="#project-form"
+        hx-swap="outerHTML"
+        id="project-form"
+        class="stack">
+
+        {{if .Organizations}}
+          <div class="form-field">
+            <label for="organization_id">Organization</label>
+            <select
+              id="organization_id"
+              name="organization_id"
+              required
+              autofocus>
+              <option value="">Select an organization</option>
+              {{range .Organizations}}
+                <option value="{{.ID}}">{{.Name}}</option>
+              {{end}}
+            </select>
+            <small class="help-text">Select the organization this project belongs to</small>
+          </div>
+
+          <div class="form-field">
+            <label for="name">Project Name</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              required
+              maxlength="255"
+              placeholder="e.g., Main Street Construction">
+            <small class="help-text">Enter a descriptive name for the project</small>
+          </div>
+
+          <div style="display: flex; gap: var(--space-sm);">
+            <button type="submit" class="btn-primary">Create Project</button>
+            <a href="/projects" class="btn-secondary">Cancel</a>
+          </div>
+        {{else}}
+          <div class="alert alert-warning">
+            <strong>No Organizations:</strong> You need to create or join an organization before creating projects.
+          </div>
+          <a href="/organizations" class="btn-primary">Go to Organizations</a>
+        {{end}}
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

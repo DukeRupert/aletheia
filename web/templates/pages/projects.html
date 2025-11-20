@@ -1,0 +1,36 @@
+{{template "base" .}}
+
+{{define "title"}}Projects - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div class="stack" style="margin-top: var(--space-xl);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>Projects</h1>
+      <a href="/projects/new" class="btn-primary">New Project</a>
+    </div>
+
+    {{if .Projects}}
+      <div class="grid">
+        {{range .Projects}}
+          <div class="card">
+            <h3>{{.Name}}</h3>
+            <p style="color: #666; font-size: 0.875rem;">
+              Created {{.CreatedAt.Format "Jan 2, 2006"}}
+            </p>
+            <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+              <a href="/projects/{{.ID}}" class="btn-primary">View</a>
+              <a href="/projects/{{.ID}}/inspections" class="btn-secondary">Inspections</a>
+            </div>
+          </div>
+        {{end}}
+      </div>
+    {{else}}
+      <div class="card" style="text-align: center; padding: var(--space-2xl);">
+        <p style="color: #666; margin-bottom: var(--space-lg);">No projects yet. Create your first project to get started.</p>
+        <a href="/projects/new" class="btn-primary">Create Project</a>
+      </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

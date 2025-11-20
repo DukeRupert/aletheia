@@ -1,17 +1,27 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
+	"github.com/dukerupert/aletheia/internal/database"
+	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
 
 // PageHandler handles template rendering for HTML pages
-type PageHandler struct{}
+type PageHandler struct {
+	pool   *pgxpool.Pool
+	logger *slog.Logger
+}
 
 // NewPageHandler creates a new page handler
-func NewPageHandler() *PageHandler {
-	return &PageHandler{}
+func NewPageHandler(pool *pgxpool.Pool, logger *slog.Logger) *PageHandler {
+	return &PageHandler{
+		pool:   pool,
+		logger: logger,
+	}
 }
 
 // HomePage renders the home page
@@ -84,4 +94,81 @@ func (h *PageHandler) ForgotPasswordPage(c echo.Context) error {
 		"IsAuthenticated": false,
 	}
 	return c.Render(http.StatusOK, "forgot-password.html", data)
+}
+
+// ProjectsPage renders the projects list page
+func (h *PageHandler) ProjectsPage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Get user's organizations to get their projects
+	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	if err != nil {
+		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
+		memberships = []database.OrganizationMember{}
+	}
+
+	// Get all projects from user's organizations
+	var allProjects []database.Project
+	for _, membership := range memberships {
+		projects, err := queries.ListProjects(c.Request().Context(), membership.OrganizationID)
+		if err != nil {
+			h.logger.Error("failed to list projects", slog.String("err", err.Error()))
+			continue
+		}
+		allProjects = append(allProjects, projects...)
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User": map[string]interface{}{
+			"Name": "User",
+		},
+		"Projects": allProjects,
+	}
+	return c.Render(http.StatusOK, "projects.html", data)
+}
+
+// NewProjectPage renders the new project form page
+func (h *PageHandler) NewProjectPage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Get user's organizations where they can create projects (owner/admin)
+	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	if err != nil {
+		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
+		memberships = []database.OrganizationMember{}
+	}
+
+	// Filter to only orgs where user is owner or admin
+	var organizations []database.Organization
+	for _, membership := range memberships {
+		if membership.Role == database.OrganizationRoleOwner || membership.Role == database.OrganizationRoleAdmin {
+			org, err := queries.GetOrganization(c.Request().Context(), membership.OrganizationID)
+			if err != nil {
+				continue
+			}
+			organizations = append(organizations, org)
+		}
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User": map[string]interface{}{
+			"Name": "User",
+		},
+		"Organizations": organizations,
+	}
+	return c.Render(http.StatusOK, "new-project.html", data)
 }
