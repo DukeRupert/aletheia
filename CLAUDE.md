@@ -12,6 +12,7 @@ Aletheia is a Go-based construction safety inspection platform that uses AI to d
 - **Web Framework**: Echo v4
 - **Database**: PostgreSQL with pgx/v5 connection pool
 - **Storage**: Pluggable interface supporting local filesystem and AWS S3
+- **Queue**: Pluggable job queue supporting PostgreSQL (Redis planned for future)
 - **Migrations**: Goose (SQL migrations in `internal/migrations/`)
 - **Configuration**: Environment variables via godotenv + command-line flags
 - **Logging**: slog (JSON in production, text in development)
@@ -64,6 +65,11 @@ Configuration is loaded from `.env` file (required) and can be overridden with c
 - `EMAIL_PROVIDER` - "mock" or "postmark" (default: "mock")
 - `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME` - Email sender configuration
 - `EMAIL_VERIFY_BASE_URL` - Base URL for verification links
+- `QUEUE_PROVIDER` - "postgres" or "redis" (default: "postgres")
+- `QUEUE_WORKER_COUNT` - Number of concurrent workers (default: 3)
+- `QUEUE_POLL_INTERVAL` - How often to poll for jobs (default: "1s")
+- `QUEUE_JOB_TIMEOUT` - Job processing timeout (default: "60s")
+- `QUEUE_ENABLE_RATE_LIMITING` - Enable per-organization rate limits (default: true)
 
 ## Architecture
 
@@ -91,14 +97,56 @@ The `storage.FileStorage` interface (`internal/storage/storage.go`) provides plu
 
 Storage is configured via the `STORAGE_PROVIDER` environment variable. The `storage.NewFileStorage()` factory function automatically initializes the appropriate storage implementation based on configuration (similar to the email service pattern). To switch between local and S3 storage, update the `STORAGE_PROVIDER` variable in your `.env` file.
 
+### Queue System
+
+The `queue.Queue` interface (`internal/queue/queue.go`) provides a pluggable job queue for async background processing:
+
+- **PostgresQueue**: Production-ready PostgreSQL implementation using `SELECT FOR UPDATE SKIP LOCKED`
+- **RedisQueue**: Planned for high-performance scenarios (not yet implemented)
+- **MockQueue**: In-memory implementation for testing
+
+**Key Features:**
+- Job priorities and delayed scheduling
+- Automatic retry with exponential backoff (1min → 2min → 4min)
+- Per-organization rate limiting (hourly quotas + concurrent job limits)
+- Worker pool with configurable concurrency
+- Job handlers registered by type
+- Graceful shutdown support
+
+**Database Tables:**
+- `jobs` - Main job queue with status tracking, retry counts, and results
+- `organization_rate_limits` - Per-organization rate limiting with sliding window tracking
+
+**Usage Pattern:**
+1. Register job handlers with `WorkerPool.RegisterHandler(jobType, handlerFunc)`
+2. Start worker pool with `WorkerPool.Start(ctx, queueNames)`
+3. Enqueue jobs with `Queue.Enqueue(ctx, queueName, jobType, organizationID, payload, opts)`
+4. Workers automatically dequeue, process, and update job status
+
+The queue is configured via `QUEUE_PROVIDER` environment variable. The `queue.NewQueue()` factory function initializes the appropriate implementation. Workers poll for jobs at `QUEUE_POLL_INTERVAL` and process them with registered handlers.
+
+**Common Job Types:**
+- `photo_analysis` - Analyze photos for safety violations using AI
+- `report_generation` - Generate PDF inspection reports
+- `notification_email` - Send email notifications
+
 ### Request Flow
 
+**Synchronous Requests:**
 1. Echo router receives HTTP request
 2. Middleware: Request logger (slog-based)
-3. Handler (e.g., `UploadHandler`) processes request
+3. Handler processes request
 4. Handler uses storage interface to save files
 5. Handler uses pgxpool for database operations
 6. Response returned as JSON
+
+**Asynchronous Background Jobs:**
+1. Handler enqueues job via `Queue.Enqueue()`
+2. Returns immediately with job ID
+3. Worker pool continuously polls for pending jobs
+4. Worker dequeues job and invokes registered handler
+5. Handler processes job (e.g., AI photo analysis)
+6. Worker updates job status (completed/failed) with results
 
 ### Database Connection
 
@@ -124,12 +172,27 @@ Handlers are structs with dependencies injected via constructor:
 ```go
 type UploadHandler struct {
     storage storage.FileStorage
+    queue   queue.Queue
 }
 
-func NewUploadHandler(storage storage.FileStorage) *UploadHandler {
-    return &UploadHandler{storage: storage}
+func NewUploadHandler(storage storage.FileStorage, q queue.Queue) *UploadHandler {
+    return &UploadHandler{storage: storage, queue: q}
 }
 ```
+
+### Pluggable Services Pattern
+
+Both storage and queue follow a factory pattern for swappable implementations:
+
+```go
+// Storage factory (local vs S3)
+storage := storage.NewFileStorage(cfg)
+
+// Queue factory (postgres vs redis)
+queue := queue.NewQueue(ctx, logger, queueCfg)
+```
+
+This pattern allows switching implementations via environment variables without code changes.
 
 ### Migration Pattern
 
@@ -150,6 +213,7 @@ Migrations use Goose format with `-- +goose Up` and `-- +goose Down` sections. A
 │   ├── config/              # Configuration loading and validation
 │   ├── handlers/            # HTTP request handlers
 │   ├── storage/             # File storage implementations (local, S3)
+│   ├── queue/               # Job queue system (postgres, redis, mock)
 │   └── migrations/          # Goose SQL migrations
 ├── pkg/                     # (Currently empty - future shared packages)
 ├── uploads/                 # Local file storage directory
@@ -166,3 +230,14 @@ Migrations use Goose format with `-- +goose Up` and `-- +goose Down` sections. A
 - Upload endpoint: `POST /api/upload` (accepts "image" form field)
 - Accepted image types: JPEG, PNG, WebP (5MB max)
 - Database pool is closed on shutdown
+
+### Queue System Notes
+
+- PostgreSQL queue uses `SELECT FOR UPDATE SKIP LOCKED` for safe concurrent job dequeuing
+- Failed jobs automatically retry with exponential backoff: 1min, 2min, 4min, etc.
+- Rate limits are per-organization and per-queue with sliding window tracking
+- Worker pool gracefully shuts down, waiting for in-flight jobs to complete
+- Job handlers should be idempotent (safe to retry) since jobs may be retried on failure
+- Use `MockQueue` for testing to avoid database dependencies
+- Maximum retry attempts default to 3 but can be configured per job
+- Jobs can be scheduled for future execution via `EnqueueOptions.ScheduledAt` or `Delay`
