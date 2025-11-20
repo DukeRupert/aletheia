@@ -1,31 +1,72 @@
 {{define "nav"}}
-<nav>
+<nav x-data="{ mobileMenuOpen: false }">
   <div class="container">
     <div class="nav-content">
       <a href="/" class="logo">Aletheia</a>
 
-      <ul class="nav-links">
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li><a href="/inspections">Inspections</a></li>
-        <li><a href="/projects">Projects</a></li>
-      </ul>
+      <!-- Mobile hamburger button -->
+      <button
+        @click="mobileMenuOpen = !mobileMenuOpen"
+        class="mobile-menu-btn"
+        aria-label="Toggle mobile menu"
+        aria-expanded="false"
+        :aria-expanded="mobileMenuOpen.toString()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12" x-show="!mobileMenuOpen"></line>
+          <line x1="3" y1="6" x2="21" y2="6" x-show="!mobileMenuOpen"></line>
+          <line x1="3" y1="18" x2="21" y2="18" x-show="!mobileMenuOpen"></line>
+          <line x1="18" y1="6" x2="6" y2="18" x-show="mobileMenuOpen"></line>
+          <line x1="6" y1="6" x2="18" y2="18" x-show="mobileMenuOpen"></line>
+        </svg>
+      </button>
 
-      <!-- User dropdown menu with Alpine.js -->
-      <div class="nav-user" x-data="{ open: false }">
-        <button @click="open = !open" aria-label="User menu" class="btn-secondary">
-          {{if .User}}{{.User.Name}}{{else}}Account{{end}}
-        </button>
+      <!-- Desktop navigation -->
+      <div class="nav-desktop">
+        <ul class="nav-links">
+          <li><a href="/dashboard">Dashboard</a></li>
+          <li><a href="/inspections">Inspections</a></li>
+          <li><a href="/projects">Projects</a></li>
+        </ul>
 
-        <div x-show="open" @click.away="open = false" class="dropdown" x-cloak>
-          <a href="/settings/profile">Profile</a>
-          <a href="/organizations">Organizations</a>
-          <a href="/settings">Settings</a>
-          <hr>
+        <!-- User dropdown menu with Alpine.js -->
+        <div class="nav-user" x-data="{ open: false }">
+          <button @click="open = !open" aria-label="User menu" class="btn-secondary">
+            {{if .User}}{{.User.Name}}{{else}}Account{{end}}
+          </button>
+
+          <div x-show="open" @click.away="open = false" class="dropdown" x-cloak>
+            <a href="/settings/profile">Profile</a>
+            <a href="/organizations">Organizations</a>
+            <a href="/settings">Settings</a>
+            <hr>
+            <form hx-post="/api/auth/logout" hx-swap="none">
+              <button type="submit" class="btn-link">Logout</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile menu -->
+    <div
+      x-show="mobileMenuOpen"
+      @click.away="mobileMenuOpen = false"
+      x-cloak
+      class="mobile-menu">
+      <ul class="mobile-nav-links">
+        <li><a href="/dashboard" @click="mobileMenuOpen = false">Dashboard</a></li>
+        <li><a href="/inspections" @click="mobileMenuOpen = false">Inspections</a></li>
+        <li><a href="/projects" @click="mobileMenuOpen = false">Projects</a></li>
+        <li><hr></li>
+        <li><a href="/settings/profile" @click="mobileMenuOpen = false">Profile</a></li>
+        <li><a href="/organizations" @click="mobileMenuOpen = false">Organizations</a></li>
+        <li><a href="/settings" @click="mobileMenuOpen = false">Settings</a></li>
+        <li>
           <form hx-post="/api/auth/logout" hx-swap="none">
             <button type="submit" class="btn-link">Logout</button>
           </form>
-        </div>
-      </div>
+        </li>
+      </ul>
     </div>
   </div>
 </nav>
