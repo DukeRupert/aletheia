@@ -1,0 +1,179 @@
+{{template "base" .}}
+
+{{define "title"}}{{.Project.Name}} - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div style="max-width: 800px; margin: 3rem auto;">
+    <div class="stack">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>{{.Project.Name}}</h1>
+        <a href="/projects" class="btn-secondary">Back to Projects</a>
+      </div>
+
+      <div class="card">
+        <h2>Project Details</h2>
+
+        <form
+          hx-put="/api/projects/{{.Project.ID}}"
+          hx-target="#project-form"
+          hx-swap="outerHTML"
+          id="project-form"
+          class="stack">
+
+          <div class="form-field">
+            <label for="name">Project Name *</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              required
+              maxlength="255"
+              value="{{.Project.Name}}"
+              placeholder="e.g., Main Street Construction">
+          </div>
+
+          <div class="form-field">
+            <label for="description">Description</label>
+            <textarea
+              id="description"
+              name="description"
+              rows="4"
+              placeholder="Describe the project...">{{if .Project.Description.Valid}}{{.Project.Description.String}}{{end}}</textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="project_type">Project Type</label>
+            <select id="project_type" name="project_type">
+              <option value="">Select type</option>
+              <option value="Commercial" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Commercial")}}selected{{end}}>Commercial</option>
+              <option value="Residential" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Residential")}}selected{{end}}>Residential</option>
+              <option value="Industrial" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Industrial")}}selected{{end}}>Industrial</option>
+              <option value="Infrastructure" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Infrastructure")}}selected{{end}}>Infrastructure</option>
+              <option value="Other" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Other")}}selected{{end}}>Other</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="status">Status</label>
+            <select id="status" name="status">
+              <option value="active" {{if and .Project.Status.Valid (eq .Project.Status.String "active")}}selected{{end}}>Active</option>
+              <option value="on_hold" {{if and .Project.Status.Valid (eq .Project.Status.String "on_hold")}}selected{{end}}>On Hold</option>
+              <option value="completed" {{if and .Project.Status.Valid (eq .Project.Status.String "completed")}}selected{{end}}>Completed</option>
+            </select>
+          </div>
+
+          <h3 style="margin-top: var(--space-lg);">Location Information</h3>
+          <p style="color: #666; font-size: 0.875rem; margin-bottom: var(--space-md);">
+            The project location helps determine applicable state safety codes for AI photo analysis.
+          </p>
+
+          <div class="form-field">
+            <label for="address">Street Address</label>
+            <input
+              type="text"
+              id="address"
+              name="address"
+              maxlength="255"
+              value="{{if .Project.Address.Valid}}{{.Project.Address.String}}{{end}}"
+              placeholder="e.g., 123 Main Street">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-md);">
+            <div class="form-field">
+              <label for="city">City</label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                maxlength="100"
+                value="{{if .Project.City.Valid}}{{.Project.City.String}}{{end}}"
+                placeholder="e.g., San Francisco">
+            </div>
+
+            <div class="form-field">
+              <label for="state">State *</label>
+              <select id="state" name="state" required>
+                <option value="">Select state</option>
+                <option value="AL" {{if and .Project.State.Valid (eq .Project.State.String "AL")}}selected{{end}}>AL</option>
+                <option value="AK" {{if and .Project.State.Valid (eq .Project.State.String "AK")}}selected{{end}}>AK</option>
+                <option value="AZ" {{if and .Project.State.Valid (eq .Project.State.String "AZ")}}selected{{end}}>AZ</option>
+                <option value="AR" {{if and .Project.State.Valid (eq .Project.State.String "AR")}}selected{{end}}>AR</option>
+                <option value="CA" {{if and .Project.State.Valid (eq .Project.State.String "CA")}}selected{{end}}>CA</option>
+                <option value="CO" {{if and .Project.State.Valid (eq .Project.State.String "CO")}}selected{{end}}>CO</option>
+                <option value="CT" {{if and .Project.State.Valid (eq .Project.State.String "CT")}}selected{{end}}>CT</option>
+                <option value="DE" {{if and .Project.State.Valid (eq .Project.State.String "DE")}}selected{{end}}>DE</option>
+                <option value="FL" {{if and .Project.State.Valid (eq .Project.State.String "FL")}}selected{{end}}>FL</option>
+                <option value="GA" {{if and .Project.State.Valid (eq .Project.State.String "GA")}}selected{{end}}>GA</option>
+                <option value="HI" {{if and .Project.State.Valid (eq .Project.State.String "HI")}}selected{{end}}>HI</option>
+                <option value="ID" {{if and .Project.State.Valid (eq .Project.State.String "ID")}}selected{{end}}>ID</option>
+                <option value="IL" {{if and .Project.State.Valid (eq .Project.State.String "IL")}}selected{{end}}>IL</option>
+                <option value="IN" {{if and .Project.State.Valid (eq .Project.State.String "IN")}}selected{{end}}>IN</option>
+                <option value="IA" {{if and .Project.State.Valid (eq .Project.State.String "IA")}}selected{{end}}>IA</option>
+                <option value="KS" {{if and .Project.State.Valid (eq .Project.State.String "KS")}}selected{{end}}>KS</option>
+                <option value="KY" {{if and .Project.State.Valid (eq .Project.State.String "KY")}}selected{{end}}>KY</option>
+                <option value="LA" {{if and .Project.State.Valid (eq .Project.State.String "LA")}}selected{{end}}>LA</option>
+                <option value="ME" {{if and .Project.State.Valid (eq .Project.State.String "ME")}}selected{{end}}>ME</option>
+                <option value="MD" {{if and .Project.State.Valid (eq .Project.State.String "MD")}}selected{{end}}>MD</option>
+                <option value="MA" {{if and .Project.State.Valid (eq .Project.State.String "MA")}}selected{{end}}>MA</option>
+                <option value="MI" {{if and .Project.State.Valid (eq .Project.State.String "MI")}}selected{{end}}>MI</option>
+                <option value="MN" {{if and .Project.State.Valid (eq .Project.State.String "MN")}}selected{{end}}>MN</option>
+                <option value="MS" {{if and .Project.State.Valid (eq .Project.State.String "MS")}}selected{{end}}>MS</option>
+                <option value="MO" {{if and .Project.State.Valid (eq .Project.State.String "MO")}}selected{{end}}>MO</option>
+                <option value="MT" {{if and .Project.State.Valid (eq .Project.State.String "MT")}}selected{{end}}>MT</option>
+                <option value="NE" {{if and .Project.State.Valid (eq .Project.State.String "NE")}}selected{{end}}>NE</option>
+                <option value="NV" {{if and .Project.State.Valid (eq .Project.State.String "NV")}}selected{{end}}>NV</option>
+                <option value="NH" {{if and .Project.State.Valid (eq .Project.State.String "NH")}}selected{{end}}>NH</option>
+                <option value="NJ" {{if and .Project.State.Valid (eq .Project.State.String "NJ")}}selected{{end}}>NJ</option>
+                <option value="NM" {{if and .Project.State.Valid (eq .Project.State.String "NM")}}selected{{end}}>NM</option>
+                <option value="NY" {{if and .Project.State.Valid (eq .Project.State.String "NY")}}selected{{end}}>NY</option>
+                <option value="NC" {{if and .Project.State.Valid (eq .Project.State.String "NC")}}selected{{end}}>NC</option>
+                <option value="ND" {{if and .Project.State.Valid (eq .Project.State.String "ND")}}selected{{end}}>ND</option>
+                <option value="OH" {{if and .Project.State.Valid (eq .Project.State.String "OH")}}selected{{end}}>OH</option>
+                <option value="OK" {{if and .Project.State.Valid (eq .Project.State.String "OK")}}selected{{end}}>OK</option>
+                <option value="OR" {{if and .Project.State.Valid (eq .Project.State.String "OR")}}selected{{end}}>OR</option>
+                <option value="PA" {{if and .Project.State.Valid (eq .Project.State.String "PA")}}selected{{end}}>PA</option>
+                <option value="RI" {{if and .Project.State.Valid (eq .Project.State.String "RI")}}selected{{end}}>RI</option>
+                <option value="SC" {{if and .Project.State.Valid (eq .Project.State.String "SC")}}selected{{end}}>SC</option>
+                <option value="SD" {{if and .Project.State.Valid (eq .Project.State.String "SD")}}selected{{end}}>SD</option>
+                <option value="TN" {{if and .Project.State.Valid (eq .Project.State.String "TN")}}selected{{end}}>TN</option>
+                <option value="TX" {{if and .Project.State.Valid (eq .Project.State.String "TX")}}selected{{end}}>TX</option>
+                <option value="UT" {{if and .Project.State.Valid (eq .Project.State.String "UT")}}selected{{end}}>UT</option>
+                <option value="VT" {{if and .Project.State.Valid (eq .Project.State.String "VT")}}selected{{end}}>VT</option>
+                <option value="VA" {{if and .Project.State.Valid (eq .Project.State.String "VA")}}selected{{end}}>VA</option>
+                <option value="WA" {{if and .Project.State.Valid (eq .Project.State.String "WA")}}selected{{end}}>WA</option>
+                <option value="WV" {{if and .Project.State.Valid (eq .Project.State.String "WV")}}selected{{end}}>WV</option>
+                <option value="WI" {{if and .Project.State.Valid (eq .Project.State.String "WI")}}selected{{end}}>WI</option>
+                <option value="WY" {{if and .Project.State.Valid (eq .Project.State.String "WY")}}selected{{end}}>WY</option>
+              </select>
+              <small class="help-text">Required for safety code compliance</small>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="zip_code">ZIP Code</label>
+            <input
+              type="text"
+              id="zip_code"
+              name="zip_code"
+              maxlength="10"
+              value="{{if .Project.ZipCode.Valid}}{{.Project.ZipCode.String}}{{end}}"
+              placeholder="e.g., 94102">
+          </div>
+
+          <div style="display: flex; gap: var(--space-sm);">
+            <button type="submit" class="btn-primary">Save Changes</button>
+            <a href="/projects" class="btn-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top: var(--space-lg);">
+        <h2>Inspections</h2>
+        <p style="color: #666; margin-bottom: var(--space-md);">View and manage safety inspections for this project.</p>
+        <a href="/projects/{{.Project.ID}}/inspections" class="btn-primary">View Inspections</a>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

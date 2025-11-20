@@ -240,3 +240,53 @@ func (h *PageHandler) NewOrganizationPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "new-organization.html", data)
 }
+
+// ProjectDetailPage renders the project detail/edit page
+func (h *PageHandler) ProjectDetailPage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	projectID := c.Param("id")
+	if projectID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "project id is required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Parse project ID
+	projectUUID, err := parseUUID(projectID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid project id")
+	}
+
+	// Get project
+	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	if err != nil {
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+	}
+
+	// Verify user is a member of the organization that owns this project
+	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+		OrganizationID: project.OrganizationID,
+		UserID:         uuidToPgUUID(userID),
+	})
+	if err != nil {
+		h.logger.Warn("user not authorized to access project",
+			slog.String("user_id", userID.String()),
+			slog.String("project_id", projectID))
+		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User": map[string]interface{}{
+			"Name": "User",
+		},
+		"Project": project,
+	}
+	return c.Render(http.StatusOK, "project-detail.html", data)
+}

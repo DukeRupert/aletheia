@@ -14,20 +14,44 @@ import (
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects (
   organization_id,
-  name
+  name,
+  description,
+  project_type,
+  address,
+  city,
+  state,
+  zip_code,
+  country
 ) VALUES (
-  $1, $2
+  $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
-RETURNING id, organization_id, name, created_at, updated_at
+RETURNING id, organization_id, name, created_at, updated_at, description, project_type, status, address, city, state, zip_code, country
 `
 
 type CreateProjectParams struct {
 	OrganizationID pgtype.UUID `json:"organization_id"`
 	Name           string      `json:"name"`
+	Description    pgtype.Text `json:"description"`
+	ProjectType    pgtype.Text `json:"project_type"`
+	Address        pgtype.Text `json:"address"`
+	City           pgtype.Text `json:"city"`
+	State          pgtype.Text `json:"state"`
+	ZipCode        pgtype.Text `json:"zip_code"`
+	Country        pgtype.Text `json:"country"`
 }
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
-	row := q.db.QueryRow(ctx, createProject, arg.OrganizationID, arg.Name)
+	row := q.db.QueryRow(ctx, createProject,
+		arg.OrganizationID,
+		arg.Name,
+		arg.Description,
+		arg.ProjectType,
+		arg.Address,
+		arg.City,
+		arg.State,
+		arg.ZipCode,
+		arg.Country,
+	)
 	var i Project
 	err := row.Scan(
 		&i.ID,
@@ -35,6 +59,14 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
+		&i.ProjectType,
+		&i.Status,
+		&i.Address,
+		&i.City,
+		&i.State,
+		&i.ZipCode,
+		&i.Country,
 	)
 	return i, err
 }
@@ -50,7 +82,7 @@ func (q *Queries) DeleteProject(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getProject = `-- name: GetProject :one
-SELECT id, organization_id, name, created_at, updated_at FROM projects
+SELECT id, organization_id, name, created_at, updated_at, description, project_type, status, address, city, state, zip_code, country FROM projects
 WHERE id = $1 LIMIT 1
 `
 
@@ -63,12 +95,20 @@ func (q *Queries) GetProject(ctx context.Context, id pgtype.UUID) (Project, erro
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
+		&i.ProjectType,
+		&i.Status,
+		&i.Address,
+		&i.City,
+		&i.State,
+		&i.ZipCode,
+		&i.Country,
 	)
 	return i, err
 }
 
 const listProjects = `-- name: ListProjects :many
-SELECT id, organization_id, name, created_at, updated_at FROM projects
+SELECT id, organization_id, name, created_at, updated_at, description, project_type, status, address, city, state, zip_code, country FROM projects
 WHERE organization_id = $1
 ORDER BY created_at DESC
 `
@@ -88,6 +128,14 @@ func (q *Queries) ListProjects(ctx context.Context, organizationID pgtype.UUID) 
 			&i.Name,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Description,
+			&i.ProjectType,
+			&i.Status,
+			&i.Address,
+			&i.City,
+			&i.State,
+			&i.ZipCode,
+			&i.Country,
 		); err != nil {
 			return nil, err
 		}
@@ -102,19 +150,46 @@ func (q *Queries) ListProjects(ctx context.Context, organizationID pgtype.UUID) 
 const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET
-  name = COALESCE($2, name),
+  name = COALESCE($1, name),
+  description = COALESCE($2, description),
+  project_type = COALESCE($3, project_type),
+  status = COALESCE($4, status),
+  address = COALESCE($5, address),
+  city = COALESCE($6, city),
+  state = COALESCE($7, state),
+  zip_code = COALESCE($8, zip_code),
+  country = COALESCE($9, country),
   updated_at = CURRENT_TIMESTAMP
-WHERE id = $1
-RETURNING id, organization_id, name, created_at, updated_at
+WHERE id = $10
+RETURNING id, organization_id, name, created_at, updated_at, description, project_type, status, address, city, state, zip_code, country
 `
 
 type UpdateProjectParams struct {
-	ID   pgtype.UUID `json:"id"`
-	Name string      `json:"name"`
+	Name        pgtype.Text `json:"name"`
+	Description pgtype.Text `json:"description"`
+	ProjectType pgtype.Text `json:"project_type"`
+	Status      pgtype.Text `json:"status"`
+	Address     pgtype.Text `json:"address"`
+	City        pgtype.Text `json:"city"`
+	State       pgtype.Text `json:"state"`
+	ZipCode     pgtype.Text `json:"zip_code"`
+	Country     pgtype.Text `json:"country"`
+	ID          pgtype.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
-	row := q.db.QueryRow(ctx, updateProject, arg.ID, arg.Name)
+	row := q.db.QueryRow(ctx, updateProject,
+		arg.Name,
+		arg.Description,
+		arg.ProjectType,
+		arg.Status,
+		arg.Address,
+		arg.City,
+		arg.State,
+		arg.ZipCode,
+		arg.Country,
+		arg.ID,
+	)
 	var i Project
 	err := row.Scan(
 		&i.ID,
@@ -122,6 +197,14 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.Name,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
+		&i.ProjectType,
+		&i.Status,
+		&i.Address,
+		&i.City,
+		&i.State,
+		&i.ZipCode,
+		&i.Country,
 	)
 	return i, err
 }

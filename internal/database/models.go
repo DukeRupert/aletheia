@@ -308,6 +308,14 @@ type Project struct {
 	Name           string             `json:"name"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	Description    pgtype.Text        `json:"description"`
+	ProjectType    pgtype.Text        `json:"project_type"`
+	Status         pgtype.Text        `json:"status"`
+	Address        pgtype.Text        `json:"address"`
+	City           pgtype.Text        `json:"city"`
+	State          pgtype.Text        `json:"state"`
+	ZipCode        pgtype.Text        `json:"zip_code"`
+	Country        pgtype.Text        `json:"country"`
 }
 
 type Report struct {

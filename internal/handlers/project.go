@@ -6,6 +6,7 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -26,6 +27,13 @@ func NewProjectHandler(pool *pgxpool.Pool, logger *slog.Logger) *ProjectHandler 
 type CreateProjectRequest struct {
 	OrganizationID string `json:"organization_id" form:"organization_id" validate:"required"`
 	Name           string `json:"name" form:"name" validate:"required,min=1,max=255"`
+	Description    string `json:"description" form:"description"`
+	ProjectType    string `json:"project_type" form:"project_type"`
+	Address        string `json:"address" form:"address"`
+	City           string `json:"city" form:"city"`
+	State          string `json:"state" form:"state" validate:"omitempty,len=2"`
+	ZipCode        string `json:"zip_code" form:"zip_code"`
+	Country        string `json:"country" form:"country" validate:"omitempty,len=2"`
 }
 
 // CreateProjectResponse is the response payload for project creation
@@ -83,10 +91,23 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can create projects")
 	}
 
+	// Set default country if not provided
+	country := req.Country
+	if country == "" {
+		country = "US"
+	}
+
 	// Create project
 	project, err := queries.CreateProject(c.Request().Context(), database.CreateProjectParams{
 		OrganizationID: orgUUID,
 		Name:           req.Name,
+		Description:    pgtype.Text{String: req.Description, Valid: req.Description != ""},
+		ProjectType:    pgtype.Text{String: req.ProjectType, Valid: req.ProjectType != ""},
+		Address:        pgtype.Text{String: req.Address, Valid: req.Address != ""},
+		City:           pgtype.Text{String: req.City, Valid: req.City != ""},
+		State:          pgtype.Text{String: req.State, Valid: req.State != ""},
+		ZipCode:        pgtype.Text{String: req.ZipCode, Valid: req.ZipCode != ""},
+		Country:        pgtype.Text{String: country, Valid: true},
 	})
 	if err != nil {
 		h.logger.Error("failed to create project", slog.String("err", err.Error()))
@@ -243,7 +264,15 @@ func (h *ProjectHandler) ListProjects(c echo.Context) error {
 
 // UpdateProjectRequest is the request payload for updating a project
 type UpdateProjectRequest struct {
-	Name *string `json:"name,omitempty" validate:"omitempty,min=1,max=255"`
+	Name        *string `json:"name,omitempty" form:"name" validate:"omitempty,min=1,max=255"`
+	Description *string `json:"description,omitempty" form:"description"`
+	ProjectType *string `json:"project_type,omitempty" form:"project_type"`
+	Status      *string `json:"status,omitempty" form:"status"`
+	Address     *string `json:"address,omitempty" form:"address"`
+	City        *string `json:"city,omitempty" form:"city"`
+	State       *string `json:"state,omitempty" form:"state" validate:"omitempty,len=2"`
+	ZipCode     *string `json:"zip_code,omitempty" form:"zip_code"`
+	Country     *string `json:"country,omitempty" form:"country" validate:"omitempty,len=2"`
 }
 
 // UpdateProjectResponse is the response payload for project update
@@ -309,7 +338,31 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 	}
 
 	if req.Name != nil {
-		params.Name = *req.Name
+		params.Name = pgtype.Text{String: *req.Name, Valid: true}
+	}
+	if req.Description != nil {
+		params.Description = pgtype.Text{String: *req.Description, Valid: true}
+	}
+	if req.ProjectType != nil {
+		params.ProjectType = pgtype.Text{String: *req.ProjectType, Valid: true}
+	}
+	if req.Status != nil {
+		params.Status = pgtype.Text{String: *req.Status, Valid: true}
+	}
+	if req.Address != nil {
+		params.Address = pgtype.Text{String: *req.Address, Valid: true}
+	}
+	if req.City != nil {
+		params.City = pgtype.Text{String: *req.City, Valid: true}
+	}
+	if req.State != nil {
+		params.State = pgtype.Text{String: *req.State, Valid: true}
+	}
+	if req.ZipCode != nil {
+		params.ZipCode = pgtype.Text{String: *req.ZipCode, Valid: true}
+	}
+	if req.Country != nil {
+		params.Country = pgtype.Text{String: *req.Country, Valid: true}
 	}
 
 	updatedProject, err := queries.UpdateProject(c.Request().Context(), params)
