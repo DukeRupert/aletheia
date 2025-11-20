@@ -44,8 +44,8 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [x] Dashboard page (`/dashboard`) - Protected page for post-login
 - [x] Register page (`/register`) - HTMX form with redirect to login on success
 - [x] Email verification page (`/verify`) - Auto-verify with token in URL, manual entry fallback
-- [ ] Forgot password page (`/forgot-password`)
-- [ ] Reset password page (`/reset-password`)
+- [x] Forgot password page (`/forgot-password`)
+- [x] Reset password page (`/reset-password`)
 
 ### Components
 - [ ] Form component (validation errors, success messages)
