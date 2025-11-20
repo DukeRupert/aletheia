@@ -11,9 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dukerupert/aletheia/internal/ai"
 	"github.com/dukerupert/aletheia/internal/config"
+	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/handlers"
+	"github.com/dukerupert/aletheia/internal/queue"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
 	"github.com/dukerupert/aletheia/internal/templates"
@@ -103,6 +106,35 @@ func main() {
 	})
 	logger.Info("email service initialized", slog.String("provider", cfg.Email.Provider))
 
+	// Initialize AI service (configured via AI_PROVIDER env var)
+	logger.Debug("AI service configuration",
+		slog.String("provider", cfg.AI.Provider))
+	aiService := ai.NewAIService(logger, ai.AIConfig{
+		Provider:     cfg.AI.Provider,
+		ClaudeAPIKey: cfg.AI.ClaudeAPIKey,
+		ClaudeModel:  cfg.AI.ClaudeModel,
+		MaxTokens:    cfg.AI.MaxTokens,
+		Temperature:  cfg.AI.Temperature,
+	})
+	logger.Info("AI service initialized", slog.String("provider", cfg.AI.Provider))
+
+	// Initialize queue (using Postgres with existing pool)
+	logger.Debug("initializing queue service")
+	queueConfig := queue.Config{
+		Provider:             "postgres",
+		WorkerCount:          3,
+		PollInterval:         time.Second,
+		JobTimeout:           60 * time.Second,
+		EnableRateLimiting:   true,
+		ShutdownTimeout:      10 * time.Second,
+		CleanupInterval:      time.Hour,
+		CleanupRetention:     7 * 24 * time.Hour,
+		DefaultMaxJobsPerHour: 100,
+		DefaultMaxConcurrentJobs: 10,
+	}
+	queueService := queue.NewPostgresQueue(pool, logger, queueConfig)
+	logger.Info("queue service initialized")
+
 	// Initialize template renderer
 	logger.Debug("initializing template renderer", slog.String("path", "web/templates"))
 	renderer, err := templates.NewTemplateRenderer("web/templates")
@@ -136,6 +168,7 @@ func main() {
 
 	// Initialize handlers
 	logger.Debug("initializing HTTP handlers")
+	queries := database.New(pool)
 	pageHandler := handlers.NewPageHandler(pool, logger)
 	uploadHandler := handlers.NewUploadHandler(fileStorage, pool, logger)
 	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
@@ -143,7 +176,20 @@ func main() {
 	projectHandler := handlers.NewProjectHandler(pool, logger)
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
+	photoHandler := handlers.NewPhotoHandler(queries, queueService, logger)
 	logger.Info("all handlers initialized")
+
+	// Register queue job handlers
+	logger.Debug("registering queue job handlers")
+	workerPool := queue.NewWorkerPool(queueService, logger, queueConfig)
+	photoAnalysisJobHandler := handlers.NewPhotoAnalysisJobHandler(queries, aiService, fileStorage, logger)
+	workerPool.RegisterHandler("analyze_photo", photoAnalysisJobHandler.Handle)
+	logger.Info("queue job handlers registered")
+
+	// Start worker pool
+	logger.Debug("starting worker pool")
+	go workerPool.Start(context.Background(), []string{"photo_analysis"})
+	logger.Info("worker pool started")
 
 	// Page routes (public)
 	e.GET("/", pageHandler.HomePage)
@@ -214,6 +260,8 @@ func main() {
 	protected.GET("/inspections/:inspectionId/photos", uploadHandler.ListPhotos)
 	protected.GET("/photos/:id", uploadHandler.GetPhoto)
 	protected.DELETE("/photos/:id", uploadHandler.DeletePhoto)
+	protected.POST("/photos/analyze", photoHandler.AnalyzePhoto)
+	protected.GET("/photos/analyze/:job_id", photoHandler.GetPhotoAnalysisStatus)
 
 	// Safety code routes
 	protected.POST("/safety-codes", safetyCodeHandler.CreateSafetyCode)

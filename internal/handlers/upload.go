@@ -151,8 +151,11 @@ func (h *UploadHandler) UploadImage(c echo.Context) error {
 			<a href="` + photo.StorageUrl + `" target="_blank">
 				<img src="` + displayURL + `" alt="Inspection photo" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px; margin-bottom: var(--space-sm);">
 			</a>
-			<div style="display: flex; justify-content: space-between; align-items: center;">
+			<div style="margin-bottom: var(--space-sm);">
 				<p style="color: #666; font-size: 0.75rem; margin: 0;">` + photo.CreatedAt.Time.Format("Jan 2, 3:04 PM") + `</p>
+			</div>
+			<div style="display: flex; gap: var(--space-xs); flex-wrap: wrap;">
+				<button hx-post="/api/photos/analyze" hx-vals='{"photo_id": "` + photo.ID.String() + `"}' hx-target="closest .card" hx-swap="outerHTML" class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; flex: 1;">Analyze</button>
 				<button hx-delete="/api/photos/` + photo.ID.String() + `" hx-confirm="Are you sure you want to delete this photo?" hx-target="closest .card" hx-swap="outerHTML swap:1s" class="btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Delete</button>
 			</div>
 		</div>`

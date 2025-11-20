@@ -108,33 +108,33 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 
 ## Inspection Workflow (Phase 5) - In Progress
 
-### Inspection Pages
+### Inspection Pages ✓ Core Complete
 - [x] Inspection list page (`/inspections`) - Global view across all projects with context
 - [x] Project-specific inspection list (`/projects/:projectId/inspections`)
 - [x] Create inspection page (`/projects/:projectId/inspections/new`) - HTMX form with project context
+- [x] Inspection detail page (`/inspections/:id`) with metadata and photo gallery
 - [ ] Filter by project (global view)
 - [ ] Filter by status
 - [ ] Sort by date
-- [ ] Inspection detail page (`/inspections/:id`)
-  - [ ] Inspection metadata
-  - [ ] Photo gallery
-  - [ ] Violation summary
-  - [ ] Status workflow
+- [ ] Violation summary section
+- [ ] Status workflow controls
 
-### Photo Upload & Management
-- [ ] Photo upload interface
+### Photo Upload & Management ✓ Basic Complete
+- [x] Photo upload interface (single file)
+  - [x] Click-to-upload with file input
+  - [x] Auto-submit on file selection
+  - [x] Upload status indicator
   - [ ] Drag & drop zone
-  - [ ] File input fallback
   - [ ] Upload progress bar
   - [ ] Multiple file support
-- [ ] Photo gallery component
-  - [ ] Thumbnail grid
-  - [ ] Lightbox viewer
-  - [ ] Photo metadata
-- [ ] Photo detail view
-  - [ ] Full-size image
-  - [ ] EXIF data display
-  - [ ] Trigger AI analysis button
+- [x] Photo gallery component (thumbnail grid in inspection detail)
+  - [x] Thumbnail display with fallback to full image
+  - [x] Click thumbnail to view full-size in new tab
+  - [x] Delete button with HTMX confirmation
+  - [x] Upload timestamp
+- [ ] Photo detail view with violations
+  - [ ] Trigger AI analysis button (next task)
+  - [ ] Analysis status indicator
   - [ ] Violations detected on this photo
 
 ### Components
@@ -144,10 +144,18 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [ ] Status badge component (draft, in_progress, completed)
 - [ ] Tab component (for inspection sections)
 
-## AI Analysis & Violations (Phase 6)
+## AI Analysis & Violations (Phase 6) - In Progress
 
-### AI Analysis Interface
-- [ ] "Analyze Photo" button (HTMX trigger)
+### AI Analysis Backend ✓ COMPLETED
+- [x] State-specific safety code filtering
+- [x] Rich inspection context (project name, location, type)
+- [x] Image download from storage (local & S3)
+- [x] Claude vision API integration
+- [x] Job queue processing with retry
+- [x] Violation detection and storage
+
+### AI Analysis Interface - Next Up
+- [ ] "Analyze Photo" button (HTMX trigger) ← **CURRENT TASK**
 - [ ] Analysis status indicator
   - [ ] Queued state
   - [ ] Processing state (polling)

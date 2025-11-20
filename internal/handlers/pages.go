@@ -568,6 +568,21 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photos")
 	}
 
+	// Get violations for the inspection
+	violations, err := queries.ListDetectedViolationsByInspection(c.Request().Context(), inspectionUUID)
+	if err != nil {
+		h.logger.Error("failed to list violations", slog.String("err", err.Error()))
+		// Don't fail the page load if violations can't be fetched, just log it
+		violations = []database.DetectedViolation{}
+	}
+
+	// Create a map of photo ID -> violations for easy lookup in template
+	violationsByPhoto := make(map[string][]database.DetectedViolation)
+	for _, violation := range violations {
+		photoIDStr := violation.PhotoID.String()
+		violationsByPhoto[photoIDStr] = append(violationsByPhoto[photoIDStr], violation)
+	}
+
 	// Build project location string
 	var projectLocation string
 	if project.Address.Valid {
@@ -581,12 +596,13 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"IsAuthenticated": true,
-		"User":            h.getUserDisplayInfo(c, userID),
-		"Inspection":      inspection,
-		"ProjectName":     project.Name,
-		"ProjectLocation": projectLocation,
-		"Photos":          photos,
+		"IsAuthenticated":    true,
+		"User":               h.getUserDisplayInfo(c, userID),
+		"Inspection":         inspection,
+		"ProjectName":        project.Name,
+		"ProjectLocation":    projectLocation,
+		"Photos":             photos,
+		"ViolationsByPhoto":  violationsByPhoto,
 	}
 	return c.Render(http.StatusOK, "inspection-detail.html", data)
 }
