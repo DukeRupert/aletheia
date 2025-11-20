@@ -61,10 +61,6 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
 
-	if err := c.Validate(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
 	photoID, err := uuid.Parse(req.PhotoID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid photo_id format")

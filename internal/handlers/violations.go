@@ -208,10 +208,6 @@ func (h *ViolationHandler) UpdateViolation(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
 
-	if err := c.Validate(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
 	// Prepare update parameters
 	params := database.UpdateDetectedViolationNotesParams{
 		ID: pgtype.UUID{Bytes: violationID, Valid: true},
