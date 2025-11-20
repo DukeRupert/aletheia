@@ -19,7 +19,7 @@
               Role: <strong>{{.Role}}</strong>
             </p>
             <p style="color: #666; font-size: 0.875rem;">
-              Created {{.CreatedAt.Format "Jan 2, 2006"}}
+              Created {{.CreatedAt.Time.Format "Jan 2, 2006"}}
             </p>
             <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
               <a href="/organizations/{{.ID}}" class="btn-primary">View</a>
