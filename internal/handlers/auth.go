@@ -252,7 +252,11 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	// Get session token from cookie
 	cookie, err := c.Cookie(session.SessionCookieName)
 	if err != nil {
-		// No session cookie found
+		// No session cookie found - redirect to login anyway
+		if c.Request().Header.Get("HX-Request") == "true" {
+			c.Response().Header().Set("HX-Redirect", "/login")
+			return c.NoContent(http.StatusOK)
+		}
 		return echo.NewHTTPError(http.StatusBadRequest, "not logged in")
 	}
 
@@ -274,6 +278,14 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 
 	h.logger.Info("user logged out successfully")
 
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - redirect to login page
+		c.Response().Header().Set("HX-Redirect", "/login")
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "logged out successfully",
 	})
