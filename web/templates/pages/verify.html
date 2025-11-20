@@ -1,0 +1,57 @@
+{{template "base" .}}
+
+{{define "title"}}Verify Email - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div style="max-width: 400px; margin: 3rem auto;">
+    <div class="card">
+      {{if .Token}}
+        <!-- Token provided in URL - auto-verify -->
+        <div
+          hx-post="/api/auth/verify-email"
+          hx-trigger="load"
+          hx-vals='{"token":"{{.Token}}"}'
+          hx-target="#verify-content"
+          hx-swap="innerHTML"
+          id="verify-content">
+          <h1>Verifying Email...</h1>
+          <p>Please wait while we verify your email address.</p>
+          <div class="spinner" style="margin: var(--space-lg) auto;"></div>
+        </div>
+      {{else}}
+        <!-- Manual token entry -->
+        <h1>Verify Your Email</h1>
+        <p>Enter the verification code sent to your email address.</p>
+
+        <form
+          hx-post="/api/auth/verify-email"
+          hx-target="#verify-form"
+          hx-swap="outerHTML"
+          id="verify-form"
+          class="stack">
+
+          <div class="form-field">
+            <label for="token">Verification Code</label>
+            <input
+              type="text"
+              id="token"
+              name="token"
+              required
+              autofocus
+              placeholder="Enter verification code">
+          </div>
+
+          <button type="submit" class="btn-primary">Verify Email</button>
+
+          <hr style="margin: var(--space-lg) 0; border: 0; border-top: 1px solid var(--color-border);">
+
+          <div style="text-align: center;">
+            <p style="margin: 0;">Didn't receive the email? <a href="/resend-verification">Resend</a></p>
+          </div>
+        </form>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

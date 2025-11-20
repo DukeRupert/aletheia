@@ -425,6 +425,23 @@ func (h *AuthHandler) VerifyEmail(c echo.Context) error {
 		slog.String("email", verifiedUser.Email),
 	)
 
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - return success HTML fragment
+		successHTML := `
+			<div id="verify-content">
+				<h1>Email Verified!</h1>
+				<p>Your email has been successfully verified.</p>
+				<div class="alert alert-success">
+					<strong>Success:</strong> You can now sign in to your account.
+				</div>
+				<a href="/login" class="btn-primary">Go to Sign In</a>
+			</div>
+		`
+		return c.HTML(http.StatusOK, successHTML)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "email verified successfully",
 	})

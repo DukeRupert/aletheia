@@ -65,3 +65,15 @@ func (h *PageHandler) RegisterPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "register.html", data)
 }
+
+// VerifyEmailPage renders the email verification page
+func (h *PageHandler) VerifyEmailPage(c echo.Context) error {
+	// Check if token is provided in query string
+	token := c.QueryParam("token")
+
+	data := map[string]interface{}{
+		"IsAuthenticated": false,
+		"Token":           token,
+	}
+	return c.Render(http.StatusOK, "verify.html", data)
+}

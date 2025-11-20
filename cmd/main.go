@@ -126,6 +126,7 @@ func main() {
 	e.GET("/", pageHandler.HomePage)
 	e.GET("/login", pageHandler.LoginPage)
 	e.GET("/register", pageHandler.RegisterPage)
+	e.GET("/verify", pageHandler.VerifyEmailPage)
 
 	// Public API routes
 	e.POST("/api/auth/register", authHandler.Register)
