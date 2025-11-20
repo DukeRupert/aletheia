@@ -441,3 +441,75 @@ func (h *PageHandler) NewInspectionPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "new-inspection.html", data)
 }
+
+// AllInspectionsPage renders a global view of all inspections across all projects
+func (h *PageHandler) AllInspectionsPage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Get user's organizations
+	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	if err != nil {
+		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
+		memberships = []database.OrganizationMember{}
+	}
+
+	// Collect all inspections with project context
+	type InspectionWithContext struct {
+		Inspection      database.Inspection
+		ProjectID       pgtype.UUID
+		ProjectName     string
+		ProjectLocation string
+	}
+
+	var allInspections []InspectionWithContext
+
+	for _, membership := range memberships {
+		// Get all projects in this organization
+		projects, err := queries.ListProjects(c.Request().Context(), membership.OrganizationID)
+		if err != nil {
+			h.logger.Warn("failed to list projects", slog.String("err", err.Error()))
+			continue
+		}
+
+		// Get inspections for each project
+		for _, project := range projects {
+			inspections, err := queries.ListInspections(c.Request().Context(), project.ID)
+			if err != nil {
+				h.logger.Warn("failed to list inspections", slog.String("err", err.Error()))
+				continue
+			}
+
+			// Build location string
+			location := ""
+			if project.City.Valid && project.State.Valid {
+				location = project.City.String + ", " + project.State.String
+			} else if project.State.Valid {
+				location = project.State.String
+			} else if project.Address.Valid {
+				location = project.Address.String
+			}
+
+			for _, inspection := range inspections {
+				allInspections = append(allInspections, InspectionWithContext{
+					Inspection:      inspection,
+					ProjectID:       project.ID,
+					ProjectName:     project.Name,
+					ProjectLocation: location,
+				})
+			}
+		}
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Inspections":     allInspections,
+	}
+	return c.Render(http.StatusOK, "all-inspections.html", data)
+}

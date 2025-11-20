@@ -1,0 +1,58 @@
+{{template "base" .}}
+
+{{define "title"}}All Inspections - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div class="stack" style="margin-top: var(--space-xl);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>All Inspections</h1>
+    </div>
+
+    {{if .Inspections}}
+      <div class="grid">
+        {{range .Inspections}}
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-sm);">
+              <div>
+                <h3>Inspection #{{.Inspection.ID}}</h3>
+                <p style="color: #666; font-size: 0.875rem; margin-top: var(--space-xs);">
+                  <strong>Project:</strong> {{.ProjectName}}
+                </p>
+              </div>
+              <span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+                {{if eq .Inspection.Status "draft"}}background: #f3f4f6; color: #374151;
+                {{else if eq .Inspection.Status "in_progress"}}background: #dbeafe; color: #1e40af;
+                {{else if eq .Inspection.Status "completed"}}background: #d1fae5; color: #065f46;
+                {{else}}background: #fef3c7; color: #92400e;{{end}}">
+                {{.Inspection.Status}}
+              </span>
+            </div>
+
+            {{if .ProjectLocation}}
+            <p style="color: #666; font-size: 0.875rem;">
+              <strong>Location:</strong> {{.ProjectLocation}}
+            </p>
+            {{end}}
+
+            <p style="color: #666; font-size: 0.875rem;">
+              Created {{.Inspection.CreatedAt.Time.Format "Jan 2, 2006 at 3:04 PM"}}
+            </p>
+
+            <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm); flex-wrap: wrap;">
+              <a href="/inspections/{{.Inspection.ID}}" class="btn-primary">View Details</a>
+              <a href="/inspections/{{.Inspection.ID}}/photos" class="btn-secondary">Photos</a>
+              <a href="/projects/{{.ProjectID}}" class="btn-secondary">View Project</a>
+            </div>
+          </div>
+        {{end}}
+      </div>
+    {{else}}
+      <div class="card" style="text-align: center; padding: var(--space-2xl);">
+        <p style="color: #666; margin-bottom: var(--space-lg);">No inspections found. Create a project first, then add inspections to it.</p>
+        <a href="/projects" class="btn-primary">View Projects</a>
+      </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
