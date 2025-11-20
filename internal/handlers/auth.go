@@ -549,6 +549,23 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 		if err == pgx.ErrNoRows {
 			// Don't reveal if email exists or not for security
 			h.logger.Warn("password reset attempt for non-existent email", slog.String("email", req.Email))
+
+			// Check if this is an HTMX request
+			if c.Request().Header.Get("HX-Request") == "true" {
+				// HTMX request - return success HTML fragment (same message for security)
+				successHTML := `
+					<div id="forgot-form">
+						<h1>Check Your Email</h1>
+						<p>If that email exists in our system, we've sent a password reset link.</p>
+						<div class="alert alert-success">
+							<strong>Success:</strong> Check your email for the reset link.
+						</div>
+						<a href="/login" class="btn-primary">Back to Sign In</a>
+					</div>
+				`
+				return c.HTML(http.StatusOK, successHTML)
+			}
+
 			return c.JSON(http.StatusOK, map[string]string{
 				"message": "if that email exists, a password reset link has been sent",
 			})
@@ -594,6 +611,23 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 		slog.String("email", user.Email),
 	)
 
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - return success HTML fragment
+		successHTML := `
+			<div id="forgot-form">
+				<h1>Check Your Email</h1>
+				<p>If that email exists in our system, we've sent a password reset link.</p>
+				<div class="alert alert-success">
+					<strong>Success:</strong> Check your email for the reset link.
+				</div>
+				<a href="/login" class="btn-primary">Back to Sign In</a>
+			</div>
+		`
+		return c.HTML(http.StatusOK, successHTML)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "if that email exists, a password reset link has been sent",
 	})

@@ -77,3 +77,11 @@ func (h *PageHandler) VerifyEmailPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "verify.html", data)
 }
+
+// ForgotPasswordPage renders the forgot password page
+func (h *PageHandler) ForgotPasswordPage(c echo.Context) error {
+	data := map[string]interface{}{
+		"IsAuthenticated": false,
+	}
+	return c.Render(http.StatusOK, "forgot-password.html", data)
+}

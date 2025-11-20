@@ -20,6 +20,3 @@ fileStorage := storage.NewS3Storage(
     "https://cdn.myapp.com", // CloudFront URL
 )
 ```
-```
-```
-```
