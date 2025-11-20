@@ -37,11 +37,12 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [x] Navigation styles
 - [x] Accessibility features (skip link, focus states)
 
-## Authentication UI (Phase 2)
+## Authentication UI (Phase 2) - In Progress
 
 ### Public Pages
-- [ ] Login page (`/login`)
-- [ ] Register page (`/register`)
+- [x] Login page (`/login`) - HTMX form with redirect to dashboard on success
+- [x] Dashboard page (`/dashboard`) - Protected page for post-login
+- [x] Register page (`/register`) - HTMX form with redirect to login on success
 - [ ] Email verification page (`/verify`)
 - [ ] Forgot password page (`/forgot-password`)
 - [ ] Reset password page (`/reset-password`)
@@ -51,6 +52,11 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [ ] Input field component (text, email, password)
 - [x] Button component (primary, secondary, danger) - in CSS
 - [x] Flash message component (success, error, info) - in base layout
+
+### HTMX Integration
+- [x] Login handler detects `HX-Request` header
+- [x] Returns `HX-Redirect` header for HTMX requests
+- [x] Maintains JSON response for API compatibility
 
 ## Dashboard & Navigation (Phase 3)
 

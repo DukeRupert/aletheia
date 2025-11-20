@@ -57,3 +57,11 @@ func (h *PageHandler) DashboardPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "dashboard.html", data)
 }
+
+// RegisterPage renders the registration page
+func (h *PageHandler) RegisterPage(c echo.Context) error {
+	data := map[string]interface{}{
+		"IsAuthenticated": false,
+	}
+	return c.Render(http.StatusOK, "register.html", data)
+}

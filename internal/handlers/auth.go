@@ -133,7 +133,14 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		slog.String("username", user.Username),
 	)
 
-	// Return user info (without password hash)
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - redirect to login page
+		c.Response().Header().Set("HX-Redirect", "/login")
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusCreated, RegisterResponse{
 		ID:       user.ID.String(),
 		Email:    user.Email,
