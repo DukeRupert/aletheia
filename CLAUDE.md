@@ -11,6 +11,7 @@ Aletheia is a Go-based construction safety inspection platform that uses AI to d
 - **Language**: Go 1.25.1
 - **Web Framework**: Echo v4
 - **Database**: PostgreSQL with pgx/v5 connection pool
+- **Templates**: Go `html/template` with HTMX and Alpine.js
 - **Storage**: Pluggable interface supporting local filesystem and AWS S3
 - **Queue**: Pluggable job queue supporting PostgreSQL (Redis planned for future)
 - **Migrations**: Goose (SQL migrations in `internal/migrations/`)
@@ -214,19 +215,56 @@ Migrations use Goose format with `-- +goose Up` and `-- +goose Down` sections. A
 │   ├── handlers/            # HTTP request handlers
 │   ├── storage/             # File storage implementations (local, S3)
 │   ├── queue/               # Job queue system (postgres, redis, mock)
+│   ├── templates/           # Template renderer for Go html/template
 │   └── migrations/          # Goose SQL migrations
 ├── pkg/                     # (Currently empty - future shared packages)
 ├── uploads/                 # Local file storage directory
-├── web/                     # (Currently empty - future frontend)
+├── web/
+│   ├── templates/           # HTML templates (layouts, components, pages)
+│   └── static/              # CSS, JavaScript, images
 ├── docker-compose.yaml      # PostgreSQL service
 └── Makefile                 # Build and migration commands
 ```
+
+## Frontend Architecture
+
+The frontend uses a server-side rendering approach with progressive enhancement:
+
+**Template System:**
+- Go `html/template` for server-side rendering
+- Base layout (`layouts/base.html`) with reusable components
+- HTMX for dynamic server interactions without full page reloads
+- Alpine.js for lightweight client-side reactivity
+- Minimal CSS following semantic HTML-first approach
+
+**Template Structure:**
+- `web/templates/layouts/` - Base page layouts
+- `web/templates/components/` - Reusable components (nav, forms, etc.)
+- `web/templates/pages/` - Individual page templates
+
+**Static Assets:**
+- Served at `/static/` route
+- CSS in `web/static/css/main.css`
+- Images in `web/static/images/`
+
+**Rendering Pattern:**
+```go
+func (h *Handler) MyPage(c echo.Context) error {
+    data := map[string]interface{}{
+        "IsAuthenticated": true,
+        "User": user,
+    }
+    return c.Render(http.StatusOK, "mypage.html", data)
+}
+```
+
+See `web/README.md` for template usage patterns and `STYLE_GUIDE.md` for styling guidelines.
 
 ## Important Notes
 
 - Server runs on port 1323 by default (configurable)
 - Graceful shutdown implemented with 10-second timeout
-- Static file serving enabled at `/uploads` route
+- Static files served at `/static/` (CSS, JS, images) and `/uploads/` (user uploads)
 - Upload endpoint: `POST /api/upload` (accepts "image" form field)
 - Accepted image types: JPEG, PNG, WebP (5MB max)
 - Database pool is closed on shutdown

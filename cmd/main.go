@@ -15,6 +15,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/handlers"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
+	"github.com/dukerupert/aletheia/internal/templates"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -88,15 +89,32 @@ func main() {
 	})
 	logger.Info("email service initialized", slog.String("provider", cfg.Email.Provider))
 
+	// Initialize template renderer
+	renderer, err := templates.NewTemplateRenderer("web/templates")
+	if err != nil {
+		log.Fatal("failed to initialize templates:", err)
+	}
+
 	e := echo.New()
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
+	e.Renderer = renderer
+
+	// HTMX response middleware
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Set HX-Request header detection
+			if c.Request().Header.Get("HX-Request") == "true" {
+				c.Set("IsHTMX", true)
+			}
+			return next(c)
+		}
 	})
 
-	// Serve static files from uploads directory
+	// Serve static files
+	e.Static("/static", "web/static")
 	e.Static("/uploads", "./uploads")
 
 	// Initialize handlers
+	pageHandler := handlers.NewPageHandler()
 	uploadHandler := handlers.NewUploadHandler(fileStorage, pool, logger)
 	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
 	orgHandler := handlers.NewOrganizationHandler(pool, logger)
@@ -104,7 +122,10 @@ func main() {
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
 
-	// Public routes
+	// Page routes (public)
+	e.GET("/", pageHandler.HomePage)
+
+	// Public API routes
 	e.POST("/api/auth/register", authHandler.Register)
 	e.POST("/api/auth/login", authHandler.Login)
 	e.POST("/api/auth/verify-email", authHandler.VerifyEmail)

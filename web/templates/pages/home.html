@@ -1,0 +1,21 @@
+{{template "base" .}}
+
+{{define "title"}}Welcome - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div class="stack">
+    <h1>Welcome to Aletheia</h1>
+    <p>Construction safety inspection platform using AI to detect safety violations from photos.</p>
+
+    <div class="card">
+      <h3>Get Started</h3>
+      <p>Sign in to your account or create a new one to begin inspections.</p>
+      <div class="flex gap-md">
+        <a href="/login" class="btn-primary">Sign In</a>
+        <a href="/register" class="btn-secondary">Create Account</a>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
