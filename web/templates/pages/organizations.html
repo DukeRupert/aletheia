@@ -1,0 +1,39 @@
+{{template "base" .}}
+
+{{define "title"}}Organizations - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div class="stack" style="margin-top: var(--space-xl);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>Organizations</h1>
+      <a href="/organizations/new" class="btn-primary">New Organization</a>
+    </div>
+
+    {{if .Organizations}}
+      <div class="grid">
+        {{range .Organizations}}
+          <div class="card">
+            <h3>{{.Name}}</h3>
+            <p style="color: #666; font-size: 0.875rem;">
+              Role: <strong>{{.Role}}</strong>
+            </p>
+            <p style="color: #666; font-size: 0.875rem;">
+              Created {{.CreatedAt.Format "Jan 2, 2006"}}
+            </p>
+            <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+              <a href="/organizations/{{.ID}}" class="btn-primary">View</a>
+              <a href="/organizations/{{.ID}}/members" class="btn-secondary">Members</a>
+            </div>
+          </div>
+        {{end}}
+      </div>
+    {{else}}
+      <div class="card" style="text-align: center; padding: var(--space-2xl);">
+        <p style="color: #666; margin-bottom: var(--space-lg);">No organizations yet. Create your first organization to get started.</p>
+        <a href="/organizations/new" class="btn-primary">Create Organization</a>
+      </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

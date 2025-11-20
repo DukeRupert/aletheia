@@ -165,6 +165,8 @@ func main() {
 	protectedPages := e.Group("")
 	protectedPages.Use(session.SessionMiddleware(pool))
 	protectedPages.GET("/dashboard", pageHandler.DashboardPage)
+	protectedPages.GET("/organizations", pageHandler.OrganizationsPage)
+	protectedPages.GET("/organizations/new", pageHandler.NewOrganizationPage)
 	protectedPages.GET("/projects", pageHandler.ProjectsPage)
 	protectedPages.GET("/projects/new", pageHandler.NewProjectPage)
 

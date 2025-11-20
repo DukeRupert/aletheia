@@ -6,6 +6,7 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -171,4 +172,71 @@ func (h *PageHandler) NewProjectPage(c echo.Context) error {
 		"Organizations": organizations,
 	}
 	return c.Render(http.StatusOK, "new-project.html", data)
+}
+
+// OrganizationsPage renders the organizations list page
+func (h *PageHandler) OrganizationsPage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Get user's organizations
+	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	if err != nil {
+		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
+		memberships = []database.OrganizationMember{}
+	}
+
+	// Fetch organization details for each membership
+	type OrgWithRole struct {
+		ID        pgtype.UUID
+		Name      string
+		Role      database.OrganizationRole
+		CreatedAt pgtype.Timestamptz
+	}
+
+	var organizations []OrgWithRole
+	for _, membership := range memberships {
+		org, err := queries.GetOrganization(c.Request().Context(), membership.OrganizationID)
+		if err != nil {
+			h.logger.Warn("failed to get organization", slog.String("err", err.Error()))
+			continue
+		}
+		organizations = append(organizations, OrgWithRole{
+			ID:        org.ID,
+			Name:      org.Name,
+			Role:      membership.Role,
+			CreatedAt: org.CreatedAt,
+		})
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User": map[string]interface{}{
+			"Name": "User",
+		},
+		"Organizations": organizations,
+	}
+	return c.Render(http.StatusOK, "organizations.html", data)
+}
+
+// NewOrganizationPage renders the new organization form page
+func (h *PageHandler) NewOrganizationPage(c echo.Context) error {
+	// Get user from session
+	_, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User": map[string]interface{}{
+			"Name": "User",
+		},
+	}
+	return c.Render(http.StatusOK, "new-organization.html", data)
 }

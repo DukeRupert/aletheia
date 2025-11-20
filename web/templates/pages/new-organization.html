@@ -1,0 +1,40 @@
+{{template "base" .}}
+
+{{define "title"}}New Organization - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div style="max-width: 600px; margin: 3rem auto;">
+    <div class="card">
+      <h1>Create New Organization</h1>
+      <p>Organizations allow you to manage teams and projects for your company or department.</p>
+
+      <form
+        hx-post="/api/organizations"
+        hx-target="#organization-form"
+        hx-swap="outerHTML"
+        id="organization-form"
+        class="stack">
+
+        <div class="form-field">
+          <label for="name">Organization Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            required
+            autofocus
+            maxlength="255"
+            placeholder="e.g., Acme Construction Co.">
+          <small class="help-text">Enter a descriptive name for your organization</small>
+        </div>
+
+        <div style="display: flex; gap: var(--space-sm);">
+          <button type="submit" class="btn-primary">Create Organization</button>
+          <a href="/organizations" class="btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

@@ -24,7 +24,7 @@ func NewOrganizationHandler(pool *pgxpool.Pool, logger *slog.Logger) *Organizati
 
 // CreateOrganizationRequest is the request payload for creating an organization
 type CreateOrganizationRequest struct {
-	Name string `json:"name" validate:"required,min=1,max=255"`
+	Name string `json:"name" form:"name" validate:"required,min=1,max=255"`
 }
 
 // CreateOrganizationResponse is the response payload for organization creation
@@ -75,6 +75,14 @@ func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
 
 	h.logger.Info("organization created", slog.String("org_id", org.ID.String()), slog.String("user_id", userID.String()))
 
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - redirect to organizations list
+		c.Response().Header().Set("HX-Redirect", "/organizations")
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusCreated, CreateOrganizationResponse{
 		ID:        org.ID.String(),
 		Name:      org.Name,
