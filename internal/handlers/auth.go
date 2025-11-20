@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dukerupert/aletheia/internal/auth"
@@ -30,11 +31,12 @@ func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger, emailService email.Em
 }
 
 type RegisterRequest struct {
-	Email     string `json:"email" validate:"required,email"`
-	Username  string `json:"username" validate:"required,min=3,max=50"`
-	Password  string `json:"password" validate:"required,min=8"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	Email     string `json:"email" form:"email" validate:"required,email"`
+	Username  string `json:"username" form:"username" validate:"required,min=3,max=50"`
+	Password  string `json:"password" form:"password" validate:"required,min=8"`
+	Name      string `json:"name" form:"name"` // Full name from form
+	FirstName string `json:"first_name" form:"first_name"`
+	LastName  string `json:"last_name" form:"last_name"`
 }
 
 type RegisterResponse struct {
@@ -70,13 +72,23 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	// Create user in database
 	queries := database.New(h.db)
 
-	// Convert optional fields to pgtype.Text
+	// Handle name field - split full name if provided, otherwise use first/last names
 	var firstName, lastName pgtype.Text
-	if req.FirstName != "" {
-		firstName = pgtype.Text{String: req.FirstName, Valid: true}
-	}
-	if req.LastName != "" {
-		lastName = pgtype.Text{String: req.LastName, Valid: true}
+	if req.Name != "" {
+		// Split full name into first and last name (simple split on first space)
+		parts := strings.SplitN(req.Name, " ", 2)
+		firstName = pgtype.Text{String: parts[0], Valid: true}
+		if len(parts) > 1 {
+			lastName = pgtype.Text{String: parts[1], Valid: true}
+		}
+	} else {
+		// Use explicit first/last name fields
+		if req.FirstName != "" {
+			firstName = pgtype.Text{String: req.FirstName, Valid: true}
+		}
+		if req.LastName != "" {
+			lastName = pgtype.Text{String: req.LastName, Valid: true}
+		}
 	}
 
 	user, err := queries.CreateUser(c.Request().Context(), database.CreateUserParams{
@@ -149,8 +161,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Email    string `json:"email" form:"email" validate:"required,email"`
+	Password string `json:"password" form:"password" validate:"required"`
 }
 
 type LoginResponse struct {
@@ -394,7 +406,7 @@ func (h *AuthHandler) UpdateProfile(c echo.Context) error {
 }
 
 type VerifyEmailRequest struct {
-	Token string `json:"token" validate:"required"`
+	Token string `json:"token" form:"token" validate:"required"`
 }
 
 // VerifyEmail verifies a user's email address using the verification token
@@ -460,7 +472,7 @@ func (h *AuthHandler) VerifyEmail(c echo.Context) error {
 }
 
 type ResendVerificationRequest struct {
-	Email string `json:"email" validate:"required,email"`
+	Email string `json:"email" form:"email" validate:"required,email"`
 }
 
 // ResendVerification resends the verification email to a user
@@ -538,7 +550,7 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 }
 
 type RequestPasswordResetRequest struct {
-	Email string `json:"email" validate:"required,email"`
+	Email string `json:"email" form:"email" validate:"required,email"`
 }
 
 // RequestPasswordReset initiates the password reset flow
@@ -646,7 +658,7 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 }
 
 type VerifyResetTokenRequest struct {
-	Token string `json:"token" validate:"required"`
+	Token string `json:"token" form:"token" validate:"required"`
 }
 
 // VerifyResetToken verifies that a password reset token is valid
@@ -688,8 +700,9 @@ func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
 }
 
 type ResetPasswordRequest struct {
-	Token       string `json:"token" validate:"required"`
-	NewPassword string `json:"new_password" validate:"required,min=8"`
+	Token       string `json:"token" form:"token" validate:"required"`
+	NewPassword string `json:"new_password" form:"password" validate:"required,min=8"`
+	Password    string `json:"password" form:"confirm_password"` // For form compatibility
 }
 
 // ResetPassword resets a user's password using a valid reset token
