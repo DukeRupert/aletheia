@@ -1,0 +1,32 @@
+{{template "base" .}}
+
+{{define "title"}}Dashboard - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div class="stack">
+    <h1>Dashboard</h1>
+    <p>Welcome back, {{if .User}}{{.User.Name}}{{else}}User{{end}}!</p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Recent Inspections</h3>
+        <p>View and manage your recent safety inspections.</p>
+        <a href="/inspections" class="btn-primary">View Inspections</a>
+      </div>
+
+      <div class="card">
+        <h3>Projects</h3>
+        <p>Manage your construction projects.</p>
+        <a href="/projects" class="btn-primary">View Projects</a>
+      </div>
+
+      <div class="card">
+        <h3>Organizations</h3>
+        <p>Manage your organizations and team members.</p>
+        <a href="/organizations" class="btn-primary">View Organizations</a>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

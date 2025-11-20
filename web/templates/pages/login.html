@@ -9,7 +9,13 @@
       <h1>Sign In</h1>
       <p>Welcome back! Sign in to your account.</p>
 
-      <form action="/api/auth/login" method="post" class="stack">
+      <form
+        hx-post="/api/auth/login"
+        hx-target="#login-form"
+        hx-swap="outerHTML"
+        id="login-form"
+        class="stack">
+
         <div class="form-field">
           <label for="email">Email</label>
           <input

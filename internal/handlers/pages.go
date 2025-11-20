@@ -45,3 +45,15 @@ func (h *PageHandler) LoginPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "login.html", data)
 }
+
+// DashboardPage renders the dashboard page
+func (h *PageHandler) DashboardPage(c echo.Context) error {
+	// TODO: Get user from session
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User": map[string]interface{}{
+			"Name": "User", // TODO: Get from session
+		},
+	}
+	return c.Render(http.StatusOK, "dashboard.html", data)
+}

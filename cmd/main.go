@@ -135,7 +135,12 @@ func main() {
 	e.POST("/api/auth/verify-reset-token", authHandler.VerifyResetToken)
 	e.POST("/api/auth/reset-password", authHandler.ResetPassword)
 
-	// Protected routes (require session)
+	// Protected page routes (require session)
+	protectedPages := e.Group("")
+	protectedPages.Use(session.SessionMiddleware(pool))
+	protectedPages.GET("/dashboard", pageHandler.DashboardPage)
+
+	// Protected API routes (require session)
 	protected := e.Group("/api")
 	protected.Use(session.SessionMiddleware(pool))
 	protected.POST("/upload", uploadHandler.UploadImage)

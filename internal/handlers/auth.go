@@ -225,7 +225,14 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		slog.String("email", user.Email),
 	)
 
-	// Return user info
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - redirect to dashboard
+		c.Response().Header().Set("HX-Redirect", "/dashboard")
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusOK, LoginResponse{
 		ID:       user.ID.String(),
 		Email:    user.Email,
