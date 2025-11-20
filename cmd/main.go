@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -213,8 +214,9 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info("starting server", slog.String("address", ":1323"))
-		if err := e.Start(":1323"); err != nil && err != http.ErrServerClosed {
+		address := fmt.Sprintf("%s:%d", cfg.App.Host, cfg.App.Port)
+		logger.Info("starting server", slog.String("address", address))
+		if err := e.Start(address); err != nil && err != http.ErrServerClosed {
 			logger.Error("server error", slog.String("err", err.Error()))
 			os.Exit(1)
 		}
