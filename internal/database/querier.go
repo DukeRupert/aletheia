@@ -63,6 +63,7 @@ type Querier interface {
 	ListReports(ctx context.Context, inspectionID pgtype.UUID) ([]Report, error)
 	ListSafetyCodes(ctx context.Context) ([]SafetyCode, error)
 	ListSafetyCodesByCountry(ctx context.Context, country pgtype.Text) ([]SafetyCode, error)
+	ListSafetyCodesByLocation(ctx context.Context, arg ListSafetyCodesByLocationParams) ([]SafetyCode, error)
 	ListSafetyCodesByStateProvince(ctx context.Context, stateProvince pgtype.Text) ([]SafetyCode, error)
 	ListUserOrganizations(ctx context.Context, userID pgtype.UUID) ([]OrganizationMember, error)
 	ListUsers(ctx context.Context, status UserStatus) ([]User, error)

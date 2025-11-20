@@ -20,6 +20,12 @@ SELECT * FROM safety_codes
 WHERE state_province = $1
 ORDER BY code;
 
+-- name: ListSafetyCodesByLocation :many
+SELECT * FROM safety_codes
+WHERE country = $1
+  AND (state_province = $2 OR state_province IS NULL)
+ORDER BY code;
+
 -- name: CreateSafetyCode :one
 INSERT INTO safety_codes (
   code,

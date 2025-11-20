@@ -56,8 +56,35 @@ func (h *PhotoAnalysisJobHandler) Handle(ctx context.Context, job *queue.Job) (m
 		return nil, fmt.Errorf("failed to fetch photo: %w", err)
 	}
 
-	// Fetch safety codes for analysis context
-	safetyCodes, err := h.db.ListSafetyCodes(ctx)
+	// Fetch inspection to get project context
+	inspection, err := h.db.GetInspection(ctx, photo.InspectionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch inspection: %w", err)
+	}
+
+	// Fetch project to get location and organization
+	project, err := h.db.GetProject(ctx, inspection.ProjectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch project: %w", err)
+	}
+
+	// Fetch safety codes filtered by project location (state/country)
+	var safetyCodes []database.SafetyCode
+	if project.State.Valid && project.State.String != "" {
+		// Filter by state and country
+		country := "US"
+		if project.Country.Valid {
+			country = project.Country.String
+		}
+		safetyCodes, err = h.db.ListSafetyCodesByLocation(ctx, database.ListSafetyCodesByLocationParams{
+			Country:       pgtype.Text{String: country, Valid: true},
+			StateProvince: project.State,
+		})
+	} else {
+		// Fall back to all safety codes
+		safetyCodes, err = h.db.ListSafetyCodes(ctx)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch safety codes: %w", err)
 	}
@@ -72,12 +99,32 @@ func (h *PhotoAnalysisJobHandler) Handle(ctx context.Context, job *queue.Job) (m
 		})
 	}
 
+	// Download image from storage
+	imageData, err := h.storage.Download(ctx, photo.StorageUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download photo from storage: %w", err)
+	}
+
+	// Build rich inspection context
+	inspectionContext := fmt.Sprintf("Construction site inspection at project: %s", project.Name)
+	if project.Address.Valid {
+		inspectionContext += fmt.Sprintf(", Location: %s", project.Address.String)
+		if project.City.Valid {
+			inspectionContext += fmt.Sprintf(", %s", project.City.String)
+		}
+		if project.State.Valid {
+			inspectionContext += fmt.Sprintf(", %s", project.State.String)
+		}
+	}
+	if project.ProjectType.Valid {
+		inspectionContext += fmt.Sprintf(", Project Type: %s", project.ProjectType.String)
+	}
+
 	// Prepare AI analysis request
-	// Use the photo URL for analysis (AI service will fetch it)
 	analysisReq := ai.AnalysisRequest{
-		ImageURL:          photo.StorageUrl,
+		ImageData:         imageData,
 		SafetyCodes:       codeContexts,
-		InspectionContext: fmt.Sprintf("Construction site inspection at project location"),
+		InspectionContext: inspectionContext,
 	}
 
 	// Perform AI analysis

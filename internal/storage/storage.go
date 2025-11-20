@@ -25,6 +25,7 @@ type FileStorage interface {
 	Delete(ctx context.Context, filename string) error
 	GetURL(filename string) string
 	GenerateThumbnail(ctx context.Context, originalFilename string) (thumbnailFilename string, err error)
+	Download(ctx context.Context, url string) ([]byte, error)
 }
 
 // StorageConfig holds configuration for storage services
@@ -182,6 +183,21 @@ func (s *LocalStorage) GenerateThumbnail(ctx context.Context, originalFilename s
 	}
 
 	return thumbnailFilename, nil
+}
+
+// Download reads a file from local storage and returns its contents
+func (s *LocalStorage) Download(ctx context.Context, url string) ([]byte, error) {
+	// Extract filename from URL
+	filename := filepath.Base(url)
+	filePath := filepath.Join(s.basePath, filename)
+
+	// Read file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return data, nil
 }
 
 // resizeImage resizes an image to fit within maxWidth x maxHeight while maintaining aspect ratio

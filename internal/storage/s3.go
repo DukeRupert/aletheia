@@ -148,3 +148,27 @@ func (s *S3Storage) GenerateThumbnail(ctx context.Context, originalFilename stri
 
 	return thumbnailFilename, nil
 }
+
+// Download retrieves a file from S3 and returns its contents
+func (s *S3Storage) Download(ctx context.Context, url string) ([]byte, error) {
+	// Extract filename/key from URL
+	filename := filepath.Base(url)
+
+	// Get object from S3
+	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(filename),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to download from S3: %w", err)
+	}
+	defer result.Body.Close()
+
+	// Read all content
+	buf := new(bytes.Buffer)
+	if _, err := buf.ReadFrom(result.Body); err != nil {
+		return nil, fmt.Errorf("failed to read S3 object: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}

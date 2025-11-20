@@ -167,6 +167,46 @@ func (q *Queries) ListSafetyCodesByCountry(ctx context.Context, country pgtype.T
 	return items, nil
 }
 
+const listSafetyCodesByLocation = `-- name: ListSafetyCodesByLocation :many
+SELECT id, code, description, country, state_province, created_at, updated_at FROM safety_codes
+WHERE country = $1
+  AND (state_province = $2 OR state_province IS NULL)
+ORDER BY code
+`
+
+type ListSafetyCodesByLocationParams struct {
+	Country       pgtype.Text `json:"country"`
+	StateProvince pgtype.Text `json:"state_province"`
+}
+
+func (q *Queries) ListSafetyCodesByLocation(ctx context.Context, arg ListSafetyCodesByLocationParams) ([]SafetyCode, error) {
+	rows, err := q.db.Query(ctx, listSafetyCodesByLocation, arg.Country, arg.StateProvince)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SafetyCode{}
+	for rows.Next() {
+		var i SafetyCode
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Description,
+			&i.Country,
+			&i.StateProvince,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSafetyCodesByStateProvince = `-- name: ListSafetyCodesByStateProvince :many
 SELECT id, code, description, country, state_province, created_at, updated_at FROM safety_codes
 WHERE state_province = $1
