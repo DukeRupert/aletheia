@@ -113,19 +113,18 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Implement violation confirmation/dismissal workflow
 - [x] Create violation update endpoint (add notes, change status)
 
-## Phase 7: Reporting
+## Phase 7: Frontend Development (In Progress)
 
-### Report Generation
-- [ ] Design report template structure
-- [ ] Create report generation endpoint
-- [ ] Generate PDF reports with violations
-- [ ] Include photos in reports
-- [ ] Add report metadata (inspector, date, project info)
-- [ ] Create report listing endpoint
-- [ ] Create report download endpoint
-- [ ] Implement report sharing/export
+> **Note:** Phase 7 (Reporting) has been deferred until after the UI is built. PDF generation is easier when HTML templates are already created.
 
-## Phase 8: Frontend Development
+See [UI_ROADMAP.md](./UI_ROADMAP.md) for detailed frontend implementation plan.
+See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for minimal styling guidelines.
+
+**Tech Stack:**
+- Go `html/template` for server-side rendering
+- HTMX for dynamic interactions
+- Alpine.js for client-side reactivity
+- Minimal CSS (semantic HTML-first)
 
 ### Authentication UI
 - [ ] Login page
