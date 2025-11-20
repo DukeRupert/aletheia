@@ -34,6 +34,10 @@ func main() {
 	logger := slog.New(cfg.GetLogger())
 	slog.SetDefault(logger)
 	logger.Debug("logger initialized", slog.String("level", cfg.Logger.Level.String()))
+	logger.Debug("application configuration",
+		slog.String("environment", cfg.App.Env),
+		slog.String("host", cfg.App.Host),
+		slog.Int("port", cfg.App.Port))
 
 	// Create pool configuration
 	connString := cfg.GetConnectionString()
@@ -67,6 +71,11 @@ func main() {
 	logger.Info("database connection pool established")
 
 	// Initialize storage service (configured via STORAGE_PROVIDER env var)
+	logger.Debug("storage service configuration",
+		slog.String("provider", cfg.Storage.Provider),
+		slog.String("local_path", cfg.Storage.LocalPath),
+		slog.String("s3_bucket", cfg.Storage.S3Bucket),
+		slog.String("s3_region", cfg.Storage.S3Region))
 	fileStorage, err := storage.NewFileStorage(context.Background(), logger, storage.StorageConfig{
 		Provider:  cfg.Storage.Provider,
 		LocalPath: cfg.Storage.LocalPath,
@@ -80,6 +89,10 @@ func main() {
 	}
 
 	// Initialize email service (configured via EMAIL_PROVIDER env var)
+	logger.Debug("email service configuration",
+		slog.String("provider", cfg.Email.Provider),
+		slog.String("from_address", cfg.Email.FromAddress),
+		slog.String("from_name", cfg.Email.FromName))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:        cfg.Email.Provider,
 		PostmarkToken:   cfg.Email.PostmarkToken,
@@ -91,15 +104,19 @@ func main() {
 	logger.Info("email service initialized", slog.String("provider", cfg.Email.Provider))
 
 	// Initialize template renderer
+	logger.Debug("initializing template renderer", slog.String("path", "web/templates"))
 	renderer, err := templates.NewTemplateRenderer("web/templates")
 	if err != nil {
 		log.Fatal("failed to initialize templates:", err)
 	}
+	logger.Info("template renderer initialized")
 
+	logger.Debug("initializing Echo web server")
 	e := echo.New()
 	e.Renderer = renderer
 
 	// HTMX response middleware
+	logger.Debug("configuring HTMX middleware")
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// Set HX-Request header detection
@@ -111,10 +128,14 @@ func main() {
 	})
 
 	// Serve static files
+	logger.Debug("configuring static file routes",
+		slog.String("css_js_images", "/static"),
+		slog.String("uploads", "/uploads"))
 	e.Static("/static", "web/static")
 	e.Static("/uploads", "./uploads")
 
 	// Initialize handlers
+	logger.Debug("initializing HTTP handlers")
 	pageHandler := handlers.NewPageHandler()
 	uploadHandler := handlers.NewUploadHandler(fileStorage, pool, logger)
 	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
@@ -122,6 +143,7 @@ func main() {
 	projectHandler := handlers.NewProjectHandler(pool, logger)
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
+	logger.Info("all handlers initialized")
 
 	// Page routes (public)
 	e.GET("/", pageHandler.HomePage)
