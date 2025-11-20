@@ -1,0 +1,93 @@
+{{template "base" .}}
+
+{{define "title"}}Profile - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div style="max-width: 600px; margin: 3rem auto;">
+    <div class="stack">
+      <h1>My Profile</h1>
+
+      <div class="card">
+        <h2>Account Information</h2>
+
+        <div class="stack" style="margin-bottom: var(--space-lg);">
+          <div>
+            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Email</label>
+            <p style="color: #666;">{{.Profile.Email}}</p>
+            <small class="help-text">Email cannot be changed</small>
+          </div>
+
+          <div>
+            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Username</label>
+            <p style="color: #666;">{{.Profile.Username}}</p>
+            <small class="help-text">Username cannot be changed</small>
+          </div>
+
+          <div>
+            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Account Status</label>
+            <p style="color: #666;">
+              {{if eq .Profile.Status "active"}}
+                <span style="color: #16a34a;">✓ Active</span>
+              {{else if eq .Profile.Status "pending"}}
+                <span style="color: #ea580c;">⏳ Pending Verification</span>
+              {{else}}
+                <span style="color: #dc2626;">{{.Profile.Status}}</span>
+              {{end}}
+            </p>
+          </div>
+
+          <div>
+            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Member Since</label>
+            <p style="color: #666;">{{.Profile.CreatedAt.Time.Format "January 2, 2006"}}</p>
+          </div>
+        </div>
+
+        <h3 style="margin-top: var(--space-lg);">Update Profile</h3>
+
+        <form
+          hx-put="/api/auth/profile"
+          hx-target="#profile-form"
+          hx-swap="outerHTML"
+          id="profile-form"
+          class="stack">
+
+          <div class="form-field">
+            <label for="first_name">First Name</label>
+            <input
+              type="text"
+              id="first_name"
+              name="first_name"
+              maxlength="100"
+              value="{{if .Profile.FirstName.Valid}}{{.Profile.FirstName.String}}{{end}}"
+              placeholder="Your first name">
+          </div>
+
+          <div class="form-field">
+            <label for="last_name">Last Name</label>
+            <input
+              type="text"
+              id="last_name"
+              name="last_name"
+              maxlength="100"
+              value="{{if .Profile.LastName.Valid}}{{.Profile.LastName.String}}{{end}}"
+              placeholder="Your last name">
+          </div>
+
+          <div style="display: flex; gap: var(--space-sm);">
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Security</h2>
+        <p style="color: #666; margin-bottom: var(--space-md);">
+          Change your password or manage account security settings.
+        </p>
+        <a href="/profile/security" class="btn-secondary">Security Settings</a>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

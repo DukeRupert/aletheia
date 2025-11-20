@@ -334,8 +334,8 @@ func (h *AuthHandler) Me(c echo.Context) error {
 }
 
 type UpdateProfileRequest struct {
-	FirstName *string `json:"first_name"`
-	LastName  *string `json:"last_name"`
+	FirstName *string `json:"first_name" form:"first_name"`
+	LastName  *string `json:"last_name" form:"last_name"`
 }
 
 type UpdateProfileResponse struct {

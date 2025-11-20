@@ -290,3 +290,38 @@ func (h *PageHandler) ProjectDetailPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "project-detail.html", data)
 }
+
+// ProfilePage renders the user profile page
+func (h *PageHandler) ProfilePage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Get user details
+	user, err := queries.GetUser(c.Request().Context(), uuidToPgUUID(userID))
+	if err != nil {
+		h.logger.Error("failed to get user", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+	}
+
+	// Build display name
+	displayName := user.Username
+	if user.FirstName.Valid && user.LastName.Valid {
+		displayName = user.FirstName.String + " " + user.LastName.String
+	} else if user.FirstName.Valid {
+		displayName = user.FirstName.String
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User": map[string]interface{}{
+			"Name": displayName,
+		},
+		"Profile": user,
+	}
+	return c.Render(http.StatusOK, "profile.html", data)
+}
