@@ -56,14 +56,28 @@ type AnalyzePhotoResponse struct {
 func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	// Parse request
+	// Parse request - try form params first (from HTMX), then JSON
 	var req AnalyzePhotoRequest
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
 
+	// If PhotoID is empty, try getting it from form param directly
+	if req.PhotoID == "" {
+		req.PhotoID = c.FormValue("photo_id")
+	}
+
+	h.logger.Debug("analyze photo request",
+		slog.String("photo_id", req.PhotoID),
+		slog.String("content_type", c.Request().Header.Get("Content-Type")),
+	)
+
 	photoID, err := uuid.Parse(req.PhotoID)
 	if err != nil {
+		h.logger.Error("failed to parse photo_id",
+			slog.String("photo_id_raw", req.PhotoID),
+			slog.String("error", err.Error()),
+		)
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid photo_id format")
 	}
 

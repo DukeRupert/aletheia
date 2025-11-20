@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 )
 
@@ -19,12 +20,59 @@ type TemplateRenderer struct {
 func NewTemplateRenderer(templatesDir string) (*TemplateRenderer, error) {
 	templates := make(map[string]*template.Template)
 
+	// Define custom template functions
+	funcMap := template.FuncMap{
+		"mul": func(a, b interface{}) float64 {
+			var aFloat, bFloat float64
+
+			// Handle pgtype.Numeric
+			if numeric, ok := a.(pgtype.Numeric); ok {
+				floatVal, _ := numeric.Float64Value()
+				aFloat = floatVal.Float64
+			} else {
+				switch v := a.(type) {
+				case float64:
+					aFloat = v
+				case float32:
+					aFloat = float64(v)
+				case int:
+					aFloat = float64(v)
+				case int64:
+					aFloat = float64(v)
+				default:
+					return 0
+				}
+			}
+
+			// Handle pgtype.Numeric
+			if numeric, ok := b.(pgtype.Numeric); ok {
+				floatVal, _ := numeric.Float64Value()
+				bFloat = floatVal.Float64
+			} else {
+				switch v := b.(type) {
+				case float64:
+					bFloat = v
+				case float32:
+					bFloat = float64(v)
+				case int:
+					bFloat = float64(v)
+				case int64:
+					bFloat = float64(v)
+				default:
+					return 0
+				}
+			}
+
+			return aFloat * bFloat
+		},
+	}
+
 	// Get layout and component patterns
 	layoutPattern := filepath.Join(templatesDir, "layouts", "*.html")
 	componentPattern := filepath.Join(templatesDir, "components", "*.html")
 
-	// Parse base templates (layouts and components) ONCE
-	baseTmpl, err := template.New("base").ParseGlob(layoutPattern)
+	// Parse base templates (layouts and components) ONCE with custom functions
+	baseTmpl, err := template.New("base").Funcs(funcMap).ParseGlob(layoutPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse layouts: %w", err)
 	}
