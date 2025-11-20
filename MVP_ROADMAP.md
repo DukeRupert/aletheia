@@ -126,35 +126,42 @@ See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for minimal styling guidelines.
 - Alpine.js for client-side reactivity
 - Minimal CSS (semantic HTML-first)
 
-### Authentication UI
-- [ ] Login page
-- [ ] Registration page
-- [ ] Email verification page
-- [ ] Password reset page
-- [ ] User profile page
+### Authentication UI ✓ COMPLETED
+- [x] Login page (`/login`)
+- [x] Registration page (`/register`)
+- [x] Email verification page (`/verify`)
+- [x] Forgot password page (`/forgot-password`)
+- [x] Reset password page (`/reset-password`)
+- [x] User profile page (`/profile`)
 
-### Dashboard
-- [ ] Organization dashboard
-- [ ] Project listing view
-- [ ] Recent inspections view
+### Dashboard - Basic Complete
+- [x] Basic dashboard page (`/dashboard`)
+- [x] Navigation with user display name
+- [ ] Organization selector/switcher
+- [ ] Recent inspections widget
 - [ ] Violation statistics/charts
 
-### Inspection Interface
-- [ ] Create new inspection form
-- [ ] Inspection detail view
+### Organization & Project Management UI ✓ COMPLETED
+- [x] Organization list page (`/organizations`)
+- [x] Create organization form (`/organizations/new`)
+- [x] Project list page (`/projects`)
+- [x] Create project form (`/projects/new`)
+- [x] Project detail/edit page (`/projects/:id`) with location data collection
+- [ ] Organization detail page
+- [ ] Organization member management UI
+
+### Inspection Interface - Core Complete
+- [x] Global inspection list (`/inspections`) - Aggregated across all projects
+- [x] Project-specific inspection list (`/projects/:projectId/inspections`)
+- [x] Create new inspection form (`/projects/:projectId/inspections/new`)
+- [ ] Inspection detail view (`/inspections/:id`)
 - [ ] Photo upload interface
 - [ ] Photo gallery view
 - [ ] Trigger AI analysis button
 - [ ] Violation review interface
 - [ ] Mark violations as confirmed/dismissed
 
-### Project Management UI
-- [ ] Create project form
-- [ ] Project detail view
-- [ ] Project settings page
-- [ ] Organization member management UI
-
-### Reports UI
+### Reports UI - Not Started
 - [ ] Report generation form
 - [ ] Report preview
 - [ ] Report download/share

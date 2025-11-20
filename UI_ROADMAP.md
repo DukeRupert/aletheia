@@ -37,7 +37,7 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [x] Navigation styles
 - [x] Accessibility features (skip link, focus states)
 
-## Authentication UI (Phase 2) - In Progress
+## Authentication UI (Phase 2) ✓ COMPLETED
 
 ### Public Pages
 - [x] Login page (`/login`) - HTMX form with redirect to dashboard on success
@@ -46,6 +46,7 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [x] Email verification page (`/verify`) - Auto-verify with token in URL, manual entry fallback
 - [x] Forgot password page (`/forgot-password`)
 - [x] Reset password page (`/reset-password`)
+- [x] User profile page (`/profile`) - Edit name with HTMX form
 
 ### Components
 - [ ] Form component (validation errors, success messages)
@@ -57,28 +58,33 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [x] Login handler detects `HX-Request` header
 - [x] Returns `HX-Redirect` header for HTMX requests
 - [x] Maintains JSON response for API compatibility
+- [x] Registration handler with HTMX redirect
+- [x] Organization/project creation with HTMX redirect
+- [x] Inspection creation with HTMX redirect
 
-## Dashboard & Navigation (Phase 3)
+## Dashboard & Navigation (Phase 3) - In Progress
 
 ### Main Dashboard
-- [ ] Dashboard layout (`/dashboard`)
+- [x] Dashboard layout (`/dashboard`) - Basic page with navigation
 - [ ] Organization selector/switcher
 - [ ] Recent inspections widget
 - [ ] Pending violations count
 - [ ] Quick actions menu
 
 ### Navigation
-- [ ] Top navigation bar
+- [x] Top navigation bar (with user display name)
+- [x] Logo link to dashboard
+- [x] Profile link
+- [x] Logout functionality
 - [ ] Mobile hamburger menu
 - [ ] User profile dropdown
-- [ ] Logout functionality
 - [ ] Breadcrumb navigation
 
-## Organization & Project Management (Phase 4)
+## Organization & Project Management (Phase 4) ✓ COMPLETED
 
 ### Organization Pages
-- [ ] Organization list page (`/organizations`)
-- [ ] Create organization form (modal or page)
+- [x] Organization list page (`/organizations`) - Card grid layout with creation dates
+- [x] Create organization form (`/organizations/new`) - HTMX form with redirect
 - [ ] Organization detail page (`/organizations/:id`)
 - [ ] Organization settings page
 - [ ] Member management interface
@@ -88,29 +94,27 @@ Frontend implementation using Go templates + HTMX + Alpine.js
   - [ ] Remove member
 
 ### Project Pages
-- [ ] Project list page (`/projects`)
-- [ ] Create project form (HTMX modal)
-- [ ] Project detail page (`/projects/:id`)
-- [ ] Edit project form
+- [x] Project list page (`/projects`) - Shows all projects across user's organizations
+- [x] Create project form (`/projects/new`) - HTMX form with organization selector
+- [x] Project detail page (`/projects/:id`) - Comprehensive location info collection with full US state dropdown
+- [x] Edit project form - Inline editing with location fields (address, city, state, zip, country)
 - [ ] Archive/delete project
 
 ### Components
-- [ ] Card component (for projects, organizations)
+- [x] Card component (for projects, organizations) - in CSS
 - [ ] Table component (for lists)
 - [ ] Modal component (HTMX-powered)
 - [ ] Dropdown menu component
 
-## Inspection Workflow (Phase 5)
+## Inspection Workflow (Phase 5) - In Progress
 
 ### Inspection Pages
-- [ ] Inspection list page (`/inspections`)
-  - [ ] Filter by project
-  - [ ] Filter by status
-  - [ ] Sort by date
-- [ ] Create inspection page (`/inspections/new`)
-  - [ ] Select project
-  - [ ] Select inspector
-  - [ ] Set status
+- [x] Inspection list page (`/inspections`) - Global view across all projects with context
+- [x] Project-specific inspection list (`/projects/:projectId/inspections`)
+- [x] Create inspection page (`/projects/:projectId/inspections/new`) - HTMX form with project context
+- [ ] Filter by project (global view)
+- [ ] Filter by status
+- [ ] Sort by date
 - [ ] Inspection detail page (`/inspections/:id`)
   - [ ] Inspection metadata
   - [ ] Photo gallery
