@@ -35,9 +35,9 @@
           </button>
 
           <div x-show="open" @click.away="open = false" class="dropdown" x-cloak>
-            <a href="/settings/profile">Profile</a>
+            <a href="/profile">Profile</a>
             <a href="/organizations">Organizations</a>
-            <a href="/settings">Settings</a>
+            <a href="/projects">Projects</a>
             <hr>
             <form hx-post="/api/auth/logout" hx-swap="none">
               <button type="submit" class="btn-link">Logout</button>

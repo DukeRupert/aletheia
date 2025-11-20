@@ -25,6 +25,26 @@ func NewPageHandler(pool *pgxpool.Pool, logger *slog.Logger) *PageHandler {
 	}
 }
 
+// getUserDisplayInfo fetches user from DB and returns display name for nav
+func (h *PageHandler) getUserDisplayInfo(c echo.Context, userID [16]byte) map[string]interface{} {
+	queries := database.New(h.pool)
+	user, err := queries.GetUser(c.Request().Context(), uuidToPgUUID(userID))
+	if err != nil {
+		// Fallback to generic name if user fetch fails
+		return map[string]interface{}{"Name": "User"}
+	}
+
+	// Build display name: FirstName LastName, or FirstName, or Username
+	displayName := user.Username
+	if user.FirstName.Valid && user.LastName.Valid {
+		displayName = user.FirstName.String + " " + user.LastName.String
+	} else if user.FirstName.Valid {
+		displayName = user.FirstName.String
+	}
+
+	return map[string]interface{}{"Name": displayName}
+}
+
 // HomePage renders the home page
 func (h *PageHandler) HomePage(c echo.Context) error {
 	data := map[string]interface{}{
@@ -59,12 +79,14 @@ func (h *PageHandler) LoginPage(c echo.Context) error {
 
 // DashboardPage renders the dashboard page
 func (h *PageHandler) DashboardPage(c echo.Context) error {
-	// TODO: Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
 	data := map[string]interface{}{
 		"IsAuthenticated": true,
-		"User": map[string]interface{}{
-			"Name": "User", // TODO: Get from session
-		},
+		"User":            h.getUserDisplayInfo(c, userID),
 	}
 	return c.Render(http.StatusOK, "dashboard.html", data)
 }
@@ -127,10 +149,8 @@ func (h *PageHandler) ProjectsPage(c echo.Context) error {
 
 	data := map[string]interface{}{
 		"IsAuthenticated": true,
-		"User": map[string]interface{}{
-			"Name": "User",
-		},
-		"Projects": allProjects,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Projects":        allProjects,
 	}
 	return c.Render(http.StatusOK, "projects.html", data)
 }
@@ -166,10 +186,8 @@ func (h *PageHandler) NewProjectPage(c echo.Context) error {
 
 	data := map[string]interface{}{
 		"IsAuthenticated": true,
-		"User": map[string]interface{}{
-			"Name": "User",
-		},
-		"Organizations": organizations,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Organizations":   organizations,
 	}
 	return c.Render(http.StatusOK, "new-project.html", data)
 }
@@ -216,10 +234,8 @@ func (h *PageHandler) OrganizationsPage(c echo.Context) error {
 
 	data := map[string]interface{}{
 		"IsAuthenticated": true,
-		"User": map[string]interface{}{
-			"Name": "User",
-		},
-		"Organizations": organizations,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Organizations":   organizations,
 	}
 	return c.Render(http.StatusOK, "organizations.html", data)
 }
@@ -227,16 +243,14 @@ func (h *PageHandler) OrganizationsPage(c echo.Context) error {
 // NewOrganizationPage renders the new organization form page
 func (h *PageHandler) NewOrganizationPage(c echo.Context) error {
 	// Get user from session
-	_, ok := session.GetUserID(c)
+	userID, ok := session.GetUserID(c)
 	if !ok {
 		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
 	}
 
 	data := map[string]interface{}{
 		"IsAuthenticated": true,
-		"User": map[string]interface{}{
-			"Name": "User",
-		},
+		"User":            h.getUserDisplayInfo(c, userID),
 	}
 	return c.Render(http.StatusOK, "new-organization.html", data)
 }
@@ -283,10 +297,8 @@ func (h *PageHandler) ProjectDetailPage(c echo.Context) error {
 
 	data := map[string]interface{}{
 		"IsAuthenticated": true,
-		"User": map[string]interface{}{
-			"Name": "User",
-		},
-		"Project": project,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Project":         project,
 	}
 	return c.Render(http.StatusOK, "project-detail.html", data)
 }
