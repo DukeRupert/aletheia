@@ -172,6 +172,7 @@ func main() {
 	protectedPages.GET("/projects/new", pageHandler.NewProjectPage)
 	protectedPages.GET("/projects/:id", pageHandler.ProjectDetailPage)
 	protectedPages.GET("/inspections", pageHandler.AllInspectionsPage)
+	protectedPages.GET("/inspections/:id", pageHandler.InspectionDetailPage)
 	protectedPages.GET("/projects/:projectId/inspections", pageHandler.InspectionsPage)
 	protectedPages.GET("/projects/:projectId/inspections/new", pageHandler.NewInspectionPage)
 

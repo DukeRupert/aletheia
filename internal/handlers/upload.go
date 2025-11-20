@@ -139,7 +139,27 @@ func (h *UploadHandler) UploadImage(c echo.Context) error {
 		slog.String("inspection_id", inspectionID),
 		slog.String("user_id", userID.String()))
 
-	// Prepare response with optional thumbnail URL
+	// Check if HTMX request - return HTML fragment
+	if c.Request().Header.Get("HX-Request") == "true" {
+		imageURL := photo.StorageUrl
+		if photo.ThumbnailUrl.Valid {
+			imageURL = photo.ThumbnailUrl.String
+		}
+
+		html := `<div class="card" style="padding: var(--space-sm);">
+			<a href="` + photo.StorageUrl + `" target="_blank">
+				<img src="` + imageURL + `" alt="Inspection photo" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px; margin-bottom: var(--space-sm);">
+			</a>
+			<div style="display: flex; justify-content: space-between; align-items: center;">
+				<p style="color: #666; font-size: 0.75rem; margin: 0;">` + photo.CreatedAt.Time.Format("Jan 2, 3:04 PM") + `</p>
+				<button hx-delete="/api/photos/` + photo.ID.String() + `" hx-confirm="Are you sure you want to delete this photo?" hx-target="closest .card" hx-swap="outerHTML swap:1s" class="btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Delete</button>
+			</div>
+		</div>`
+
+		return c.HTML(http.StatusCreated, html)
+	}
+
+	// Prepare JSON response with optional thumbnail URL
 	response := UploadPhotoResponse{
 		ID:           photo.ID.String(),
 		InspectionID: photo.InspectionID.String(),

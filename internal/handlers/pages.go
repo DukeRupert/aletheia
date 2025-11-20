@@ -513,3 +513,80 @@ func (h *PageHandler) AllInspectionsPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "all-inspections.html", data)
 }
+
+// InspectionDetailPage displays a single inspection with its photos
+func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
+	// Get authenticated user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return c.Redirect(http.StatusSeeOther, "/login")
+	}
+
+	inspectionID := c.Param("id")
+	if inspectionID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "inspection id is required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Parse inspection ID
+	inspectionUUID, err := parseUUID(inspectionID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid inspection id")
+	}
+
+	// Get inspection
+	inspection, err := queries.GetInspection(c.Request().Context(), inspectionUUID)
+	if err != nil {
+		h.logger.Error("failed to get inspection", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+	}
+
+	// Get project for inspection
+	project, err := queries.GetProject(c.Request().Context(), inspection.ProjectID)
+	if err != nil {
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load inspection details")
+	}
+
+	// Verify user is a member of the organization
+	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+		OrganizationID: project.OrganizationID,
+		UserID:         uuidToPgUUID(userID),
+	})
+	if err != nil {
+		h.logger.Warn("user not authorized to view inspection",
+			slog.String("user_id", userID.String()),
+			slog.String("inspection_id", inspectionID))
+		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this inspection's organization")
+	}
+
+	// Get photos for inspection
+	photos, err := queries.ListPhotos(c.Request().Context(), inspectionUUID)
+	if err != nil {
+		h.logger.Error("failed to list photos", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photos")
+	}
+
+	// Build project location string
+	var projectLocation string
+	if project.Address.Valid {
+		projectLocation = project.Address.String
+		if project.City.Valid {
+			projectLocation += ", " + project.City.String
+		}
+		if project.State.Valid {
+			projectLocation += ", " + project.State.String
+		}
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Inspection":      inspection,
+		"ProjectName":     project.Name,
+		"ProjectLocation": projectLocation,
+		"Photos":          photos,
+	}
+	return c.Render(http.StatusOK, "inspection-detail.html", data)
+}
