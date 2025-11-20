@@ -11,25 +11,42 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countDetectedViolationsByInspection = `-- name: CountDetectedViolationsByInspection :one
+SELECT COUNT(*) FROM detected_violations dv
+JOIN photos p ON dv.photo_id = p.id
+WHERE p.inspection_id = $1
+`
+
+func (q *Queries) CountDetectedViolationsByInspection(ctx context.Context, inspectionID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countDetectedViolationsByInspection, inspectionID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createDetectedViolation = `-- name: CreateDetectedViolation :one
 INSERT INTO detected_violations (
   photo_id,
   description,
   confidence_score,
   safety_code_id,
-  status
+  status,
+  severity,
+  location
 ) VALUES (
-  $1, $2, $3, $4, $5
+  $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, photo_id, description, confidence_score, status, created_at, safety_code_id
+RETURNING id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location
 `
 
 type CreateDetectedViolationParams struct {
-	PhotoID         pgtype.UUID     `json:"photo_id"`
-	Description     string          `json:"description"`
-	ConfidenceScore pgtype.Numeric  `json:"confidence_score"`
-	SafetyCodeID    pgtype.UUID     `json:"safety_code_id"`
-	Status          ViolationStatus `json:"status"`
+	PhotoID         pgtype.UUID       `json:"photo_id"`
+	Description     string            `json:"description"`
+	ConfidenceScore pgtype.Numeric    `json:"confidence_score"`
+	SafetyCodeID    pgtype.UUID       `json:"safety_code_id"`
+	Status          ViolationStatus   `json:"status"`
+	Severity        ViolationSeverity `json:"severity"`
+	Location        pgtype.Text       `json:"location"`
 }
 
 func (q *Queries) CreateDetectedViolation(ctx context.Context, arg CreateDetectedViolationParams) (DetectedViolation, error) {
@@ -39,6 +56,8 @@ func (q *Queries) CreateDetectedViolation(ctx context.Context, arg CreateDetecte
 		arg.ConfidenceScore,
 		arg.SafetyCodeID,
 		arg.Status,
+		arg.Severity,
+		arg.Location,
 	)
 	var i DetectedViolation
 	err := row.Scan(
@@ -49,6 +68,8 @@ func (q *Queries) CreateDetectedViolation(ctx context.Context, arg CreateDetecte
 		&i.Status,
 		&i.CreatedAt,
 		&i.SafetyCodeID,
+		&i.Severity,
+		&i.Location,
 	)
 	return i, err
 }
@@ -64,7 +85,7 @@ func (q *Queries) DeleteDetectedViolation(ctx context.Context, id pgtype.UUID) e
 }
 
 const getDetectedViolation = `-- name: GetDetectedViolation :one
-SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id FROM detected_violations
+SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location FROM detected_violations
 WHERE id = $1 LIMIT 1
 `
 
@@ -79,12 +100,14 @@ func (q *Queries) GetDetectedViolation(ctx context.Context, id pgtype.UUID) (Det
 		&i.Status,
 		&i.CreatedAt,
 		&i.SafetyCodeID,
+		&i.Severity,
+		&i.Location,
 	)
 	return i, err
 }
 
 const listDetectedViolations = `-- name: ListDetectedViolations :many
-SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id FROM detected_violations
+SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location FROM detected_violations
 WHERE photo_id = $1
 ORDER BY created_at DESC
 `
@@ -106,6 +129,87 @@ func (q *Queries) ListDetectedViolations(ctx context.Context, photoID pgtype.UUI
 			&i.Status,
 			&i.CreatedAt,
 			&i.SafetyCodeID,
+			&i.Severity,
+			&i.Location,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDetectedViolationsByInspection = `-- name: ListDetectedViolationsByInspection :many
+SELECT dv.id, dv.photo_id, dv.description, dv.confidence_score, dv.status, dv.created_at, dv.safety_code_id, dv.severity, dv.location FROM detected_violations dv
+JOIN photos p ON dv.photo_id = p.id
+WHERE p.inspection_id = $1
+ORDER BY dv.created_at DESC
+`
+
+func (q *Queries) ListDetectedViolationsByInspection(ctx context.Context, inspectionID pgtype.UUID) ([]DetectedViolation, error) {
+	rows, err := q.db.Query(ctx, listDetectedViolationsByInspection, inspectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DetectedViolation{}
+	for rows.Next() {
+		var i DetectedViolation
+		if err := rows.Scan(
+			&i.ID,
+			&i.PhotoID,
+			&i.Description,
+			&i.ConfidenceScore,
+			&i.Status,
+			&i.CreatedAt,
+			&i.SafetyCodeID,
+			&i.Severity,
+			&i.Location,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDetectedViolationsByInspectionAndStatus = `-- name: ListDetectedViolationsByInspectionAndStatus :many
+SELECT dv.id, dv.photo_id, dv.description, dv.confidence_score, dv.status, dv.created_at, dv.safety_code_id, dv.severity, dv.location FROM detected_violations dv
+JOIN photos p ON dv.photo_id = p.id
+WHERE p.inspection_id = $1 AND dv.status = $2
+ORDER BY dv.created_at DESC
+`
+
+type ListDetectedViolationsByInspectionAndStatusParams struct {
+	InspectionID pgtype.UUID     `json:"inspection_id"`
+	Status       ViolationStatus `json:"status"`
+}
+
+func (q *Queries) ListDetectedViolationsByInspectionAndStatus(ctx context.Context, arg ListDetectedViolationsByInspectionAndStatusParams) ([]DetectedViolation, error) {
+	rows, err := q.db.Query(ctx, listDetectedViolationsByInspectionAndStatus, arg.InspectionID, arg.Status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DetectedViolation{}
+	for rows.Next() {
+		var i DetectedViolation
+		if err := rows.Scan(
+			&i.ID,
+			&i.PhotoID,
+			&i.Description,
+			&i.ConfidenceScore,
+			&i.Status,
+			&i.CreatedAt,
+			&i.SafetyCodeID,
+			&i.Severity,
+			&i.Location,
 		); err != nil {
 			return nil, err
 		}
@@ -118,7 +222,7 @@ func (q *Queries) ListDetectedViolations(ctx context.Context, photoID pgtype.UUI
 }
 
 const listDetectedViolationsByStatus = `-- name: ListDetectedViolationsByStatus :many
-SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id FROM detected_violations
+SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location FROM detected_violations
 WHERE photo_id = $1 AND status = $2
 ORDER BY created_at DESC
 `
@@ -145,6 +249,8 @@ func (q *Queries) ListDetectedViolationsByStatus(ctx context.Context, arg ListDe
 			&i.Status,
 			&i.CreatedAt,
 			&i.SafetyCodeID,
+			&i.Severity,
+			&i.Location,
 		); err != nil {
 			return nil, err
 		}
@@ -156,11 +262,43 @@ func (q *Queries) ListDetectedViolationsByStatus(ctx context.Context, arg ListDe
 	return items, nil
 }
 
+const updateDetectedViolationNotes = `-- name: UpdateDetectedViolationNotes :one
+UPDATE detected_violations
+SET
+  status = COALESCE($2, status),
+  description = COALESCE($3, description)
+WHERE id = $1
+RETURNING id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location
+`
+
+type UpdateDetectedViolationNotesParams struct {
+	ID          pgtype.UUID         `json:"id"`
+	Status      NullViolationStatus `json:"status"`
+	Description pgtype.Text         `json:"description"`
+}
+
+func (q *Queries) UpdateDetectedViolationNotes(ctx context.Context, arg UpdateDetectedViolationNotesParams) (DetectedViolation, error) {
+	row := q.db.QueryRow(ctx, updateDetectedViolationNotes, arg.ID, arg.Status, arg.Description)
+	var i DetectedViolation
+	err := row.Scan(
+		&i.ID,
+		&i.PhotoID,
+		&i.Description,
+		&i.ConfidenceScore,
+		&i.Status,
+		&i.CreatedAt,
+		&i.SafetyCodeID,
+		&i.Severity,
+		&i.Location,
+	)
+	return i, err
+}
+
 const updateDetectedViolationSafetyCode = `-- name: UpdateDetectedViolationSafetyCode :one
 UPDATE detected_violations
 SET safety_code_id = $2
 WHERE id = $1
-RETURNING id, photo_id, description, confidence_score, status, created_at, safety_code_id
+RETURNING id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location
 `
 
 type UpdateDetectedViolationSafetyCodeParams struct {
@@ -179,6 +317,8 @@ func (q *Queries) UpdateDetectedViolationSafetyCode(ctx context.Context, arg Upd
 		&i.Status,
 		&i.CreatedAt,
 		&i.SafetyCodeID,
+		&i.Severity,
+		&i.Location,
 	)
 	return i, err
 }
@@ -187,7 +327,7 @@ const updateDetectedViolationStatus = `-- name: UpdateDetectedViolationStatus :o
 UPDATE detected_violations
 SET status = $2
 WHERE id = $1
-RETURNING id, photo_id, description, confidence_score, status, created_at, safety_code_id
+RETURNING id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location
 `
 
 type UpdateDetectedViolationStatusParams struct {
@@ -206,6 +346,8 @@ func (q *Queries) UpdateDetectedViolationStatus(ctx context.Context, arg UpdateD
 		&i.Status,
 		&i.CreatedAt,
 		&i.SafetyCodeID,
+		&i.Severity,
+		&i.Location,
 	)
 	return i, err
 }

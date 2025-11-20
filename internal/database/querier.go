@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
+	CountDetectedViolationsByInspection(ctx context.Context, inspectionID pgtype.UUID) (int64, error)
 	CreateDetectedViolation(ctx context.Context, arg CreateDetectedViolationParams) (DetectedViolation, error)
 	CreateInspection(ctx context.Context, arg CreateInspectionParams) (Inspection, error)
 	CreateOrganization(ctx context.Context, name string) (Organization, error)
@@ -49,6 +50,8 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (User, error)
 	ListDetectedViolations(ctx context.Context, photoID pgtype.UUID) ([]DetectedViolation, error)
+	ListDetectedViolationsByInspection(ctx context.Context, inspectionID pgtype.UUID) ([]DetectedViolation, error)
+	ListDetectedViolationsByInspectionAndStatus(ctx context.Context, arg ListDetectedViolationsByInspectionAndStatusParams) ([]DetectedViolation, error)
 	ListDetectedViolationsByStatus(ctx context.Context, arg ListDetectedViolationsByStatusParams) ([]DetectedViolation, error)
 	ListInspections(ctx context.Context, projectID pgtype.UUID) ([]Inspection, error)
 	ListInspectionsByInspector(ctx context.Context, inspectorID pgtype.UUID) ([]Inspection, error)
@@ -68,6 +71,7 @@ type Querier interface {
 	SearchOrganizationsByName(ctx context.Context, dollar_1 pgtype.Text) ([]Organization, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
+	UpdateDetectedViolationNotes(ctx context.Context, arg UpdateDetectedViolationNotesParams) (DetectedViolation, error)
 	UpdateDetectedViolationSafetyCode(ctx context.Context, arg UpdateDetectedViolationSafetyCodeParams) (DetectedViolation, error)
 	UpdateDetectedViolationStatus(ctx context.Context, arg UpdateDetectedViolationStatusParams) (DetectedViolation, error)
 	UpdateInspectionStatus(ctx context.Context, arg UpdateInspectionStatusParams) (Inspection, error)

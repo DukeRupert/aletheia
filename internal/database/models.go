@@ -140,6 +140,50 @@ func (ns NullUserStatus) Value() (driver.Value, error) {
 	return string(ns.UserStatus), nil
 }
 
+type ViolationSeverity string
+
+const (
+	ViolationSeverityCritical ViolationSeverity = "critical"
+	ViolationSeverityHigh     ViolationSeverity = "high"
+	ViolationSeverityMedium   ViolationSeverity = "medium"
+	ViolationSeverityLow      ViolationSeverity = "low"
+)
+
+func (e *ViolationSeverity) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ViolationSeverity(s)
+	case string:
+		*e = ViolationSeverity(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ViolationSeverity: %T", src)
+	}
+	return nil
+}
+
+type NullViolationSeverity struct {
+	ViolationSeverity ViolationSeverity `json:"violation_severity"`
+	Valid             bool              `json:"valid"` // Valid is true if ViolationSeverity is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullViolationSeverity) Scan(value interface{}) error {
+	if value == nil {
+		ns.ViolationSeverity, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ViolationSeverity.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullViolationSeverity) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ViolationSeverity), nil
+}
+
 type ViolationStatus string
 
 const (
@@ -191,6 +235,8 @@ type DetectedViolation struct {
 	Status          ViolationStatus    `json:"status"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	SafetyCodeID    pgtype.UUID        `json:"safety_code_id"`
+	Severity        ViolationSeverity  `json:"severity"`
+	Location        pgtype.Text        `json:"location"`
 }
 
 type Inspection struct {
@@ -200,6 +246,25 @@ type Inspection struct {
 	Status      InspectionStatus   `json:"status"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Job struct {
+	ID             pgtype.UUID        `json:"id"`
+	QueueName      string             `json:"queue_name"`
+	JobType        string             `json:"job_type"`
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	Payload        []byte             `json:"payload"`
+	Status         string             `json:"status"`
+	Priority       int32              `json:"priority"`
+	MaxAttempts    int32              `json:"max_attempts"`
+	AttemptCount   int32              `json:"attempt_count"`
+	ScheduledAt    pgtype.Timestamptz `json:"scheduled_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	Result         []byte             `json:"result"`
+	ErrorMessage   pgtype.Text        `json:"error_message"`
+	WorkerID       pgtype.Text        `json:"worker_id"`
 }
 
 type Organization struct {
@@ -215,6 +280,18 @@ type OrganizationMember struct {
 	UserID         pgtype.UUID        `json:"user_id"`
 	Role           OrganizationRole   `json:"role"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type OrganizationRateLimit struct {
+	OrganizationID      pgtype.UUID        `json:"organization_id"`
+	QueueName           string             `json:"queue_name"`
+	Tier                string             `json:"tier"`
+	MaxJobsPerHour      int32              `json:"max_jobs_per_hour"`
+	MaxConcurrentJobs   int32              `json:"max_concurrent_jobs"`
+	JobsInCurrentWindow int32              `json:"jobs_in_current_window"`
+	WindowStart         pgtype.Timestamptz `json:"window_start"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Photo struct {
