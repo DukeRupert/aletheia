@@ -24,7 +24,7 @@ func NewInspectionHandler(pool *pgxpool.Pool, logger *slog.Logger) *InspectionHa
 
 // CreateInspectionRequest is the request payload for creating an inspection
 type CreateInspectionRequest struct {
-	ProjectID string `json:"project_id" validate:"required"`
+	ProjectID string `json:"project_id" form:"project_id" validate:"required"`
 }
 
 // CreateInspectionResponse is the response payload for inspection creation
@@ -97,6 +97,14 @@ func (h *InspectionHandler) CreateInspection(c echo.Context) error {
 		slog.String("project_id", req.ProjectID),
 		slog.String("inspector_id", userID.String()))
 
+	// Check if this is an HTMX request
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// HTMX request - redirect to inspection detail
+		c.Response().Header().Set("HX-Redirect", "/inspections/"+inspection.ID.String())
+		return c.NoContent(http.StatusOK)
+	}
+
+	// Regular API request - return JSON
 	return c.JSON(http.StatusCreated, CreateInspectionResponse{
 		ID:          inspection.ID.String(),
 		ProjectID:   inspection.ProjectID.String(),

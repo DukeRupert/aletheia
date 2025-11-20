@@ -171,6 +171,8 @@ func main() {
 	protectedPages.GET("/projects", pageHandler.ProjectsPage)
 	protectedPages.GET("/projects/new", pageHandler.NewProjectPage)
 	protectedPages.GET("/projects/:id", pageHandler.ProjectDetailPage)
+	protectedPages.GET("/projects/:projectId/inspections", pageHandler.InspectionsPage)
+	protectedPages.GET("/projects/:projectId/inspections/new", pageHandler.NewInspectionPage)
 
 	// Protected API routes (require session)
 	protected := e.Group("/api")

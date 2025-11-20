@@ -1,0 +1,49 @@
+{{template "base" .}}
+
+{{define "title"}}New Inspection - {{.Project.Name}} - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div style="max-width: 600px; margin: 3rem auto;">
+    <div class="card">
+      <h1>Create New Inspection</h1>
+      <p>Create a new safety inspection for {{.Project.Name}}.</p>
+
+      <form
+        hx-post="/api/inspections"
+        hx-target="#inspection-form"
+        hx-swap="outerHTML"
+        id="inspection-form"
+        class="stack"
+        style="margin-top: var(--space-lg);">
+
+        <input type="hidden" name="project_id" value="{{.Project.ID}}">
+
+        <div style="padding: var(--space-md); background: #f3f4f6; border-radius: 4px;">
+          <p style="margin: 0; font-size: 0.875rem;">
+            <strong>Project:</strong> {{.Project.Name}}
+          </p>
+          {{if .Project.Address.Valid}}
+          <p style="margin: var(--space-xs) 0 0 0; font-size: 0.875rem; color: #666;">
+            <strong>Location:</strong> {{.Project.Address.String}}
+            {{if .Project.City.Valid}}, {{.Project.City.String}}{{end}}
+            {{if .Project.State.Valid}}, {{.Project.State.String}}{{end}}
+          </p>
+          {{end}}
+        </div>
+
+        <div style="padding: var(--space-md); background: #dbeafe; border-radius: 4px;">
+          <p style="margin: 0; font-size: 0.875rem; color: #1e40af;">
+            The inspection will be created in <strong>draft</strong> status. You can upload photos and the system will analyze them for safety violations.
+          </p>
+        </div>
+
+        <div style="display: flex; gap: var(--space-sm);">
+          <button type="submit" class="btn-primary">Create Inspection</button>
+          <a href="/projects/{{.Project.ID}}/inspections" class="btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,54 @@
+{{template "base" .}}
+
+{{define "title"}}Inspections - {{.Project.Name}} - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div class="stack" style="margin-top: var(--space-xl);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h1>Inspections</h1>
+        <p style="color: #666; margin-top: var(--space-xs);">Project: {{.Project.Name}}</p>
+      </div>
+      <div style="display: flex; gap: var(--space-sm);">
+        <a href="/projects/{{.Project.ID}}/inspections/new" class="btn-primary">New Inspection</a>
+        <a href="/projects/{{.Project.ID}}" class="btn-secondary">Back to Project</a>
+      </div>
+    </div>
+
+    {{if .Inspections}}
+      <div class="grid">
+        {{range .Inspections}}
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-sm);">
+              <h3>Inspection #{{.ID}}</h3>
+              <span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+                {{if eq .Status "draft"}}background: #f3f4f6; color: #374151;
+                {{else if eq .Status "in_progress"}}background: #dbeafe; color: #1e40af;
+                {{else if eq .Status "completed"}}background: #d1fae5; color: #065f46;
+                {{else}}background: #fef3c7; color: #92400e;{{end}}">
+                {{.Status}}
+              </span>
+            </div>
+            <p style="color: #666; font-size: 0.875rem;">
+              Inspector: {{.InspectorID}}
+            </p>
+            <p style="color: #666; font-size: 0.875rem;">
+              Created {{.CreatedAt.Time.Format "Jan 2, 2006 at 3:04 PM"}}
+            </p>
+            <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+              <a href="/inspections/{{.ID}}" class="btn-primary">View Details</a>
+              <a href="/inspections/{{.ID}}/photos" class="btn-secondary">Photos</a>
+            </div>
+          </div>
+        {{end}}
+      </div>
+    {{else}}
+      <div class="card" style="text-align: center; padding: var(--space-2xl);">
+        <p style="color: #666; margin-bottom: var(--space-lg);">No inspections yet. Create your first inspection to get started.</p>
+        <a href="/projects/{{.Project.ID}}/inspections/new" class="btn-primary">Create Inspection</a>
+      </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

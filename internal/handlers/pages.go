@@ -337,3 +337,107 @@ func (h *PageHandler) ProfilePage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "profile.html", data)
 }
+
+// InspectionsPage renders the inspections list page for a project
+func (h *PageHandler) InspectionsPage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	projectID := c.Param("projectId")
+	if projectID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "project id is required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Parse project ID
+	projectUUID, err := parseUUID(projectID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid project id")
+	}
+
+	// Get project
+	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	if err != nil {
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+	}
+
+	// Verify user is a member of the organization
+	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+		OrganizationID: project.OrganizationID,
+		UserID:         uuidToPgUUID(userID),
+	})
+	if err != nil {
+		h.logger.Warn("user not authorized to access project inspections",
+			slog.String("user_id", userID.String()),
+			slog.String("project_id", projectID))
+		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+	}
+
+	// Get all inspections for the project
+	inspections, err := queries.ListInspections(c.Request().Context(), projectUUID)
+	if err != nil {
+		h.logger.Error("failed to list inspections", slog.String("err", err.Error()))
+		inspections = []database.Inspection{}
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Project":         project,
+		"Inspections":     inspections,
+	}
+	return c.Render(http.StatusOK, "inspections.html", data)
+}
+
+// NewInspectionPage renders the new inspection form page
+func (h *PageHandler) NewInspectionPage(c echo.Context) error {
+	// Get user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	projectID := c.Param("projectId")
+	if projectID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "project id is required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Parse project ID
+	projectUUID, err := parseUUID(projectID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid project id")
+	}
+
+	// Get project
+	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	if err != nil {
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+	}
+
+	// Verify user is a member of the organization
+	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+		OrganizationID: project.OrganizationID,
+		UserID:         uuidToPgUUID(userID),
+	})
+	if err != nil {
+		h.logger.Warn("user not authorized to create inspection",
+			slog.String("user_id", userID.String()),
+			slog.String("project_id", projectID))
+		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Project":         project,
+	}
+	return c.Render(http.StatusOK, "new-inspection.html", data)
+}
