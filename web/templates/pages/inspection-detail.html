@@ -90,7 +90,7 @@
       <div id="photo-list" class="grid">
         {{range .Photos}}
           <div class="card" style="padding: var(--space-sm);">
-            <a href="{{if .ThumbnailUrl.Valid}}{{.ThumbnailUrl.String}}{{else}}{{.StorageUrl}}{{end}}" target="_blank">
+            <a href="{{.StorageUrl}}" target="_blank">
               <img
                 src="{{if .ThumbnailUrl.Valid}}{{.ThumbnailUrl.String}}{{else}}{{.StorageUrl}}{{end}}"
                 alt="Inspection photo"

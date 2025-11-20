@@ -141,14 +141,15 @@ func (h *UploadHandler) UploadImage(c echo.Context) error {
 
 	// Check if HTMX request - return HTML fragment
 	if c.Request().Header.Get("HX-Request") == "true" {
-		imageURL := photo.StorageUrl
+		// Use thumbnail for display, but link to full image
+		displayURL := photo.StorageUrl
 		if photo.ThumbnailUrl.Valid {
-			imageURL = photo.ThumbnailUrl.String
+			displayURL = photo.ThumbnailUrl.String
 		}
 
 		html := `<div class="card" style="padding: var(--space-sm);">
 			<a href="` + photo.StorageUrl + `" target="_blank">
-				<img src="` + imageURL + `" alt="Inspection photo" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px; margin-bottom: var(--space-sm);">
+				<img src="` + displayURL + `" alt="Inspection photo" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px; margin-bottom: var(--space-sm);">
 			</a>
 			<div style="display: flex; justify-content: space-between; align-items: center;">
 				<p style="color: #666; font-size: 0.75rem; margin: 0;">` + photo.CreatedAt.Time.Format("Jan 2, 3:04 PM") + `</p>
