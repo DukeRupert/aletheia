@@ -37,3 +37,11 @@ func (h *PageHandler) ErrorPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusInternalServerError, "500.html", data)
 }
+
+// LoginPage renders the login page
+func (h *PageHandler) LoginPage(c echo.Context) error {
+	data := map[string]interface{}{
+		"IsAuthenticated": false,
+	}
+	return c.Render(http.StatusOK, "login.html", data)
+}
