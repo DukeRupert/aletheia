@@ -132,15 +132,17 @@ func (s *claudeService) buildSystemPrompt(safetyCodes []SafetyCodeContext) strin
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("For each violation you identify, provide:\n")
-	sb.WriteString("1. The relevant safety code (if applicable)\n")
+	sb.WriteString("IMPORTANT: Each violation MUST be linked to a specific safety code/regulation. Do not report generic violations without citing the specific regulation being violated.\n\n")
+	sb.WriteString("For each violation you identify, you MUST provide:\n")
+	sb.WriteString("1. The relevant safety code/regulation (REQUIRED - use the codes provided above, or cite specific OSHA/state regulations)\n")
 	sb.WriteString("2. A clear description of what violation you observed\n")
 	sb.WriteString("3. Severity level: critical, high, medium, or low\n")
 	sb.WriteString("4. Your confidence level (0.0 to 1.0)\n")
 	sb.WriteString("5. Location in the image where the violation appears\n\n")
-	sb.WriteString("Respond ONLY with a JSON array of violations. Each violation should be a JSON object with these fields:\n")
-	sb.WriteString(`{"safety_code": "OSHA X", "description": "...", "severity": "high", "confidence": 0.85, "location": "..."}`)
-	sb.WriteString("\n\nIf no violations are found, return an empty array [].")
+	sb.WriteString("Respond ONLY with a JSON array of violations. Each violation MUST have a safety_code field with a specific regulation citation:\n")
+	sb.WriteString(`{"safety_code": "OSHA 1926.501", "description": "Worker at elevated height without fall protection system", "severity": "high", "confidence": 0.85, "location": "center of image, worker on scaffolding"}`)
+	sb.WriteString("\n\nIf no violations with identifiable regulation citations are found, return an empty array [].")
+	sb.WriteString("\n\nDo NOT report violations without specific safety code citations.")
 
 	return sb.String()
 }
@@ -181,7 +183,16 @@ func (s *claudeService) parseClaudeResponse(response string, safetyCodes []Safet
 
 	// Convert to DetectedViolation structs
 	violations := make([]DetectedViolation, 0, len(rawViolations))
+	skippedCount := 0
 	for _, raw := range rawViolations {
+		// Skip violations without safety code citation
+		if raw.SafetyCode == "" || strings.TrimSpace(raw.SafetyCode) == "" {
+			s.logger.Warn("skipping violation without safety code citation",
+				slog.String("description", raw.Description))
+			skippedCount++
+			continue
+		}
+
 		violation := DetectedViolation{
 			SafetyCode:  raw.SafetyCode,
 			Description: raw.Description,
@@ -212,6 +223,12 @@ func (s *claudeService) parseClaudeResponse(response string, safetyCodes []Safet
 		}
 
 		violations = append(violations, violation)
+	}
+
+	if skippedCount > 0 {
+		s.logger.Info("filtered violations without safety code citations",
+			slog.Int("skipped_count", skippedCount),
+			slog.Int("valid_count", len(violations)))
 	}
 
 	return violations, fmt.Sprintf("Claude identified %d potential violations", len(violations))

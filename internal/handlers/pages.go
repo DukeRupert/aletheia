@@ -583,6 +583,20 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 		violationsByPhoto[photoIDStr] = append(violationsByPhoto[photoIDStr], violation)
 	}
 
+	// Create a map of safety code ID -> safety code info
+	safetyCodeMap := make(map[string]string)
+	for _, violation := range violations {
+		if violation.SafetyCodeID.Valid {
+			// Only fetch if we haven't already
+			if _, exists := safetyCodeMap[violation.SafetyCodeID.String()]; !exists {
+				safetyCode, err := queries.GetSafetyCode(c.Request().Context(), violation.SafetyCodeID)
+				if err == nil {
+					safetyCodeMap[violation.SafetyCodeID.String()] = safetyCode.Code + " - " + safetyCode.Description
+				}
+			}
+		}
+	}
+
 	// Build project location string
 	var projectLocation string
 	if project.Address.Valid {
@@ -603,6 +617,7 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 		"ProjectLocation":    projectLocation,
 		"Photos":             photos,
 		"ViolationsByPhoto":  violationsByPhoto,
+		"SafetyCodeMap":      safetyCodeMap,
 	}
 	return c.Render(http.StatusOK, "inspection-detail.html", data)
 }

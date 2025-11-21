@@ -73,6 +73,18 @@
                   </span>
                 </div>
 
+                <!-- Regulation Citation (prominent) -->
+                {{if .SafetyCodeID.Valid}}
+                  <div style="margin-bottom: var(--space-sm); padding: var(--space-sm); background: #1e3a8a; border-radius: 4px;">
+                    <p style="font-size: 0.75rem; color: rgba(255,255,255,0.8); margin: 0 0 var(--space-2xs) 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                      Regulation Violated
+                    </p>
+                    <p style="font-size: 0.95rem; color: white; margin: 0; font-weight: 700; font-family: monospace;">
+                      📋 {{index $.SafetyCodeMap (.SafetyCodeID.String)}}
+                    </p>
+                  </div>
+                {{end}}
+
                 <!-- Violation Description -->
                 <p style="font-size: 0.95rem; color: #1f2937; margin-bottom: var(--space-sm); line-height: 1.5;">
                   {{.Description}}
@@ -80,13 +92,7 @@
 
                 {{if .Location.Valid}}
                   <p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-sm);">
-                    <strong>Location:</strong> {{.Location.String}}
-                  </p>
-                {{end}}
-
-                {{if .SafetyCodeID.Valid}}
-                  <p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-md);">
-                    <strong>Safety Code:</strong> {{index $.SafetyCodeMap (.SafetyCodeID.String)}}
+                    <strong>📍 Location:</strong> {{.Location.String}}
                   </p>
                 {{end}}
 

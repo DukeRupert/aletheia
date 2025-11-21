@@ -117,6 +117,15 @@
                 </p>
                 {{range $violations}}
                   <div style="margin-bottom: var(--space-xs); padding: var(--space-xs); background: white; border-radius: 4px;">
+                    <!-- Regulation Citation (prominent) -->
+                    {{if .SafetyCodeID.Valid}}
+                      <div style="margin-bottom: var(--space-2xs);">
+                        <span style="padding: 0.25rem 0.5rem; border-radius: 3px; font-size: 0.75rem; font-weight: 700; background: #1e3a8a; color: white; font-family: monospace;">
+                          📋 {{index $.SafetyCodeMap (.SafetyCodeID.String)}}
+                        </span>
+                      </div>
+                    {{end}}
+
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-2xs); flex-wrap: wrap; gap: var(--space-2xs);">
                       <div style="display: flex; gap: var(--space-2xs); align-items: center;">
                         <span style="padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.7rem; font-weight: 600;
@@ -142,7 +151,7 @@
                     </p>
                     {{if .Location.Valid}}
                       <p style="font-size: 0.7rem; color: #64748b; margin-top: var(--space-2xs); margin-bottom: 0;">
-                        Location: {{.Location.String}}
+                        📍 Location: {{.Location.String}}
                       </p>
                     {{end}}
                   </div>
