@@ -3,12 +3,25 @@
 {{define "title"}}Server Error - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div class="stack" style="text-align: center; padding: 3rem 0;">
-    <h1>500</h1>
-    <h2>Server Error</h2>
-    <p>Something went wrong on our end. Please try again later.</p>
-    <a href="/" class="btn-primary">Go Home</a>
+<div class="flex min-h-screen items-center justify-center px-4">
+  <div class="text-center max-w-md">
+    <p class="text-base/8 font-semibold text-zinc-500 dark:text-zinc-400">
+      500
+    </p>
+    <h1 class="mt-4 text-4xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-5xl">
+      Server Error
+    </h1>
+    <p class="mt-6 text-base/7 text-zinc-600 dark:text-zinc-400">
+      Something went wrong on our end. Please try again later.
+    </p>
+    <div class="mt-10 flex items-center justify-center gap-4">
+      <a href="javascript:history.back()">
+        {{template "button" (dict "Content" "Go Back" "Variant" "outline")}}
+      </a>
+      <a href="/dashboard">
+        {{template "button" (dict "Content" "Dashboard" "Variant" "solid" "Color" "blue")}}
+      </a>
+    </div>
   </div>
 </div>
 {{end}}
