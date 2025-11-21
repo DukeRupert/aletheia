@@ -203,6 +203,94 @@
       </div>
     </div>
 
+    <!-- Manual Violation Entry Section -->
+    <div class="card">
+      <h2 style="margin-bottom: var(--space-sm);">Add Manual Violation</h2>
+      <p style="color: #666; font-size: 0.875rem; margin-bottom: var(--space-md);">
+        If you've identified a violation that the AI missed, you can manually add it here.
+      </p>
+
+      <form id="manual-violation-form" x-data="{ submitting: false }">
+        <div style="margin-bottom: var(--space-sm);">
+          <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
+            Safety Code/Regulation <span style="color: #dc2626;">*</span>
+          </label>
+          <input
+            type="text"
+            id="safety-code"
+            name="safety_code"
+            placeholder="e.g., OSHA 1926.501"
+            required
+            style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;"
+          >
+        </div>
+
+        <div style="margin-bottom: var(--space-sm);">
+          <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
+            Description <span style="color: #dc2626;">*</span>
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            placeholder="Describe the safety violation you observed..."
+            required
+            style="width: 100%; min-height: 100px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem; resize: vertical;"
+          ></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+          <div>
+            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
+              Severity <span style="color: #dc2626;">*</span>
+            </label>
+            <select
+              id="severity"
+              name="severity"
+              required
+              style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;"
+            >
+              <option value="">Select severity...</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
+              Location (optional)
+            </label>
+            <input
+              type="text"
+              id="location"
+              name="location"
+              placeholder="e.g., Near scaffolding, left side"
+              style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;"
+            >
+          </div>
+        </div>
+
+        <input type="hidden" name="photo_id" value="{{.Photo.ID.String}}">
+
+        <button
+          type="submit"
+          hx-post="/api/violations/manual"
+          hx-include="#manual-violation-form"
+          hx-target="#manual-violation-status"
+          hx-swap="innerHTML"
+          @click="submitting = true"
+          class="btn-primary"
+          :disabled="submitting"
+          style="width: 100%;">
+          <span x-show="!submitting">Add Violation</span>
+          <span x-show="submitting">Adding...</span>
+        </button>
+
+        <div id="manual-violation-status" style="margin-top: var(--space-sm);"></div>
+      </form>
+    </div>
+
     <!-- Actions -->
     <div style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
       <a href="/inspections/{{.Inspection.ID.String}}" class="btn-secondary">Back to Inspection</a>

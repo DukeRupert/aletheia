@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log/slog"
+	"math/big"
 	"net/http"
 
 	"github.com/dukerupert/aletheia/internal/database"
@@ -579,4 +580,152 @@ func (h *ViolationHandler) renderViolationCard(c echo.Context, violation databas
 	</div>`
 
 	return c.HTML(http.StatusOK, html)
+}
+
+// CreateManualViolationRequest represents the request body for creating a manual violation
+type CreateManualViolationRequest struct {
+	PhotoID    string `form:"photo_id" json:"photo_id" validate:"required,uuid"`
+	SafetyCode string `form:"safety_code" json:"safety_code" validate:"required"`
+	Description string `form:"description" json:"description" validate:"required"`
+	Severity   string `form:"severity" json:"severity" validate:"required,oneof=critical high medium low"`
+	Location   string `form:"location" json:"location"`
+}
+
+// CreateManualViolation godoc
+// @Summary Create a manual violation
+// @Description Allows inspectors to manually add violations that AI might have missed
+// @Tags violations
+// @Accept json,multipart/form-data
+// @Produce json,html
+// @Param request body CreateManualViolationRequest true "Manual Violation Request"
+// @Success 200 {object} ViolationResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/violations/manual [post]
+func (h *ViolationHandler) CreateManualViolation(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req CreateManualViolationRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
+	}
+
+	// Validate required fields
+	if req.PhotoID == "" || req.SafetyCode == "" || req.Description == "" || req.Severity == "" {
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return c.HTML(http.StatusBadRequest, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">All required fields must be filled out</div>`)
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, "All required fields must be filled out")
+	}
+
+	// Parse photo ID
+	photoID, err := uuid.Parse(req.PhotoID)
+	if err != nil {
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return c.HTML(http.StatusBadRequest, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Invalid photo ID</div>`)
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid photo ID")
+	}
+
+	// Verify photo exists
+	photo, err := h.db.GetPhoto(ctx, pgtype.UUID{Bytes: photoID, Valid: true})
+	if err != nil {
+		h.logger.Error("photo not found", slog.String("photo_id", photoID.String()))
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return c.HTML(http.StatusNotFound, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Photo not found</div>`)
+		}
+		return echo.NewHTTPError(http.StatusNotFound, "Photo not found")
+	}
+
+	// Try to find matching safety code in database
+	var safetyCodeID pgtype.UUID
+	safetyCode, err := h.db.GetSafetyCodeByCode(ctx, req.SafetyCode)
+	if err == nil {
+		safetyCodeID = safetyCode.ID
+	}
+	// If not found, we'll create the violation anyway with the code string
+
+	// Map severity string to database type
+	var severity database.ViolationSeverity
+	switch req.Severity {
+	case "critical":
+		severity = database.ViolationSeverityCritical
+	case "high":
+		severity = database.ViolationSeverityHigh
+	case "medium":
+		severity = database.ViolationSeverityMedium
+	case "low":
+		severity = database.ViolationSeverityLow
+	default:
+		severity = database.ViolationSeverityMedium
+	}
+
+	// Prepare location field
+	locationText := pgtype.Text{
+		String: req.Location,
+		Valid:  req.Location != "",
+	}
+
+	// Create the violation with 100% confidence (manually created by inspector)
+	confidenceInt := new(big.Int).SetInt64(10000) // 1.0 * 10000
+	violation, err := h.db.CreateDetectedViolation(ctx, database.CreateDetectedViolationParams{
+		PhotoID:         photo.ID,
+		Description:     req.Description,
+		ConfidenceScore: pgtype.Numeric{Int: confidenceInt, Exp: -4, Valid: true},
+		SafetyCodeID:    safetyCodeID,
+		Status:          database.ViolationStatusConfirmed, // Manual violations start as confirmed
+		Severity:        severity,
+		Location:        locationText,
+	})
+
+	if err != nil {
+		h.logger.Error("failed to create manual violation",
+			slog.String("photo_id", photoID.String()),
+			slog.String("error", err.Error()))
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return c.HTML(http.StatusInternalServerError, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Failed to create violation. Please try again.</div>`)
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create violation")
+	}
+
+	h.logger.Info("manual violation created",
+		slog.String("photo_id", photoID.String()),
+		slog.String("violation_id", violation.ID.String()),
+		slog.String("safety_code", req.SafetyCode))
+
+	// If HTMX request, return success message and reload page
+	if c.Request().Header.Get("HX-Request") == "true" {
+		html := `
+		<div style="padding: var(--space-sm); background: #d1fae5; border-radius: 4px; color: #059669; font-size: 0.875rem;">
+			✓ Violation added successfully! Refreshing page...
+		</div>
+		<script>
+			setTimeout(function() {
+				window.location.reload();
+			}, 1500);
+		</script>`
+		return c.HTML(http.StatusOK, html)
+	}
+
+	// Return JSON response
+	resp := ViolationResponse{
+		ID:              violation.ID.String(),
+		PhotoID:         violation.PhotoID.String(),
+		Description:     violation.Description,
+		ConfidenceScore: 1.0,
+		Severity:        string(violation.Severity),
+		Status:          string(violation.Status),
+		CreatedAt:       violation.CreatedAt.Time.String(),
+	}
+
+	if violation.Location.Valid {
+		resp.Location = &violation.Location.String
+	}
+	if violation.SafetyCodeID.Valid {
+		id := violation.SafetyCodeID.String()
+		resp.SafetyCodeID = &id
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }

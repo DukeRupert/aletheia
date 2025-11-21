@@ -275,6 +275,7 @@ func main() {
 	// Violation review routes
 	protected.POST("/violations/:id/confirm", violationHandler.ConfirmViolation)
 	protected.POST("/violations/:id/dismiss", violationHandler.DismissViolation)
+	protected.POST("/violations/manual", violationHandler.CreateManualViolation)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,
