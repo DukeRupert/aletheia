@@ -19,7 +19,7 @@
 */}}
 
 {{define "button"}}
-<button type="{{.Type | default "button"}}"
+<button type="{{or .Type "button"}}"
         class="{{template "button-classes" .}}"
         {{if .HXPost}}hx-post="{{.HXPost}}"{{end}}
         {{if .HXGet}}hx-get="{{.HXGet}}"{{end}}
@@ -39,7 +39,7 @@ focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-500
 disabled:opacity-50 disabled:cursor-not-allowed
 
 {{/* Size variants */}}
-{{$size := .Size | default "md"}}
+{{$size := or .Size "md"}}
 {{if eq $size "sm"}}
   px-3 py-1.5 text-sm/6
 {{else if eq $size "lg"}}
@@ -51,8 +51,8 @@ disabled:opacity-50 disabled:cursor-not-allowed
 {{end}}
 
 {{/* Variant styles */}}
-{{$variant := .Variant | default "solid"}}
-{{$color := .Color | default "zinc"}}
+{{$variant := or .Variant "solid"}}
+{{$color := or .Color "zinc"}}
 
 {{if eq $variant "solid"}}
   {{/* Solid variant with color support */}}

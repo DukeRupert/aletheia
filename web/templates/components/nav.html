@@ -42,10 +42,17 @@
         <div class="relative" x-data="{ open: false }">
           <button @click="open = !open"
                   class="flex items-center gap-3 rounded-lg p-2 hover:bg-zinc-950/5 dark:hover:bg-white/5">
-            {{template "avatar" (dict "Initials" (if .User.Name (slice .User.Name 0 2) "U") "Size" "sm")}}
-            <span class="hidden text-sm font-medium text-zinc-950 dark:text-white lg:block">
-              {{if .User}}{{.User.Name}}{{else}}Account{{end}}
-            </span>
+            {{if .User}}
+              {{template "avatar" (dict "Initials" "UA" "Size" "sm")}}
+              <span class="hidden text-sm font-medium text-zinc-950 dark:text-white lg:block">
+                {{.User.Name}}
+              </span>
+            {{else}}
+              {{template "avatar" (dict "Initials" "U" "Size" "sm")}}
+              <span class="hidden text-sm font-medium text-zinc-950 dark:text-white lg:block">
+                Account
+              </span>
+            {{end}}
           </button>
 
           <!-- Dropdown menu -->

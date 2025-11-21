@@ -30,7 +30,7 @@
 animate-spin
 
 {{/* Size */}}
-{{$size := .Size | default "md"}}
+{{$size := or .Size "md"}}
 {{if eq $size "xs"}}
   size-3
 {{else if eq $size "sm"}}
@@ -42,7 +42,7 @@ animate-spin
 {{end}}
 
 {{/* Color */}}
-{{$color := .Color | default "zinc"}}
+{{$color := or .Color "zinc"}}
 {{if eq $color "blue"}}
   text-blue-600 dark:text-blue-400
 {{else if eq $color "white"}}
@@ -57,7 +57,7 @@ animate-spin
 {{/* Spinner with text label */}}
 {{define "spinner-text"}}
 <div class="flex items-center gap-3 {{.Class}}">
-  {{template "spinner" (dict "Size" (.Size | default "sm") "Color" .Color)}}
+  {{template "spinner" (dict "Size" (.Size | or "sm") "Color" .Color)}}
   <span class="text-base/6 text-zinc-600 sm:text-sm/6 dark:text-zinc-400">
     {{.Text}}
   </span>

@@ -20,7 +20,7 @@
 {{end}}
 
 {{define "stack-classes"}}
-{{$gap := .Gap | default "6"}}
+{{$gap := or .Gap "6"}}
 {{if eq $gap "1"}}
   space-y-1
 {{else if eq $gap "2"}}

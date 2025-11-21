@@ -22,7 +22,7 @@
 mx-auto px-gutter
 
 {{/* Max width variants */}}
-{{$maxWidth := .MaxWidth | default "7xl"}}
+{{$maxWidth := or .MaxWidth "7xl"}}
 {{if eq $maxWidth "2xl"}}
   max-w-2xl
 {{else if eq $maxWidth "3xl"}}

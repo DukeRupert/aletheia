@@ -25,7 +25,7 @@ inline-flex items-center gap-x-1.5 rounded-md font-medium
 forced-colors:outline
 
 {{/* Size variants */}}
-{{$size := .Size | default "md"}}
+{{$size := or .Size "md"}}
 {{if eq $size "sm"}}
   px-1 py-0.5 text-xs/5
 {{else}}
@@ -33,7 +33,7 @@ forced-colors:outline
 {{end}}
 
 {{/* Color variants */}}
-{{$color := .Color | default "zinc"}}
+{{$color := or .Color "zinc"}}
 {{if eq $color "zinc"}}
   bg-zinc-600/10 text-zinc-700
   dark:bg-white/5 dark:text-zinc-400

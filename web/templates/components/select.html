@@ -21,7 +21,7 @@
 
 {{define "select"}}
 <select name="{{.Name}}"
-        id="{{.ID | default .Name}}"
+        id="{{or .ID .Name}}"
         {{if .Required}}required{{end}}
         {{if .Disabled}}disabled{{end}}
         class="{{template "select-classes" .}}">

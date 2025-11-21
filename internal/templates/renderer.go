@@ -22,6 +22,25 @@ func NewTemplateRenderer(templatesDir string) (*TemplateRenderer, error) {
 
 	// Define custom template functions
 	funcMap := template.FuncMap{
+		// dict creates a dictionary/map for passing multiple values to templates
+		"dict": func(values ...interface{}) (map[string]interface{}, error) {
+			if len(values)%2 != 0 {
+				return nil, fmt.Errorf("dict requires an even number of arguments")
+			}
+			dict := make(map[string]interface{}, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				key, ok := values[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict keys must be strings")
+				}
+				dict[key] = values[i+1]
+			}
+			return dict, nil
+		},
+		// list creates a slice for passing arrays to templates
+		"list": func(values ...interface{}) []interface{} {
+			return values
+		},
 		"mul": func(a, b interface{}) float64 {
 			var aFloat, bFloat float64
 

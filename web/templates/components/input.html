@@ -16,9 +16,9 @@
 */}}
 
 {{define "input"}}
-<input type="{{.Type | default "text"}}"
+<input type="{{or .Type "text"}}"
        name="{{.Name}}"
-       id="{{.ID | default .Name}}"
+       id="{{or .ID .Name}}"
        {{if .Value}}value="{{.Value}}"{{end}}
        {{if .Placeholder}}placeholder="{{.Placeholder}}"{{end}}
        {{if .Required}}required{{end}}

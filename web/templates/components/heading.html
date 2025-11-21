@@ -12,7 +12,7 @@
 */}}
 
 {{define "heading"}}
-{{$level := .Level | default "1"}}
+{{$level := or .Level "1"}}
 {{if eq $level "1"}}
   <h1 class="text-2xl/8 font-semibold text-zinc-950 sm:text-xl/8 dark:text-white {{.Class}}">
     {{.Content}}

@@ -40,7 +40,7 @@ inline-grid shrink-0 align-middle overflow-hidden
 forced-colors:outline
 
 {{/* Shape */}}
-{{$shape := .Shape | default "circle"}}
+{{$shape := or .Shape "circle"}}
 {{if eq $shape "square"}}
   rounded-[20%]
 {{else}}
@@ -48,7 +48,7 @@ forced-colors:outline
 {{end}}
 
 {{/* Size */}}
-{{$size := .Size | default "md"}}
+{{$size := or .Size "md"}}
 {{if eq $size "xs"}}
   size-6
 {{else if eq $size "sm"}}

@@ -17,8 +17,8 @@
 
 {{define "textarea"}}
 <textarea name="{{.Name}}"
-          id="{{.ID | default .Name}}"
-          rows="{{.Rows | default 3}}"
+          id="{{or .ID .Name}}"
+          rows="{{.Rows | or 3}}"
           {{if .Placeholder}}placeholder="{{.Placeholder}}"{{end}}
           {{if .Required}}required{{end}}
           {{if .Disabled}}disabled{{end}}
