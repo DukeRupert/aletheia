@@ -150,7 +150,7 @@ See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for minimal styling guidelines.
 - [ ] Organization detail page
 - [ ] Organization member management UI
 
-### Inspection Interface - In Progress
+### Inspection Interface ✓ COMPLETED
 - [x] Global inspection list (`/inspections`) - Aggregated across all projects
 - [x] Project-specific inspection list (`/projects/:projectId/inspections`)
 - [x] Create new inspection form (`/projects/:projectId/inspections/new`)
@@ -158,9 +158,14 @@ See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for minimal styling guidelines.
 - [x] Photo upload interface (single file with HTMX)
 - [x] Photo gallery view (thumbnail grid with delete)
 - [x] AI analysis backend (state-specific safety codes, rich context)
-- [ ] Trigger AI analysis button (UI)
-- [ ] Violation review interface
-- [ ] Mark violations as confirmed/dismissed
+- [x] Trigger AI analysis button (UI with HTMX)
+- [x] Photo detail page with full violation workflow
+- [x] Real-time polling for analysis status (HTMX every 2s)
+- [x] Violation review interface (inspection detail & photo detail views)
+- [x] Mark violations as confirmed/dismissed (one-click actions)
+- [x] Manual violation creation (inspector can add violations)
+- [x] Smart re-analysis (preserves confirmed, clears pending/dismissed)
+- [x] Inspector context hints (optional notes to guide AI)
 
 ### Reports UI - Not Started
 - [ ] Report generation form

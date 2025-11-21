@@ -106,36 +106,41 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [ ] Modal component (HTMX-powered)
 - [ ] Dropdown menu component
 
-## Inspection Workflow (Phase 5) - In Progress
+## Inspection Workflow (Phase 5) ✓ COMPLETED
 
-### Inspection Pages ✓ Core Complete
+### Inspection Pages ✓ COMPLETED
 - [x] Inspection list page (`/inspections`) - Global view across all projects with context
 - [x] Project-specific inspection list (`/projects/:projectId/inspections`)
 - [x] Create inspection page (`/projects/:projectId/inspections/new`) - HTMX form with project context
 - [x] Inspection detail page (`/inspections/:id`) with metadata and photo gallery
-- [ ] Filter by project (global view)
-- [ ] Filter by status
-- [ ] Sort by date
-- [ ] Violation summary section
-- [ ] Status workflow controls
+- [x] Violation summary section with counts by severity
+- [ ] Filter by project (global view) - Deferred to Phase 10
+- [ ] Filter by status - Deferred to Phase 10
+- [ ] Sort by date - Deferred to Phase 10
+- [ ] Status workflow controls - Deferred to Phase 10
 
-### Photo Upload & Management ✓ Basic Complete
+### Photo Upload & Management ✓ COMPLETED
 - [x] Photo upload interface (single file)
   - [x] Click-to-upload with file input
   - [x] Auto-submit on file selection
   - [x] Upload status indicator
-  - [ ] Drag & drop zone
-  - [ ] Upload progress bar
-  - [ ] Multiple file support
+  - [ ] Drag & drop zone - Deferred (nice-to-have)
+  - [ ] Upload progress bar - Deferred (nice-to-have)
+  - [ ] Multiple file support - Deferred (nice-to-have)
 - [x] Photo gallery component (thumbnail grid in inspection detail)
   - [x] Thumbnail display with fallback to full image
-  - [x] Click thumbnail to view full-size in new tab
+  - [x] Click thumbnail to view photo detail page
   - [x] Delete button with HTMX confirmation
   - [x] Upload timestamp
-- [ ] Photo detail view with violations
-  - [ ] Trigger AI analysis button (next task)
-  - [ ] Analysis status indicator
-  - [ ] Violations detected on this photo
+  - [x] Analysis status indicators (pending/analyzing/completed/failed)
+- [x] Photo detail view with violations (`/photos/:id`)
+  - [x] Full-size photo display
+  - [x] Trigger AI analysis button (HTMX trigger)
+  - [x] Analysis status indicator with real-time polling
+  - [x] Inspector context input (optional hints for AI)
+  - [x] Collapsible analysis controls section
+  - [x] Violations detected on this photo
+  - [x] Manual violation creation button
 
 ### Components
 - [ ] File upload component (HTMX)
@@ -144,56 +149,68 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [ ] Status badge component (draft, in_progress, completed)
 - [ ] Tab component (for inspection sections)
 
-## AI Analysis & Violations (Phase 6) - In Progress
+## AI Analysis & Violations (Phase 6) ✓ COMPLETED
 
 ### AI Analysis Backend ✓ COMPLETED
 - [x] State-specific safety code filtering
 - [x] Rich inspection context (project name, location, type)
 - [x] Image download from storage (local & S3)
 - [x] Claude vision API integration
-- [x] Job queue processing with retry
+- [x] Job queue processing with retry (3 retries with exponential backoff)
 - [x] Violation detection and storage
+- [x] Rate limiting (100/hour, 10 concurrent per org)
+- [x] Token usage tracking
 
-### AI Analysis Interface - Next Up
-- [ ] "Analyze Photo" button (HTMX trigger) ← **CURRENT TASK**
-- [ ] Analysis status indicator
-  - [ ] Queued state
-  - [ ] Processing state (polling)
-  - [ ] Completed state
-  - [ ] Failed state
-- [ ] Analysis results display
-  - [ ] Violations found count
-  - [ ] Confidence scores
-  - [ ] Severity indicators
+### AI Analysis Interface ✓ COMPLETED
+- [x] "Analyze Photo" button (HTMX trigger with confirmation)
+- [x] Analysis status indicator with real-time polling
+  - [x] Pending state (not yet analyzed)
+  - [x] Queued state
+  - [x] Processing state (polling every 2s)
+  - [x] Completed state (auto-stops polling)
+  - [x] Failed state (with error messages)
+- [x] Analysis results display
+  - [x] Violations found count (with severity breakdown)
+  - [x] Confidence scores (percentage display)
+  - [x] Severity indicators (color-coded badges)
+- [x] Inspector context input (hints to guide AI analysis)
+- [x] Re-analysis workflow (preserves confirmed violations)
 
-### Violation Review Interface
-- [ ] Violation list page (`/inspections/:id/violations`)
-  - [ ] Group by photo
-  - [ ] Filter by severity
-  - [ ] Filter by status
-- [ ] Violation card component
-  - [ ] Photo thumbnail
-  - [ ] Description
-  - [ ] Severity badge
-  - [ ] Confidence score
-  - [ ] Safety code reference
-  - [ ] Location in image
-- [ ] Violation detail modal
-  - [ ] Full photo with violation highlighted
-  - [ ] Complete details
-  - [ ] Action buttons (confirm, dismiss, edit)
-- [ ] Violation actions
-  - [ ] Confirm violation
-  - [ ] Dismiss violation (with reason)
-  - [ ] Add notes/comments
-  - [ ] Change severity (if needed)
+### Violation Review Interface ✓ COMPLETED
+- [x] Violation display in inspection detail (`/inspections/:id`)
+  - [x] Violation count badges by severity
+  - [x] Violation cards in grid layout
+  - [x] Filter by status (all/pending/confirmed/dismissed) - Alpine.js tabs
+- [x] Violation display in photo detail (`/photos/:id`)
+  - [x] Full violation cards with all details
+  - [x] Grouped by photo implicitly
+  - [x] Status-based filtering
+- [x] Violation card component
+  - [x] Photo thumbnail link
+  - [x] Description
+  - [x] Severity badge (color-coded)
+  - [x] Confidence score
+  - [x] Safety code reference (with regulation citation)
+  - [x] Location in image
+  - [x] Status indicator
+  - [x] Timestamp
+- [x] Violation actions (inline on cards)
+  - [x] Confirm violation (HTMX one-click)
+  - [x] Dismiss violation (HTMX one-click, soft delete)
+  - [x] Manual violation creation (modal-style form)
+  - [ ] Add notes/comments - Deferred to Phase 10
+  - [ ] Change severity - Deferred to Phase 10
+  - [ ] Full detail modal - Deferred (inline display sufficient)
 
-### Components
-- [ ] Severity badge (critical, high, medium, low)
-- [ ] Confidence indicator (visual bar or percentage)
-- [ ] Action buttons group
-- [ ] Notes/comments textarea
-- [ ] Polling component (for job status)
+### Components ✓ COMPLETED
+- [x] Severity badge (critical=red, high=orange, medium=yellow, low=gray)
+- [x] Status badge (pending=blue, confirmed=green, dismissed=gray)
+- [x] Confidence indicator (percentage display)
+- [x] Action buttons group (confirm/dismiss)
+- [x] Polling component (HTMX with hx-trigger="every 2s")
+- [x] Analysis status display with loading spinner
+- [x] Violation count summary
+- [x] Manual violation form (HTMX submission)
 
 ## Safety Code Management (Phase 7)
 
