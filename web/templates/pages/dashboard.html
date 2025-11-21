@@ -3,30 +3,54 @@
 {{define "title"}}Dashboard - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div class="stack">
-    <h1>Dashboard</h1>
-    <p>Welcome back, {{if .User}}{{.User.Name}}{{else}}User{{end}}!</p>
+<div class="mx-auto max-w-7xl">
+  {{template "page-header" (dict
+    "Title" "Dashboard"
+    "Description" (printf "Welcome back, %s!" (if .User.Name .User.Name "User")))}}
 
-    <div class="grid">
-      <div class="card">
-        <h3>Recent Inspections</h3>
-        <p>View and manage your recent safety inspections.</p>
-        <a href="/inspections" class="btn-primary">View Inspections</a>
-      </div>
-
-      <div class="card">
-        <h3>Projects</h3>
-        <p>Manage your construction projects.</p>
-        <a href="/projects" class="btn-primary">View Projects</a>
-      </div>
-
-      <div class="card">
-        <h3>Organizations</h3>
-        <p>Manage your organizations and team members.</p>
-        <a href="/organizations" class="btn-primary">View Organizations</a>
-      </div>
-    </div>
+  <div class="px-gutter pb-16">
+    {{template "grid" (dict "Cols" "3" "Content" (block "dashboard-cards" .))}}
   </div>
 </div>
+
+{{define "dashboard-cards"}}
+  <!-- Recent Inspections Card -->
+  <div class="rounded-2xl bg-white p-8 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+    {{template "subheading" (dict "Content" "Recent Inspections")}}
+    <p class="mt-2 text-base/6 text-zinc-600 dark:text-zinc-400">
+      View and manage your recent safety inspections.
+    </p>
+    <div class="mt-6">
+      <a href="/inspections">
+        {{template "button" (dict "Content" "View Inspections" "Variant" "solid" "Color" "blue")}}
+      </a>
+    </div>
+  </div>
+
+  <!-- Projects Card -->
+  <div class="rounded-2xl bg-white p-8 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+    {{template "subheading" (dict "Content" "Projects")}}
+    <p class="mt-2 text-base/6 text-zinc-600 dark:text-zinc-400">
+      Manage your construction projects.
+    </p>
+    <div class="mt-6">
+      <a href="/projects">
+        {{template "button" (dict "Content" "View Projects" "Variant" "solid" "Color" "blue")}}
+      </a>
+    </div>
+  </div>
+
+  <!-- Organizations Card -->
+  <div class="rounded-2xl bg-white p-8 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+    {{template "subheading" (dict "Content" "Organizations")}}
+    <p class="mt-2 text-base/6 text-zinc-600 dark:text-zinc-400">
+      Manage your organizations and team members.
+    </p>
+    <div class="mt-6">
+      <a href="/organizations">
+        {{template "button" (dict "Content" "View Organizations" "Variant" "solid" "Color" "blue")}}
+      </a>
+    </div>
+  </div>
+{{end}}
 {{end}}
