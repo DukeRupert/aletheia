@@ -84,6 +84,16 @@ func (q *Queries) DeleteDetectedViolation(ctx context.Context, id pgtype.UUID) e
 	return err
 }
 
+const deletePendingViolationsByPhoto = `-- name: DeletePendingViolationsByPhoto :exec
+DELETE FROM detected_violations
+WHERE photo_id = $1 AND status = 'pending'
+`
+
+func (q *Queries) DeletePendingViolationsByPhoto(ctx context.Context, photoID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deletePendingViolationsByPhoto, photoID)
+	return err
+}
+
 const getDetectedViolation = `-- name: GetDetectedViolation :one
 SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location FROM detected_violations
 WHERE id = $1 LIMIT 1

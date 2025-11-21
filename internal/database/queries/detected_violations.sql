@@ -66,3 +66,7 @@ RETURNING *;
 SELECT COUNT(*) FROM detected_violations dv
 JOIN photos p ON dv.photo_id = p.id
 WHERE p.inspection_id = $1;
+
+-- name: DeletePendingViolationsByPhoto :exec
+DELETE FROM detected_violations
+WHERE photo_id = $1 AND status = 'pending';

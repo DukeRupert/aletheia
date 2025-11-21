@@ -26,6 +26,7 @@ type Querier interface {
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteInspection(ctx context.Context, id pgtype.UUID) error
 	DeleteOrganization(ctx context.Context, id pgtype.UUID) error
+	DeletePendingViolationsByPhoto(ctx context.Context, photoID pgtype.UUID) error
 	DeletePhoto(ctx context.Context, id pgtype.UUID) error
 	DeleteProject(ctx context.Context, id pgtype.UUID) error
 	DeleteReport(ctx context.Context, id pgtype.UUID) error
