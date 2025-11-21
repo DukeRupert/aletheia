@@ -3,58 +3,103 @@
 {{define "title"}}New Project - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div style="max-width: 600px; margin: 3rem auto;">
-    <div class="card">
-      <h1>Create New Project</h1>
-      <p>Create a construction project for safety inspections.</p>
+<div class="mx-auto max-w-7xl">
+  {{template "page-header" (dict
+    "Title" "Create Project"
+    "Description" "Create a construction project for safety inspections"
+  )}}
 
-      <form
-        hx-post="/api/projects"
-        hx-target="#project-form"
-        hx-swap="outerHTML"
-        id="project-form"
-        class="stack">
+  <div class="px-gutter pb-16">
+    <div class="mx-auto max-w-2xl">
+      {{if .Organizations}}
+        <form
+          hx-post="/api/projects"
+          hx-target="#project-form"
+          hx-swap="outerHTML"
+          id="project-form"
+          class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
 
-        {{if .Organizations}}
-          <div class="form-field">
-            <label for="organization_id">Organization</label>
-            <select
-              id="organization_id"
-              name="organization_id"
-              required
-              autofocus>
-              <option value="">Select an organization</option>
-              {{range .Organizations}}
-                <option value="{{.ID}}">{{.Name}}</option>
-              {{end}}
-            </select>
-            <small class="help-text">Select the organization this project belongs to</small>
-          </div>
+          <div class="space-y-6">
+            <!-- Organization -->
+            <div class="space-y-1">
+              <label for="organization_id" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+                Organization
+              </label>
+              <select name="organization_id"
+                      id="organization_id"
+                      required
+                      class="relative block w-full appearance-none rounded-lg border
+                             px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)]
+                             sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)]
+                             text-base/6 text-zinc-950 sm:text-sm/6
+                             border-zinc-950/10 hover:border-zinc-950/20
+                             dark:border-white/10 dark:text-white
+                             dark:hover:border-white/20
+                             bg-transparent dark:bg-white/5
+                             focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-blue-500
+                             disabled:border-zinc-950/20 disabled:dark:border-white/15 disabled:dark:bg-white/[2.5%]
+                             disabled:opacity-50 disabled:cursor-not-allowed">
+                <option value="">Select an organization</option>
+                {{range .Organizations}}
+                  <option value="{{.ID}}">{{.Name}}</option>
+                {{end}}
+              </select>
+              <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
+                Select the organization this project belongs to
+              </p>
+            </div>
 
-          <div class="form-field">
-            <label for="name">Project Name</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              required
-              maxlength="255"
-              placeholder="e.g., Main Street Construction">
-            <small class="help-text">Enter a descriptive name for the project</small>
-          </div>
+            <!-- Project Name -->
+            <div class="space-y-1">
+              <label for="name" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+                Project Name
+              </label>
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "name"
+                "ID" "name"
+                "Required" true
+                "Placeholder" "e.g., Main Street Construction"
+              )}}
+              <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
+                Enter a descriptive name for the project
+              </p>
+            </div>
 
-          <div style="display: flex; gap: var(--space-sm);">
-            <button type="submit" class="btn-primary">Create Project</button>
-            <a href="/projects" class="btn-secondary">Cancel</a>
+            <!-- Actions -->
+            <div class="flex gap-4 pt-4">
+              {{template "button" (dict
+                "Type" "submit"
+                "Content" "Create Project"
+                "Variant" "solid"
+                "Color" "blue"
+              )}}
+              <a href="/projects">
+                {{template "button" (dict
+                  "Content" "Cancel"
+                  "Variant" "outline"
+                )}}
+              </a>
+            </div>
           </div>
-        {{else}}
-          <div class="alert alert-warning">
-            <strong>No Organizations:</strong> You need to create or join an organization before creating projects.
+        </form>
+      {{else}}
+        <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 text-center">
+          {{template "alert" (dict
+            "Type" "warning"
+            "Content" "You need to create or join an organization before creating projects."
+          )}}
+          <div class="mt-6">
+            <a href="/organizations">
+              {{template "button" (dict
+                "Content" "Go to Organizations"
+                "Variant" "solid"
+                "Color" "blue"
+              )}}
+            </a>
           </div>
-          <a href="/organizations" class="btn-primary">Go to Organizations</a>
-        {{end}}
-      </form>
+        </div>
+      {{end}}
     </div>
   </div>
 </div>
