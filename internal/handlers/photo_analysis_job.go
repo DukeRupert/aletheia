@@ -146,18 +146,19 @@ func (h *PhotoAnalysisJobHandler) Handle(ctx context.Context, job *queue.Job) (m
 		return nil, fmt.Errorf("AI analysis failed: %w", err)
 	}
 
-	// Delete any existing pending violations for this photo before storing new ones
-	// This prevents duplicates when re-analyzing. We keep confirmed/dismissed violations
-	// to preserve the inspector's review work.
-	err = h.db.DeletePendingViolationsByPhoto(ctx, photo.ID)
+	// Delete any existing pending and dismissed violations for this photo before storing new ones
+	// This prevents duplicates when re-analyzing. We keep only confirmed violations
+	// to preserve the inspector's review work. Dismissed violations act as a "soft delete"
+	// - they're hidden from the UI but preserved until the next analysis.
+	err = h.db.DeletePendingAndDismissedViolationsByPhoto(ctx, photo.ID)
 	if err != nil {
-		h.logger.Warn("failed to delete pending violations before re-analysis",
+		h.logger.Warn("failed to delete pending/dismissed violations before re-analysis",
 			slog.String("photo_id", photoID.String()),
 			slog.String("error", err.Error()),
 		)
 		// Don't fail the job, continue with creating new violations
 	} else {
-		h.logger.Info("cleared pending violations before re-analysis",
+		h.logger.Info("cleared pending and dismissed violations before re-analysis",
 			slog.String("photo_id", photoID.String()),
 		)
 	}

@@ -577,8 +577,13 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 	}
 
 	// Create a map of photo ID -> violations for easy lookup in template
+	// Filter out dismissed violations (soft delete - hidden from UI but preserved until next analysis)
 	violationsByPhoto := make(map[string][]database.DetectedViolation)
 	for _, violation := range violations {
+		// Skip dismissed violations - they're hidden from the UI
+		if violation.Status == database.ViolationStatusDismissed {
+			continue
+		}
 		photoIDStr := violation.PhotoID.String()
 		violationsByPhoto[photoIDStr] = append(violationsByPhoto[photoIDStr], violation)
 	}
@@ -677,10 +682,18 @@ func (h *PageHandler) PhotoDetailPage(c echo.Context) error {
 	}
 
 	// Get violations for this photo
-	violations, err := queries.ListDetectedViolations(c.Request().Context(), photo.ID)
+	allViolations, err := queries.ListDetectedViolations(c.Request().Context(), photo.ID)
 	if err != nil {
 		h.logger.Error("failed to list violations", slog.String("err", err.Error()))
-		violations = []database.DetectedViolation{}
+		allViolations = []database.DetectedViolation{}
+	}
+
+	// Filter out dismissed violations (soft delete - hidden from UI but preserved until next analysis)
+	violations := make([]database.DetectedViolation, 0)
+	for _, violation := range allViolations {
+		if violation.Status != database.ViolationStatusDismissed {
+			violations = append(violations, violation)
+		}
 	}
 
 	// Get safety codes for violations

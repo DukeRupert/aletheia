@@ -70,3 +70,7 @@ WHERE p.inspection_id = $1;
 -- name: DeletePendingViolationsByPhoto :exec
 DELETE FROM detected_violations
 WHERE photo_id = $1 AND status = 'pending';
+
+-- name: DeletePendingAndDismissedViolationsByPhoto :exec
+DELETE FROM detected_violations
+WHERE photo_id = $1 AND status IN ('pending', 'dismissed');
