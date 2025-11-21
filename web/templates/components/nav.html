@@ -1,72 +1,120 @@
 {{define "nav"}}
-<nav x-data="{ mobileMenuOpen: false }">
-  <div class="container">
-    <div class="nav-content">
-      <a href="/dashboard" class="logo">Aletheia</a>
+<nav class="border-b border-zinc-950/10 bg-white dark:border-white/10 dark:bg-zinc-900"
+     x-data="{ mobileMenuOpen: false }">
+  <div class="mx-auto max-w-7xl px-gutter">
+    <div class="flex items-center justify-between gap-4 py-4">
+      <!-- Logo -->
+      <a href="/dashboard"
+         class="text-xl font-bold text-zinc-950 dark:text-white">
+        Aletheia
+      </a>
 
       <!-- Mobile hamburger button -->
-      <button
-        @click="mobileMenuOpen = !mobileMenuOpen"
-        class="mobile-menu-btn"
-        aria-label="Toggle mobile menu"
-        aria-expanded="false"
-        :aria-expanded="mobileMenuOpen.toString()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="3" y1="12" x2="21" y2="12" x-show="!mobileMenuOpen"></line>
-          <line x1="3" y1="6" x2="21" y2="6" x-show="!mobileMenuOpen"></line>
-          <line x1="3" y1="18" x2="21" y2="18" x-show="!mobileMenuOpen"></line>
-          <line x1="18" y1="6" x2="6" y2="18" x-show="mobileMenuOpen"></line>
-          <line x1="6" y1="6" x2="18" y2="18" x-show="mobileMenuOpen"></line>
+      <button @click="mobileMenuOpen = !mobileMenuOpen"
+              class="inline-flex items-center justify-center rounded-lg p-2 text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5 lg:hidden"
+              aria-label="Toggle mobile menu"
+              :aria-expanded="mobileMenuOpen.toString()">
+        <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path x-show="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          <path x-show="mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
 
       <!-- Desktop navigation -->
-      <div class="nav-desktop">
-        <ul class="nav-links">
-          <li><a href="/dashboard">Dashboard</a></li>
-          <li><a href="/inspections">Inspections</a></li>
-          <li><a href="/projects">Projects</a></li>
-        </ul>
+      <div class="hidden items-center gap-8 lg:flex">
+        <!-- Nav links -->
+        <div class="flex gap-6">
+          <a href="/dashboard"
+             class="text-sm/6 font-medium text-zinc-500 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white">
+            Dashboard
+          </a>
+          <a href="/inspections"
+             class="text-sm/6 font-medium text-zinc-500 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white">
+            Inspections
+          </a>
+          <a href="/projects"
+             class="text-sm/6 font-medium text-zinc-500 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white">
+            Projects
+          </a>
+        </div>
 
-        <!-- User dropdown menu with Alpine.js -->
-        <div class="nav-user" x-data="{ open: false }">
-          <button @click="open = !open" aria-label="User menu" class="btn-secondary">
-            {{if .User}}{{.User.Name}}{{else}}Account{{end}}
+        <!-- User dropdown -->
+        <div class="relative" x-data="{ open: false }">
+          <button @click="open = !open"
+                  class="flex items-center gap-3 rounded-lg p-2 hover:bg-zinc-950/5 dark:hover:bg-white/5">
+            {{template "avatar" (dict "Initials" (if .User.Name (slice .User.Name 0 2) "U") "Size" "sm")}}
+            <span class="hidden text-sm font-medium text-zinc-950 dark:text-white lg:block">
+              {{if .User}}{{.User.Name}}{{else}}Account{{end}}
+            </span>
           </button>
 
-          <div x-show="open" @click.away="open = false" class="dropdown" x-cloak>
-            <a href="/profile">Profile</a>
-            <a href="/organizations">Organizations</a>
-            <a href="/projects">Projects</a>
-            <hr>
-            <form hx-post="/api/auth/logout" hx-swap="none">
-              <button type="submit" class="btn-link">Logout</button>
-            </form>
+          <!-- Dropdown menu -->
+          <div x-show="open"
+               x-transition
+               @click.away="open = false"
+               x-cloak
+               class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
+            <a href="/profile"
+               @click="open = false"
+               class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+              Profile
+            </a>
+            <a href="/organizations"
+               @click="open = false"
+               class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+              Organizations
+            </a>
+            <div class="my-1 h-px bg-zinc-950/5 dark:bg-white/5"></div>
+            <button hx-post="/api/auth/logout"
+                    hx-swap="none"
+                    class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+              Logout
+            </button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Mobile menu -->
-    <div
-      x-show="mobileMenuOpen"
-      @click.away="mobileMenuOpen = false"
-      x-cloak
-      class="mobile-menu">
-      <ul class="mobile-nav-links">
-        <li><a href="/dashboard" @click="mobileMenuOpen = false">Dashboard</a></li>
-        <li><a href="/inspections" @click="mobileMenuOpen = false">Inspections</a></li>
-        <li><a href="/projects" @click="mobileMenuOpen = false">Projects</a></li>
-        <li><hr></li>
-        <li><a href="/settings/profile" @click="mobileMenuOpen = false">Profile</a></li>
-        <li><a href="/organizations" @click="mobileMenuOpen = false">Organizations</a></li>
-        <li><a href="/settings" @click="mobileMenuOpen = false">Settings</a></li>
-        <li>
-          <form hx-post="/api/auth/logout" hx-swap="none">
-            <button type="submit" class="btn-link">Logout</button>
-          </form>
-        </li>
-      </ul>
+    <div x-show="mobileMenuOpen"
+         x-transition
+         @click.away="mobileMenuOpen = false"
+         x-cloak
+         class="border-t border-zinc-950/10 py-4 dark:border-white/10 lg:hidden">
+      <div class="space-y-1">
+        <a href="/dashboard"
+           @click="mobileMenuOpen = false"
+           class="block rounded-lg px-3 py-2 text-base font-medium text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+          Dashboard
+        </a>
+        <a href="/inspections"
+           @click="mobileMenuOpen = false"
+           class="block rounded-lg px-3 py-2 text-base font-medium text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+          Inspections
+        </a>
+        <a href="/projects"
+           @click="mobileMenuOpen = false"
+           class="block rounded-lg px-3 py-2 text-base font-medium text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+          Projects
+        </a>
+        <div class="my-2 h-px bg-zinc-950/5 dark:bg-white/5"></div>
+        <a href="/profile"
+           @click="mobileMenuOpen = false"
+           class="block rounded-lg px-3 py-2 text-base font-medium text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+          Profile
+        </a>
+        <a href="/organizations"
+           @click="mobileMenuOpen = false"
+           class="block rounded-lg px-3 py-2 text-base font-medium text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+          Organizations
+        </a>
+        <div class="my-2 h-px bg-zinc-950/5 dark:bg-white/5"></div>
+        <button hx-post="/api/auth/logout"
+                hx-swap="none"
+                class="block w-full rounded-lg px-3 py-2 text-left text-base font-medium text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5">
+          Logout
+        </button>
+      </div>
     </div>
   </div>
 </nav>
