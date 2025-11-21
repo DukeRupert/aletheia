@@ -3,71 +3,83 @@
 {{define "title"}}Create Account - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div style="max-width: 400px; margin: 3rem auto;">
-    <div class="card">
-      <h1>Create Account</h1>
-      <p>Sign up for Aletheia to start safety inspections.</p>
+<div class="flex min-h-screen items-center justify-center px-4 py-12 bg-zinc-50 dark:bg-zinc-950">
+  <div class="w-full max-w-md">
+    <!-- Logo -->
+    <div class="flex justify-center mb-8">
+      <a href="/" class="text-2xl font-bold text-zinc-950 dark:text-white">
+        Aletheia
+      </a>
+    </div>
 
-      <form
-        hx-post="/api/auth/register"
-        hx-target="#register-form"
-        hx-swap="outerHTML"
-        id="register-form"
-        class="stack">
+    <!-- Card -->
+    <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <h1 class="text-2xl/8 font-semibold text-zinc-950 dark:text-white">
+        Create Account
+      </h1>
+      <p class="mt-2 text-sm/6 text-zinc-500 dark:text-zinc-400">
+        Sign up for Aletheia to start safety inspections.
+      </p>
 
-        <div class="form-field">
-          <label for="name">Full Name</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            required
-            autofocus
-            placeholder="John Doe">
+      <form hx-post="/api/auth/register"
+            hx-target="#register-form"
+            hx-swap="outerHTML"
+            id="register-form"
+            class="mt-8 space-y-6">
+
+        <!-- Name field -->
+        <div class="space-y-1">
+          <label for="name" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+            Full Name
+          </label>
+          {{template "input" (dict "Type" "text" "Name" "name" "ID" "name" "Required" true "Autofocus" true "Placeholder" "John Doe")}}
         </div>
 
-        <div class="form-field">
-          <label for="username">Username</label>
-          <input
-            type="text"
-            id="username"
-            name="username"
-            required
-            placeholder="johndoe">
-          <small class="help-text">Choose a unique username</small>
+        <!-- Username field -->
+        <div class="space-y-1">
+          <label for="username" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+            Username
+          </label>
+          {{template "input" (dict "Type" "text" "Name" "username" "ID" "username" "Required" true "Placeholder" "johndoe")}}
+          <p class="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+            Choose a unique username
+          </p>
         </div>
 
-        <div class="form-field">
-          <label for="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            required
-            placeholder="you@example.com">
+        <!-- Email field -->
+        <div class="space-y-1">
+          <label for="email" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+            Email
+          </label>
+          {{template "input" (dict "Type" "email" "Name" "email" "ID" "email" "Required" true "Placeholder" "you@example.com")}}
         </div>
 
-        <div class="form-field">
-          <label for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            required
-            minlength="8"
-            placeholder="At least 8 characters">
-          <small class="help-text">Must be at least 8 characters</small>
+        <!-- Password field -->
+        <div class="space-y-1">
+          <label for="password" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+            Password
+          </label>
+          {{template "input" (dict "Type" "password" "Name" "password" "ID" "password" "Required" true "Minlength" 8 "Placeholder" "At least 8 characters")}}
+          <p class="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+            Must be at least 8 characters
+          </p>
         </div>
 
-        <button type="submit" class="btn-primary">Create Account</button>
-
-        <hr style="margin: var(--space-lg) 0; border: 0; border-top: 1px solid var(--color-border);">
-
-        <div style="text-align: center;">
-          <p style="margin: 0;">Already have an account? <a href="/login">Sign in</a></p>
-        </div>
+        <!-- Submit button -->
+        {{template "button" (dict "Type" "submit" "Content" "Create Account" "Variant" "solid" "Color" "blue" "Class" "w-full")}}
       </form>
+
+      <!-- Divider -->
+      {{template "divider" (dict "Class" "my-8")}}
+
+      <!-- Sign in link -->
+      <div class="text-center text-sm/6 text-zinc-500 dark:text-zinc-400">
+        Already have an account?
+        <a href="/login"
+           class="font-medium text-zinc-950 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300">
+          Sign in
+        </a>
+      </div>
     </div>
   </div>
 </div>
