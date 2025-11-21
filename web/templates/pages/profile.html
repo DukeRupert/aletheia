@@ -3,89 +3,145 @@
 {{define "title"}}Profile - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div style="max-width: 600px; margin: 3rem auto;">
-    <div class="stack">
-      <h1>My Profile</h1>
+<div class="mx-auto max-w-7xl">
+  {{template "page-header" (dict
+    "Title" "My Profile"
+    "Description" "Manage your account information and settings"
+  )}}
 
-      <div class="card">
-        <h2>Account Information</h2>
+  <div class="px-gutter pb-16">
+    <div class="mx-auto max-w-3xl space-y-8">
+      <!-- Account Information Card -->
+      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white">
+          Account Information
+        </h2>
 
-        <div class="stack" style="margin-bottom: var(--space-lg);">
+        <div class="mt-6 space-y-6">
+          <!-- Email -->
           <div>
-            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Email</label>
-            <p style="color: #666;">{{.Profile.Email}}</p>
-            <small class="help-text">Email cannot be changed</small>
+            <dt class="text-sm/6 font-medium text-zinc-950 dark:text-white">Email</dt>
+            <dd class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">{{.Profile.Email}}</dd>
+            <p class="mt-1 text-xs/5 text-zinc-500 dark:text-zinc-500">Email cannot be changed</p>
           </div>
 
+          <!-- Username -->
           <div>
-            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Username</label>
-            <p style="color: #666;">{{.Profile.Username}}</p>
-            <small class="help-text">Username cannot be changed</small>
+            <dt class="text-sm/6 font-medium text-zinc-950 dark:text-white">Username</dt>
+            <dd class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">{{.Profile.Username}}</dd>
+            <p class="mt-1 text-xs/5 text-zinc-500 dark:text-zinc-500">Username cannot be changed</p>
           </div>
 
+          <!-- Account Status -->
           <div>
-            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Account Status</label>
-            <p style="color: #666;">
+            <dt class="text-sm/6 font-medium text-zinc-950 dark:text-white">Account Status</dt>
+            <dd class="mt-1">
               {{if eq .Profile.Status "active"}}
-                <span style="color: #16a34a;">✓ Active</span>
+                {{template "badge" (dict "Content" "Active" "Color" "green")}}
               {{else if eq .Profile.Status "pending"}}
-                <span style="color: #ea580c;">⏳ Pending Verification</span>
+                {{template "badge" (dict "Content" "Pending Verification" "Color" "orange")}}
               {{else}}
-                <span style="color: #dc2626;">{{.Profile.Status}}</span>
+                {{template "badge" (dict "Content" .Profile.Status "Color" "red")}}
               {{end}}
-            </p>
+            </dd>
           </div>
 
+          <!-- Member Since -->
           <div>
-            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs);">Member Since</label>
-            <p style="color: #666;">{{.Profile.CreatedAt.Time.Format "January 2, 2006"}}</p>
+            <dt class="text-sm/6 font-medium text-zinc-950 dark:text-white">Member Since</dt>
+            <dd class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">{{.Profile.CreatedAt.Time.Format "January 2, 2006"}}</dd>
           </div>
         </div>
 
-        <h3 style="margin-top: var(--space-lg);">Update Profile</h3>
+        <!-- Divider -->
+        {{template "divider" (dict "Class" "my-8")}}
+
+        <!-- Update Profile Form -->
+        <h3 class="text-base/7 font-semibold text-zinc-950 dark:text-white">
+          Update Profile
+        </h3>
 
         <form
           hx-put="/api/auth/profile"
           hx-target="#profile-form"
           hx-swap="outerHTML"
           id="profile-form"
-          class="stack">
+          class="mt-6 space-y-6">
 
-          <div class="form-field">
-            <label for="first_name">First Name</label>
-            <input
-              type="text"
-              id="first_name"
-              name="first_name"
-              maxlength="100"
-              value="{{if .Profile.FirstName.Valid}}{{.Profile.FirstName.String}}{{end}}"
-              placeholder="Your first name">
+          <!-- First Name -->
+          <div class="space-y-1">
+            <label for="first_name" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              First Name
+            </label>
+            {{if .Profile.FirstName.Valid}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "first_name"
+                "ID" "first_name"
+                "Value" .Profile.FirstName.String
+                "Placeholder" "Your first name"
+              )}}
+            {{else}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "first_name"
+                "ID" "first_name"
+                "Placeholder" "Your first name"
+              )}}
+            {{end}}
           </div>
 
-          <div class="form-field">
-            <label for="last_name">Last Name</label>
-            <input
-              type="text"
-              id="last_name"
-              name="last_name"
-              maxlength="100"
-              value="{{if .Profile.LastName.Valid}}{{.Profile.LastName.String}}{{end}}"
-              placeholder="Your last name">
+          <!-- Last Name -->
+          <div class="space-y-1">
+            <label for="last_name" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              Last Name
+            </label>
+            {{if .Profile.LastName.Valid}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "last_name"
+                "ID" "last_name"
+                "Value" .Profile.LastName.String
+                "Placeholder" "Your last name"
+              )}}
+            {{else}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "last_name"
+                "ID" "last_name"
+                "Placeholder" "Your last name"
+              )}}
+            {{end}}
           </div>
 
-          <div style="display: flex; gap: var(--space-sm);">
-            <button type="submit" class="btn-primary">Save Changes</button>
+          <!-- Submit Button -->
+          <div class="pt-4">
+            {{template "button" (dict
+              "Type" "submit"
+              "Content" "Save Changes"
+              "Variant" "solid"
+              "Color" "blue"
+            )}}
           </div>
         </form>
       </div>
 
-      <div class="card">
-        <h2>Security</h2>
-        <p style="color: #666; margin-bottom: var(--space-md);">
+      <!-- Security Card -->
+      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white">
+          Security
+        </h2>
+        <p class="mt-2 text-sm/6 text-zinc-600 dark:text-zinc-400">
           Change your password or manage account security settings.
         </p>
-        <a href="/profile/security" class="btn-secondary">Security Settings</a>
+        <div class="mt-6">
+          <a href="/profile/security">
+            {{template "button" (dict
+              "Content" "Security Settings"
+              "Variant" "outline"
+            )}}
+          </a>
+        </div>
       </div>
     </div>
   </div>
