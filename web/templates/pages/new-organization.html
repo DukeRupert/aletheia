@@ -3,35 +3,55 @@
 {{define "title"}}New Organization - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div style="max-width: 600px; margin: 3rem auto;">
-    <div class="card">
-      <h1>Create New Organization</h1>
-      <p>Organizations allow you to manage teams and projects for your company or department.</p>
+<div class="mx-auto max-w-7xl">
+  {{template "page-header" (dict
+    "Title" "Create Organization"
+    "Description" "Organizations allow you to manage teams and projects for your company or department"
+  )}}
 
+  <div class="px-gutter pb-16">
+    <div class="mx-auto max-w-2xl">
       <form
         hx-post="/api/organizations"
         hx-target="#organization-form"
         hx-swap="outerHTML"
         id="organization-form"
-        class="stack">
+        class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
 
-        <div class="form-field">
-          <label for="name">Organization Name</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            required
-            autofocus
-            maxlength="255"
-            placeholder="e.g., Acme Construction Co.">
-          <small class="help-text">Enter a descriptive name for your organization</small>
-        </div>
+        <div class="space-y-6">
+          <!-- Organization Name -->
+          <div class="space-y-1">
+            <label for="name" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              Organization Name
+            </label>
+            {{template "input" (dict
+              "Type" "text"
+              "Name" "name"
+              "ID" "name"
+              "Required" true
+              "Autofocus" true
+              "Placeholder" "e.g., Acme Construction Co."
+            )}}
+            <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
+              Enter a descriptive name for your organization
+            </p>
+          </div>
 
-        <div style="display: flex; gap: var(--space-sm);">
-          <button type="submit" class="btn-primary">Create Organization</button>
-          <a href="/organizations" class="btn-secondary">Cancel</a>
+          <!-- Actions -->
+          <div class="flex gap-4 pt-4">
+            {{template "button" (dict
+              "Type" "submit"
+              "Content" "Create Organization"
+              "Variant" "solid"
+              "Color" "blue"
+            )}}
+            <a href="/organizations">
+              {{template "button" (dict
+                "Content" "Cancel"
+                "Variant" "outline"
+              )}}
+            </a>
+          </div>
         </div>
       </form>
     </div>
