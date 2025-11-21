@@ -31,6 +31,7 @@ func NewPhotoHandler(db *database.Queries, q queue.Queue, logger *slog.Logger) *
 // AnalyzePhotoRequest is the request body for triggering photo analysis
 type AnalyzePhotoRequest struct {
 	PhotoID string `json:"photo_id" validate:"required,uuid"`
+	Context string `json:"context" form:"context"` // Optional context from inspector
 }
 
 // AnalyzePhotoResponse is the response for a photo analysis request
@@ -119,6 +120,15 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 	payload := map[string]interface{}{
 		"photo_id":      photoID.String(),
 		"inspection_id": photo.InspectionID.String(),
+	}
+
+	// Add optional context if provided
+	if req.Context != "" {
+		payload["context"] = req.Context
+		h.logger.Debug("including user context in analysis",
+			slog.String("photo_id", photoID.String()),
+			slog.String("context", req.Context),
+		)
 	}
 
 	job, err := h.queue.Enqueue(

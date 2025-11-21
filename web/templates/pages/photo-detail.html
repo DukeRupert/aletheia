@@ -151,11 +151,90 @@
       </div>
     </div>
 
+    <!-- Re-analyze Section -->
+    <div class="card">
+      <h2 style="margin-bottom: var(--space-sm);">Re-analyze Photo</h2>
+      <p style="color: #666; font-size: 0.875rem; margin-bottom: var(--space-md);">
+        If you believe there are additional violations or the AI missed something, provide additional context and re-analyze the photo.
+      </p>
+
+      <div x-data="{ analyzing: false }">
+        <textarea
+          id="reanalyze-context"
+          name="context"
+          placeholder="e.g., Look for missing hard hats on workers near the scaffolding..."
+          style="width: 100%; min-height: 80px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem; resize: vertical; margin-bottom: var(--space-sm);"
+        ></textarea>
+
+        <button
+          hx-post="/api/photos/analyze"
+          hx-include="#reanalyze-context"
+          hx-vals='{"photo_id": "{{.Photo.ID.String}}"}'
+          hx-trigger="click"
+          @click="analyzing = true"
+          hx-indicator="#analyze-status"
+          class="btn-primary"
+          :disabled="analyzing"
+          style="width: 100%;">
+          <span x-show="!analyzing">Re-analyze with Context</span>
+          <span x-show="analyzing">Analyzing...</span>
+        </button>
+
+        <div id="analyze-status" style="margin-top: var(--space-sm); display: none;">
+          <div style="padding: var(--space-sm); background: #dbeafe; border-radius: 4px; color: #1e40af; font-size: 0.875rem; display: flex; align-items: center; gap: var(--space-xs);">
+            <svg style="width: 16px; height: 16px; animation: spin 1s linear infinite;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Analysis in progress. This may take 30-60 seconds...
+          </div>
+        </div>
+
+        <div id="analyze-complete" style="margin-top: var(--space-sm); display: none;">
+          <div style="padding: var(--space-sm); background: #d1fae5; border-radius: 4px; color: #059669; font-size: 0.875rem;">
+            ✓ Analysis complete! Refresh the page to see updated violations.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Actions -->
     <div style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
       <a href="/inspections/{{.Inspection.ID.String}}" class="btn-secondary">Back to Inspection</a>
       <a href="/projects/{{.Inspection.ProjectID.String}}" class="btn-secondary">View Project</a>
     </div>
+
+    <style>
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    </style>
+
+    <script>
+      // Show status when analysis starts
+      document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        if (evt.detail.pathInfo.requestPath.includes('/api/photos/analyze')) {
+          document.getElementById('analyze-status').style.display = 'block';
+          document.getElementById('analyze-complete').style.display = 'none';
+        }
+      });
+
+      // Show complete message when analysis finishes
+      document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.pathInfo.requestPath.includes('/api/photos/analyze')) {
+          document.getElementById('analyze-status').style.display = 'none';
+          if (evt.detail.successful) {
+            document.getElementById('analyze-complete').style.display = 'block';
+            // Clear the textarea
+            document.getElementById('reanalyze-context').value = '';
+            // Optionally reload after a delay
+            setTimeout(function() {
+              window.location.reload();
+            }, 2000);
+          }
+        }
+      });
+    </script>
   </div>
 </div>
 {{end}}

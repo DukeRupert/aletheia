@@ -120,6 +120,15 @@ func (h *PhotoAnalysisJobHandler) Handle(ctx context.Context, job *queue.Job) (m
 		inspectionContext += fmt.Sprintf(", Project Type: %s", project.ProjectType.String)
 	}
 
+	// Add user-provided context if available
+	if userContext, ok := job.Payload["context"].(string); ok && userContext != "" {
+		inspectionContext += fmt.Sprintf("\n\nInspector's Additional Context: %s", userContext)
+		h.logger.Info("including inspector context in analysis",
+			slog.String("photo_id", photoID.String()),
+			slog.String("user_context", userContext),
+		)
+	}
+
 	// Prepare AI analysis request
 	analysisReq := ai.AnalysisRequest{
 		ImageData:         imageData,
