@@ -3,98 +3,187 @@
 {{define "title"}}{{.Project.Name}} - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div style="max-width: 800px; margin: 3rem auto;">
-    <div class="stack">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>{{.Project.Name}}</h1>
-        <a href="/projects" class="btn-secondary">Back to Projects</a>
-      </div>
+<div class="mx-auto max-w-7xl">
+  {{template "page-header" (dict
+    "Title" .Project.Name
+    "Description" "Manage project details and inspections"
+    "Action" (dict "Content" "Back to Projects" "Href" "/projects" "Variant" "outline")
+  )}}
 
-      <div class="card">
-        <h2>Project Details</h2>
+  <div class="px-gutter pb-16">
+    <div class="mx-auto max-w-4xl space-y-8">
+      <!-- Project Details Card -->
+      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white">
+          Project Details
+        </h2>
 
         <form
           hx-put="/api/projects/{{.Project.ID}}"
           hx-target="#project-form"
           hx-swap="outerHTML"
           id="project-form"
-          class="stack">
+          class="mt-6 space-y-6">
 
-          <div class="form-field">
-            <label for="name">Project Name *</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              required
-              maxlength="255"
-              value="{{.Project.Name}}"
-              placeholder="e.g., Main Street Construction">
+          <!-- Project Name -->
+          <div class="space-y-1">
+            <label for="name" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              Project Name <span class="text-red-500">*</span>
+            </label>
+            {{template "input" (dict
+              "Type" "text"
+              "Name" "name"
+              "ID" "name"
+              "Required" true
+              "Value" .Project.Name
+              "Placeholder" "e.g., Main Street Construction"
+            )}}
           </div>
 
-          <div class="form-field">
-            <label for="description">Description</label>
-            <textarea
-              id="description"
-              name="description"
-              rows="4"
-              placeholder="Describe the project...">{{if .Project.Description.Valid}}{{.Project.Description.String}}{{end}}</textarea>
+          <!-- Description -->
+          <div class="space-y-1">
+            <label for="description" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              Description
+            </label>
+            {{if .Project.Description.Valid}}
+              {{template "textarea" (dict
+                "Name" "description"
+                "ID" "description"
+                "Rows" 4
+                "Value" .Project.Description.String
+                "Placeholder" "Describe the project..."
+              )}}
+            {{else}}
+              {{template "textarea" (dict
+                "Name" "description"
+                "ID" "description"
+                "Rows" 4
+                "Placeholder" "Describe the project..."
+              )}}
+            {{end}}
           </div>
 
-          <div class="form-field">
-            <label for="project_type">Project Type</label>
-            <select id="project_type" name="project_type">
-              <option value="">Select type</option>
-              <option value="Commercial" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Commercial")}}selected{{end}}>Commercial</option>
-              <option value="Residential" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Residential")}}selected{{end}}>Residential</option>
-              <option value="Industrial" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Industrial")}}selected{{end}}>Industrial</option>
-              <option value="Infrastructure" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Infrastructure")}}selected{{end}}>Infrastructure</option>
-              <option value="Other" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Other")}}selected{{end}}>Other</option>
-            </select>
-          </div>
-
-          <div class="form-field">
-            <label for="status">Status</label>
-            <select id="status" name="status">
-              <option value="active" {{if and .Project.Status.Valid (eq .Project.Status.String "active")}}selected{{end}}>Active</option>
-              <option value="on_hold" {{if and .Project.Status.Valid (eq .Project.Status.String "on_hold")}}selected{{end}}>On Hold</option>
-              <option value="completed" {{if and .Project.Status.Valid (eq .Project.Status.String "completed")}}selected{{end}}>Completed</option>
-            </select>
-          </div>
-
-          <h3 style="margin-top: var(--space-lg);">Location Information</h3>
-          <p style="color: #666; font-size: 0.875rem; margin-bottom: var(--space-md);">
-            The project location helps determine applicable state safety codes for AI photo analysis.
-          </p>
-
-          <div class="form-field">
-            <label for="address">Street Address</label>
-            <input
-              type="text"
-              id="address"
-              name="address"
-              maxlength="255"
-              value="{{if .Project.Address.Valid}}{{.Project.Address.String}}{{end}}"
-              placeholder="e.g., 123 Main Street">
-          </div>
-
-          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-md);">
-            <div class="form-field">
-              <label for="city">City</label>
-              <input
-                type="text"
-                id="city"
-                name="city"
-                maxlength="100"
-                value="{{if .Project.City.Valid}}{{.Project.City.String}}{{end}}"
-                placeholder="e.g., San Francisco">
+          <!-- Project Type and Status Grid -->
+          <div class="grid gap-6 sm:grid-cols-2">
+            <!-- Project Type -->
+            <div class="space-y-1">
+              <label for="project_type" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+                Project Type
+              </label>
+              <select name="project_type" id="project_type"
+                      class="relative block w-full appearance-none rounded-lg border
+                             px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)]
+                             sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)]
+                             text-base/6 text-zinc-950 sm:text-sm/6
+                             border-zinc-950/10 hover:border-zinc-950/20
+                             dark:border-white/10 dark:text-white dark:hover:border-white/20
+                             bg-transparent dark:bg-white/5
+                             focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-blue-500">
+                <option value="">Select type</option>
+                <option value="Commercial" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Commercial")}}selected{{end}}>Commercial</option>
+                <option value="Residential" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Residential")}}selected{{end}}>Residential</option>
+                <option value="Industrial" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Industrial")}}selected{{end}}>Industrial</option>
+                <option value="Infrastructure" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Infrastructure")}}selected{{end}}>Infrastructure</option>
+                <option value="Other" {{if and .Project.ProjectType.Valid (eq .Project.ProjectType.String "Other")}}selected{{end}}>Other</option>
+              </select>
             </div>
 
-            <div class="form-field">
-              <label for="state">State *</label>
-              <select id="state" name="state" required>
-                <option value="">Select state</option>
+            <!-- Status -->
+            <div class="space-y-1">
+              <label for="status" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+                Status
+              </label>
+              <select name="status" id="status"
+                      class="relative block w-full appearance-none rounded-lg border
+                             px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)]
+                             sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)]
+                             text-base/6 text-zinc-950 sm:text-sm/6
+                             border-zinc-950/10 hover:border-zinc-950/20
+                             dark:border-white/10 dark:text-white dark:hover:border-white/20
+                             bg-transparent dark:bg-white/5
+                             focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-blue-500">
+                <option value="active" {{if and .Project.Status.Valid (eq .Project.Status.String "active")}}selected{{end}}>Active</option>
+                <option value="on_hold" {{if and .Project.Status.Valid (eq .Project.Status.String "on_hold")}}selected{{end}}>On Hold</option>
+                <option value="completed" {{if and .Project.Status.Valid (eq .Project.Status.String "completed")}}selected{{end}}>Completed</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Location Section Divider -->
+          {{template "divider" (dict "Class" "my-8")}}
+
+          <div>
+            <h3 class="text-base/7 font-semibold text-zinc-950 dark:text-white">
+              Location Information
+            </h3>
+            <p class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">
+              The project location helps determine applicable state safety codes for AI photo analysis.
+            </p>
+          </div>
+
+          <!-- Street Address -->
+          <div class="space-y-1">
+            <label for="address" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              Street Address
+            </label>
+            {{if .Project.Address.Valid}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "address"
+                "ID" "address"
+                "Value" .Project.Address.String
+                "Placeholder" "e.g., 123 Main Street"
+              )}}
+            {{else}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "address"
+                "ID" "address"
+                "Placeholder" "e.g., 123 Main Street"
+              )}}
+            {{end}}
+          </div>
+
+          <!-- City and State Grid -->
+          <div class="grid gap-6 sm:grid-cols-3">
+            <!-- City -->
+            <div class="space-y-1 sm:col-span-2">
+              <label for="city" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+                City
+              </label>
+              {{if .Project.City.Valid}}
+                {{template "input" (dict
+                  "Type" "text"
+                  "Name" "city"
+                  "ID" "city"
+                  "Value" .Project.City.String
+                  "Placeholder" "e.g., San Francisco"
+                )}}
+              {{else}}
+                {{template "input" (dict
+                  "Type" "text"
+                  "Name" "city"
+                  "ID" "city"
+                  "Placeholder" "e.g., San Francisco"
+                )}}
+              {{end}}
+            </div>
+
+            <!-- State -->
+            <div class="space-y-1">
+              <label for="state" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+                State <span class="text-red-500">*</span>
+              </label>
+              <select name="state" id="state" required
+                      class="relative block w-full appearance-none rounded-lg border
+                             px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)]
+                             sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)]
+                             text-base/6 text-zinc-950 sm:text-sm/6
+                             border-zinc-950/10 hover:border-zinc-950/20
+                             dark:border-white/10 dark:text-white dark:hover:border-white/20
+                             bg-transparent dark:bg-white/5
+                             focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-blue-500">
+                <option value="">Select</option>
                 <option value="AL" {{if and .Project.State.Valid (eq .Project.State.String "AL")}}selected{{end}}>AL</option>
                 <option value="AK" {{if and .Project.State.Valid (eq .Project.State.String "AK")}}selected{{end}}>AK</option>
                 <option value="AZ" {{if and .Project.State.Valid (eq .Project.State.String "AZ")}}selected{{end}}>AZ</option>
@@ -146,32 +235,68 @@
                 <option value="WI" {{if and .Project.State.Valid (eq .Project.State.String "WI")}}selected{{end}}>WI</option>
                 <option value="WY" {{if and .Project.State.Valid (eq .Project.State.String "WY")}}selected{{end}}>WY</option>
               </select>
-              <small class="help-text">Required for safety code compliance</small>
+              <p class="mt-1 text-xs/5 text-zinc-500 dark:text-zinc-500">Required for safety codes</p>
             </div>
           </div>
 
-          <div class="form-field">
-            <label for="zip_code">ZIP Code</label>
-            <input
-              type="text"
-              id="zip_code"
-              name="zip_code"
-              maxlength="10"
-              value="{{if .Project.ZipCode.Valid}}{{.Project.ZipCode.String}}{{end}}"
-              placeholder="e.g., 94102">
+          <!-- ZIP Code -->
+          <div class="space-y-1">
+            <label for="zip_code" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              ZIP Code
+            </label>
+            {{if .Project.ZipCode.Valid}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "zip_code"
+                "ID" "zip_code"
+                "Value" .Project.ZipCode.String
+                "Placeholder" "e.g., 94102"
+              )}}
+            {{else}}
+              {{template "input" (dict
+                "Type" "text"
+                "Name" "zip_code"
+                "ID" "zip_code"
+                "Placeholder" "e.g., 94102"
+              )}}
+            {{end}}
           </div>
 
-          <div style="display: flex; gap: var(--space-sm);">
-            <button type="submit" class="btn-primary">Save Changes</button>
-            <a href="/projects" class="btn-secondary">Cancel</a>
+          <!-- Actions -->
+          <div class="flex gap-4 pt-4">
+            {{template "button" (dict
+              "Type" "submit"
+              "Content" "Save Changes"
+              "Variant" "solid"
+              "Color" "blue"
+            )}}
+            <a href="/projects">
+              {{template "button" (dict
+                "Content" "Cancel"
+                "Variant" "outline"
+              )}}
+            </a>
           </div>
         </form>
       </div>
 
-      <div class="card" style="margin-top: var(--space-lg);">
-        <h2>Inspections</h2>
-        <p style="color: #666; margin-bottom: var(--space-md);">View and manage safety inspections for this project.</p>
-        <a href="/projects/{{.Project.ID}}/inspections" class="btn-primary">View Inspections</a>
+      <!-- Inspections Card -->
+      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white">
+          Inspections
+        </h2>
+        <p class="mt-2 text-sm/6 text-zinc-600 dark:text-zinc-400">
+          View and manage safety inspections for this project.
+        </p>
+        <div class="mt-6">
+          <a href="/projects/{{.Project.ID}}/inspections">
+            {{template "button" (dict
+              "Content" "View Inspections"
+              "Variant" "solid"
+              "Color" "blue"
+            )}}
+          </a>
+        </div>
       </div>
     </div>
   </div>
