@@ -606,3 +606,87 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 	}
 	return c.Render(http.StatusOK, "inspection-detail.html", data)
 }
+
+// PhotoDetailPage renders the photo detail page with violation review
+func (h *PageHandler) PhotoDetailPage(c echo.Context) error {
+	// Get authenticated user from session
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return c.Redirect(http.StatusSeeOther, "/login")
+	}
+
+	photoID := c.Param("id")
+	if photoID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "photo id is required")
+	}
+
+	queries := database.New(h.pool)
+
+	// Parse photo ID
+	photoUUID, err := parseUUID(photoID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid photo id")
+	}
+
+	// Get photo
+	photo, err := queries.GetPhoto(c.Request().Context(), photoUUID)
+	if err != nil {
+		h.logger.Error("failed to get photo", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusNotFound, "photo not found")
+	}
+
+	// Get inspection
+	inspection, err := queries.GetInspection(c.Request().Context(), photo.InspectionID)
+	if err != nil {
+		h.logger.Error("failed to get inspection", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photo details")
+	}
+
+	// Get project
+	project, err := queries.GetProject(c.Request().Context(), inspection.ProjectID)
+	if err != nil {
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photo details")
+	}
+
+	// Verify user is a member of the organization
+	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+		OrganizationID: project.OrganizationID,
+		UserID:         uuidToPgUUID(userID),
+	})
+	if err != nil {
+		h.logger.Warn("user not authorized to view photo",
+			slog.String("user_id", userID.String()),
+			slog.String("photo_id", photoID))
+		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this photo's organization")
+	}
+
+	// Get violations for this photo
+	violations, err := queries.ListDetectedViolations(c.Request().Context(), photo.ID)
+	if err != nil {
+		h.logger.Error("failed to list violations", slog.String("err", err.Error()))
+		violations = []database.DetectedViolation{}
+	}
+
+	// Get safety codes for violations
+	safetyCodeMap := make(map[string]string)
+	for _, violation := range violations {
+		if violation.SafetyCodeID.Valid {
+			safetyCode, err := queries.GetSafetyCode(c.Request().Context(), violation.SafetyCodeID)
+			if err == nil {
+				safetyCodeMap[violation.SafetyCodeID.String()] = safetyCode.Code + " - " + safetyCode.Description
+			}
+		}
+	}
+
+	data := map[string]interface{}{
+		"IsAuthenticated": true,
+		"User":            h.getUserDisplayInfo(c, userID),
+		"Photo":           photo,
+		"Inspection":      inspection,
+		"ProjectName":     project.Name,
+		"Violations":      violations,
+		"SafetyCodeMap":   safetyCodeMap,
+	}
+	return c.Render(http.StatusOK, "photo-detail.html", data)
+}

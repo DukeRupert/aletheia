@@ -1,0 +1,161 @@
+{{template "base" .}}
+
+{{define "title"}}Photo Review - Aletheia{{end}}
+
+{{define "content"}}
+<div class="container">
+  <div class="stack" style="margin-top: var(--space-xl);">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: start;">
+      <div>
+        <h1>Photo Review</h1>
+        <p style="color: #666; margin-top: var(--space-xs);">
+          <strong>Inspection:</strong> #{{.Inspection.ID.String}}
+          {{if .ProjectName}} | <strong>Project:</strong> {{.ProjectName}}{{end}}
+        </p>
+      </div>
+      <a href="/inspections/{{.Inspection.ID.String}}" class="btn-secondary">Back to Inspection</a>
+    </div>
+
+    <div style="display: grid; gap: var(--space-lg); grid-template-columns: 1fr 1fr;">
+      <!-- Photo Display -->
+      <div class="card">
+        <h2 style="margin-bottom: var(--space-md);">Photo</h2>
+        <img
+          src="{{.Photo.StorageUrl}}"
+          alt="Inspection photo"
+          style="width: 100%; height: auto; border-radius: 4px; margin-bottom: var(--space-sm);">
+        <p style="color: #666; font-size: 0.875rem;">
+          Uploaded: {{.Photo.CreatedAt.Time.Format "January 2, 2006 at 3:04 PM"}}
+        </p>
+      </div>
+
+      <!-- Violations List -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+          <h2 style="margin: 0;">Detected Violations</h2>
+          <span style="color: #666; font-size: 0.875rem;">{{len .Violations}} violation(s)</span>
+        </div>
+
+        {{if .Violations}}
+          <div class="stack">
+            {{range .Violations}}
+              <div id="violation-{{.ID.String}}" class="card" style="padding: var(--space-md); background:
+                {{if eq .Status "confirmed"}}#d1fae5
+                {{else if eq .Status "dismissed"}}#f3f4f6
+                {{else}}#fef2f2{{end}}; border-left: 4px solid
+                {{if eq .Status "confirmed"}}#059669
+                {{else if eq .Status "dismissed"}}#9ca3af
+                {{else if eq .Severity "critical"}}#dc2626
+                {{else if eq .Severity "high"}}#f97316
+                {{else if eq .Severity "medium"}}#fbbf24
+                {{else}}#94a3b8{{end}};">
+
+                <!-- Violation Header -->
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-sm);">
+                  <div style="display: flex; gap: var(--space-xs); align-items: center;">
+                    <span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+                      {{if eq .Severity "critical"}}background: #dc2626; color: white;
+                      {{else if eq .Severity "high"}}background: #f97316; color: white;
+                      {{else if eq .Severity "medium"}}background: #fbbf24; color: #78350f;
+                      {{else}}background: #94a3b8; color: white;{{end}}">
+                      {{.Severity}}
+                    </span>
+                    <span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+                      {{if eq .Status "confirmed"}}background: #059669; color: white;
+                      {{else if eq .Status "dismissed"}}background: #6b7280; color: white;
+                      {{else}}background: #3b82f6; color: white;{{end}}">
+                      {{.Status}}
+                    </span>
+                  </div>
+                  <span style="font-size: 0.75rem; color: #64748b;">
+                    {{printf "%.0f%%" (mul .ConfidenceScore 100)}} confidence
+                  </span>
+                </div>
+
+                <!-- Violation Description -->
+                <p style="font-size: 0.95rem; color: #1f2937; margin-bottom: var(--space-sm); line-height: 1.5;">
+                  {{.Description}}
+                </p>
+
+                {{if .Location.Valid}}
+                  <p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-sm);">
+                    <strong>Location:</strong> {{.Location.String}}
+                  </p>
+                {{end}}
+
+                {{if .SafetyCodeID.Valid}}
+                  <p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-md);">
+                    <strong>Safety Code:</strong> {{index $.SafetyCodeMap (.SafetyCodeID.String)}}
+                  </p>
+                {{end}}
+
+                <!-- Action Buttons -->
+                {{if eq .Status "pending"}}
+                  <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-md);">
+                    <button
+                      hx-post="/api/violations/{{.ID.String}}/confirm"
+                      hx-target="#violation-{{.ID.String}}"
+                      hx-swap="outerHTML"
+                      class="btn-primary"
+                      style="flex: 1;">
+                      ✓ Confirm Violation
+                    </button>
+                    <button
+                      hx-post="/api/violations/{{.ID.String}}/dismiss"
+                      hx-target="#violation-{{.ID.String}}"
+                      hx-swap="outerHTML"
+                      class="btn-secondary"
+                      style="flex: 1;">
+                      ✗ Dismiss
+                    </button>
+                  </div>
+                {{else if eq .Status "confirmed"}}
+                  <div style="margin-top: var(--space-md);">
+                    <p style="color: #059669; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
+                      ✓ Confirmed by inspector
+                    </p>
+                    <button
+                      hx-post="/api/violations/{{.ID.String}}/dismiss"
+                      hx-target="#violation-{{.ID.String}}"
+                      hx-swap="outerHTML"
+                      class="btn-secondary"
+                      style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+                      Change to Dismissed
+                    </button>
+                  </div>
+                {{else if eq .Status "dismissed"}}
+                  <div style="margin-top: var(--space-md);">
+                    <p style="color: #6b7280; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
+                      ✗ Dismissed by inspector
+                    </p>
+                    <button
+                      hx-post="/api/violations/{{.ID.String}}/confirm"
+                      hx-target="#violation-{{.ID.String}}"
+                      hx-swap="outerHTML"
+                      class="btn-primary"
+                      style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+                      Change to Confirmed
+                    </button>
+                  </div>
+                {{end}}
+              </div>
+            {{end}}
+          </div>
+        {{else}}
+          <div style="text-align: center; padding: var(--space-2xl); color: #666;">
+            <p>No violations detected for this photo.</p>
+            <p style="font-size: 0.875rem; margin-top: var(--space-xs);">This photo passed all safety checks.</p>
+          </div>
+        {{end}}
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
+      <a href="/inspections/{{.Inspection.ID.String}}" class="btn-secondary">Back to Inspection</a>
+      <a href="/projects/{{.Inspection.ProjectID.String}}" class="btn-secondary">View Project</a>
+    </div>
+  </div>
+</div>
+{{end}}

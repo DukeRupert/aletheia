@@ -177,6 +177,7 @@ func main() {
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
 	photoHandler := handlers.NewPhotoHandler(queries, queueService, logger)
+	violationHandler := handlers.NewViolationHandler(queries, logger)
 	logger.Info("all handlers initialized")
 
 	// Register queue job handlers
@@ -221,6 +222,7 @@ func main() {
 	protectedPages.GET("/inspections/:id", pageHandler.InspectionDetailPage)
 	protectedPages.GET("/projects/:projectId/inspections", pageHandler.InspectionsPage)
 	protectedPages.GET("/projects/:projectId/inspections/new", pageHandler.NewInspectionPage)
+	protectedPages.GET("/photos/:id", pageHandler.PhotoDetailPage)
 
 	// Protected API routes (require session)
 	protected := e.Group("/api")
@@ -269,6 +271,10 @@ func main() {
 	protected.GET("/safety-codes/:id", safetyCodeHandler.GetSafetyCode)
 	protected.PUT("/safety-codes/:id", safetyCodeHandler.UpdateSafetyCode)
 	protected.DELETE("/safety-codes/:id", safetyCodeHandler.DeleteSafetyCode)
+
+	// Violation review routes
+	protected.POST("/violations/:id/confirm", violationHandler.ConfirmViolation)
+	protected.POST("/violations/:id/dismiss", violationHandler.DismissViolation)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,

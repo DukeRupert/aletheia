@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -302,4 +303,280 @@ func (h *ViolationHandler) DeleteViolation(c echo.Context) error {
 	)
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+// ConfirmViolation marks a violation as confirmed
+func (h *ViolationHandler) ConfirmViolation(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	violationIDStr := c.Param("id")
+	violationID, err := uuid.Parse(violationIDStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid violation_id format")
+	}
+
+	// Update violation status to confirmed
+	violation, err := h.db.UpdateDetectedViolationStatus(ctx, database.UpdateDetectedViolationStatusParams{
+		ID:     pgtype.UUID{Bytes: violationID, Valid: true},
+		Status: database.ViolationStatusConfirmed,
+	})
+	if err != nil {
+		h.logger.Error("failed to confirm violation",
+			slog.String("violation_id", violationIDStr),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to confirm violation")
+	}
+
+	h.logger.Info("violation confirmed",
+		slog.String("violation_id", violationIDStr),
+	)
+
+	// If HTMX request, return updated HTML
+	if c.Request().Header.Get("HX-Request") == "true" {
+		return h.renderViolationCard(c, violation)
+	}
+
+	// Otherwise return JSON
+	resp := ViolationResponse{
+		ID:          violation.ID.String(),
+		PhotoID:     violation.PhotoID.String(),
+		Description: violation.Description,
+		Severity:    string(violation.Severity),
+		Status:      string(violation.Status),
+		CreatedAt:   violation.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	if violation.ConfidenceScore.Valid {
+		resp.ConfidenceScore = float64(violation.ConfidenceScore.Int.Int64()) / 10000.0
+	}
+
+	if violation.Location.Valid {
+		resp.Location = &violation.Location.String
+	}
+
+	if violation.SafetyCodeID.Valid {
+		safetyCodeIDStr := uuid.UUID(violation.SafetyCodeID.Bytes).String()
+		resp.SafetyCodeID = &safetyCodeIDStr
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+// DismissViolation marks a violation as dismissed
+func (h *ViolationHandler) DismissViolation(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	violationIDStr := c.Param("id")
+	violationID, err := uuid.Parse(violationIDStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid violation_id format")
+	}
+
+	// Update violation status to dismissed
+	violation, err := h.db.UpdateDetectedViolationStatus(ctx, database.UpdateDetectedViolationStatusParams{
+		ID:     pgtype.UUID{Bytes: violationID, Valid: true},
+		Status: database.ViolationStatusDismissed,
+	})
+	if err != nil {
+		h.logger.Error("failed to dismiss violation",
+			slog.String("violation_id", violationIDStr),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to dismiss violation")
+	}
+
+	h.logger.Info("violation dismissed",
+		slog.String("violation_id", violationIDStr),
+	)
+
+	// If HTMX request, return updated HTML
+	if c.Request().Header.Get("HX-Request") == "true" {
+		return h.renderViolationCard(c, violation)
+	}
+
+	// Otherwise return JSON
+	resp := ViolationResponse{
+		ID:          violation.ID.String(),
+		PhotoID:     violation.PhotoID.String(),
+		Description: violation.Description,
+		Severity:    string(violation.Severity),
+		Status:      string(violation.Status),
+		CreatedAt:   violation.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	if violation.ConfidenceScore.Valid {
+		resp.ConfidenceScore = float64(violation.ConfidenceScore.Int.Int64()) / 10000.0
+	}
+
+	if violation.Location.Valid {
+		resp.Location = &violation.Location.String
+	}
+
+	if violation.SafetyCodeID.Valid {
+		safetyCodeIDStr := uuid.UUID(violation.SafetyCodeID.Bytes).String()
+		resp.SafetyCodeID = &safetyCodeIDStr
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+// renderViolationCard renders a violation card HTML for HTMX updates
+func (h *ViolationHandler) renderViolationCard(c echo.Context, violation database.DetectedViolation) error {
+	ctx := c.Request().Context()
+
+	// Get safety code if available
+	safetyCodeText := ""
+	if violation.SafetyCodeID.Valid {
+		safetyCode, err := h.db.GetSafetyCode(ctx, violation.SafetyCodeID)
+		if err == nil {
+			safetyCodeText = safetyCode.Code + " - " + safetyCode.Description
+		}
+	}
+
+	// Determine background and border colors based on status and severity
+	bgColor := "#fef2f2" // default pending
+	borderColor := "#dc2626" // default critical
+	if violation.Status == database.ViolationStatusConfirmed {
+		bgColor = "#d1fae5"
+		borderColor = "#059669"
+	} else if violation.Status == database.ViolationStatusDismissed {
+		bgColor = "#f3f4f6"
+		borderColor = "#9ca3af"
+	} else {
+		// Use severity for border color when pending
+		switch violation.Severity {
+		case database.ViolationSeverityCritical:
+			borderColor = "#dc2626"
+		case database.ViolationSeverityHigh:
+			borderColor = "#f97316"
+		case database.ViolationSeverityMedium:
+			borderColor = "#fbbf24"
+		default:
+			borderColor = "#94a3b8"
+		}
+	}
+
+	// Severity badge colors
+	severityBg := "#94a3b8"
+	severityText := "white"
+	switch violation.Severity {
+	case database.ViolationSeverityCritical:
+		severityBg = "#dc2626"
+		severityText = "white"
+	case database.ViolationSeverityHigh:
+		severityBg = "#f97316"
+		severityText = "white"
+	case database.ViolationSeverityMedium:
+		severityBg = "#fbbf24"
+		severityText = "#78350f"
+	}
+
+	// Status badge colors
+	statusBg := "#3b82f6" // pending
+	statusText := "white"
+	if violation.Status == database.ViolationStatusConfirmed {
+		statusBg = "#059669"
+	} else if violation.Status == database.ViolationStatusDismissed {
+		statusBg = "#6b7280"
+	}
+
+	// Get confidence percentage
+	confidenceFloat, _ := violation.ConfidenceScore.Float64Value()
+	confidence := fmt.Sprintf("%.0f", confidenceFloat.Float64*100)
+
+	// Build HTML
+	html := `<div id="violation-` + violation.ID.String() + `" class="card" style="padding: var(--space-md); background: ` + bgColor + `; border-left: 4px solid ` + borderColor + `;">
+		<!-- Violation Header -->
+		<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-sm);">
+			<div style="display: flex; gap: var(--space-xs); align-items: center;">
+				<span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: ` + severityBg + `; color: ` + severityText + `;">
+					` + string(violation.Severity) + `
+				</span>
+				<span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: ` + statusBg + `; color: ` + statusText + `;">
+					` + string(violation.Status) + `
+				</span>
+			</div>
+			<span style="font-size: 0.75rem; color: #64748b;">
+				` + confidence + `% confidence
+			</span>
+		</div>
+
+		<!-- Violation Description -->
+		<p style="font-size: 0.95rem; color: #1f2937; margin-bottom: var(--space-sm); line-height: 1.5;">
+			` + violation.Description + `
+		</p>`
+
+	if violation.Location.Valid {
+		html += `
+		<p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-sm);">
+			<strong>Location:</strong> ` + violation.Location.String + `
+		</p>`
+	}
+
+	if safetyCodeText != "" {
+		html += `
+		<p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-md);">
+			<strong>Safety Code:</strong> ` + safetyCodeText + `
+		</p>`
+	}
+
+	// Action buttons based on status
+	if violation.Status == database.ViolationStatusPending {
+		html += `
+		<!-- Action Buttons -->
+		<div style="display: flex; gap: var(--space-sm); margin-top: var(--space-md);">
+			<button
+				hx-post="/api/violations/` + violation.ID.String() + `/confirm"
+				hx-target="#violation-` + violation.ID.String() + `"
+				hx-swap="outerHTML"
+				class="btn-primary"
+				style="flex: 1;">
+				✓ Confirm Violation
+			</button>
+			<button
+				hx-post="/api/violations/` + violation.ID.String() + `/dismiss"
+				hx-target="#violation-` + violation.ID.String() + `"
+				hx-swap="outerHTML"
+				class="btn-secondary"
+				style="flex: 1;">
+				✗ Dismiss
+			</button>
+		</div>`
+	} else if violation.Status == database.ViolationStatusConfirmed {
+		html += `
+		<div style="margin-top: var(--space-md);">
+			<p style="color: #059669; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
+				✓ Confirmed by inspector
+			</p>
+			<button
+				hx-post="/api/violations/` + violation.ID.String() + `/dismiss"
+				hx-target="#violation-` + violation.ID.String() + `"
+				hx-swap="outerHTML"
+				class="btn-secondary"
+				style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+				Change to Dismissed
+			</button>
+		</div>`
+	} else if violation.Status == database.ViolationStatusDismissed {
+		html += `
+		<div style="margin-top: var(--space-md);">
+			<p style="color: #6b7280; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
+				✗ Dismissed by inspector
+			</p>
+			<button
+				hx-post="/api/violations/` + violation.ID.String() + `/confirm"
+				hx-target="#violation-` + violation.ID.String() + `"
+				hx-swap="outerHTML"
+				class="btn-primary"
+				style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+				Change to Confirmed
+			</button>
+		</div>`
+	}
+
+	html += `
+	</div>`
+
+	return c.HTML(http.StatusOK, html)
 }
