@@ -1,0 +1,162 @@
+{{/*
+  Tabs Component - Catalyst UI Kit Style
+
+  Usage:
+    <div id="violation-tabs">
+      {{template "tabs" (dict
+        "DefaultTab" "all"
+        "Tabs" (list
+          (dict "ID" "all" "Label" "All" "Count" 25)
+          (dict "ID" "pending" "Label" "Pending" "Count" 10)
+          (dict "ID" "confirmed" "Label" "Confirmed" "Count" 15)
+        )
+      )}}
+
+      <!-- Tab panels -->
+      <div class="mt-8">
+        <div x-show="activeTab === 'all'" x-transition>
+          <!-- All violations content -->
+        </div>
+        <div x-show="activeTab === 'pending'" x-transition x-cloak>
+          <!-- Pending violations content -->
+        </div>
+        <div x-show="activeTab === 'confirmed'" x-transition x-cloak>
+          <!-- Confirmed violations content -->
+        </div>
+      </div>
+    </div>
+
+  Parameters:
+    - DefaultTab: Initial active tab ID (required)
+    - Tabs: List of tab objects (required)
+      - ID: Unique tab identifier
+      - Label: Tab label text
+      - Count: Optional badge count
+      - Icon: Optional SVG icon
+    - Variant: line (default), pills
+    - Class: Additional CSS classes
+
+  Features:
+    - Keyboard navigation (Arrow Left/Right)
+    - Active state indicator
+    - Badge counts
+    - Smooth transitions
+*/}}
+
+{{define "tabs"}}
+<div x-data="{
+       activeTab: '{{.DefaultTab}}',
+       tabs: [{{range $i, $tab := .Tabs}}{{if $i}},{{end}}'{{$tab.ID}}'{{end}}],
+       onKeydown(e) {
+         const currentIndex = this.tabs.indexOf(this.activeTab);
+         if (e.key === 'ArrowRight') {
+           e.preventDefault();
+           this.activeTab = this.tabs[(currentIndex + 1) % this.tabs.length];
+         } else if (e.key === 'ArrowLeft') {
+           e.preventDefault();
+           this.activeTab = this.tabs[(currentIndex - 1 + this.tabs.length) % this.tabs.length];
+         }
+       }
+     }"
+     @keydown="onKeydown($event)"
+     class="{{.Class}}">
+
+  {{$variant := or .Variant "line"}}
+
+  {{if eq $variant "line"}}
+    <!-- Line tabs (underline variant) -->
+    <div class="border-b border-zinc-950/10 dark:border-white/10">
+      <nav class="-mb-px flex gap-8" role="tablist" aria-label="Tabs">
+        {{range .Tabs}}
+          <button @click="activeTab = '{{.ID}}'"
+                  :class="activeTab === '{{.ID}}' ?
+                          'border-zinc-950 text-zinc-950 dark:border-white dark:text-white' :
+                          'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'"
+                  class="group inline-flex items-center gap-2 border-b-2 px-1 py-4
+                         text-sm/6 font-semibold transition-colors whitespace-nowrap"
+                  role="tab"
+                  :aria-selected="activeTab === '{{.ID}}'"
+                  :tabindex="activeTab === '{{.ID}}' ? 0 : -1">
+            {{if .Icon}}
+              <svg class="size-5 transition-colors"
+                   :class="activeTab === '{{.ID}}' ?
+                           'text-zinc-950 dark:text-white' :
+                           'text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500'"
+                   fill="none"
+                   viewBox="0 0 24 24"
+                   stroke="currentColor"
+                   stroke-width="2">
+                {{.Icon}}
+              </svg>
+            {{end}}
+            {{.Label}}
+            {{if .Count}}
+              <span class="ml-2 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors"
+                    :class="activeTab === '{{.ID}}' ?
+                            'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' :
+                            'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'">
+                {{.Count}}
+              </span>
+            {{end}}
+          </button>
+        {{end}}
+      </nav>
+    </div>
+
+  {{else if eq $variant "pills"}}
+    <!-- Pill tabs (button-like variant) -->
+    <div class="flex flex-wrap gap-2">
+      {{range .Tabs}}
+        <button @click="activeTab = '{{.ID}}'"
+                :class="activeTab === '{{.ID}}' ?
+                        'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' :
+                        'bg-transparent text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'"
+                class="inline-flex items-center gap-2 rounded-lg px-3 py-2
+                       text-sm/6 font-medium transition-colors"
+                role="tab"
+                :aria-selected="activeTab === '{{.ID}}'"
+                :tabindex="activeTab === '{{.ID}}' ? 0 : -1">
+          {{if .Icon}}
+            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              {{.Icon}}
+            </svg>
+          {{end}}
+          {{.Label}}
+          {{if .Count}}
+            <span class="ml-1 rounded-full px-2 py-0.5 text-xs"
+                  :class="activeTab === '{{.ID}}' ?
+                          'bg-white/20' :
+                          'bg-zinc-100 dark:bg-zinc-700'">
+              {{.Count}}
+            </span>
+          {{end}}
+        </button>
+      {{end}}
+    </div>
+  {{end}}
+</div>
+{{end}}
+
+{{/*
+  Tab Panel Wrapper
+
+  Usage:
+    {{template "tab-panel" (dict
+      "TabID" "pending"
+      "Content" "Panel content here"
+    )}}
+*/}}
+{{define "tab-panel"}}
+<div x-show="activeTab === '{{.TabID}}'"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     x-cloak
+     role="tabpanel"
+     :aria-hidden="activeTab !== '{{.TabID}}'">
+  {{.Content}}
+</div>
+{{end}}

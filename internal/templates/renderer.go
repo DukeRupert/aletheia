@@ -84,6 +84,18 @@ func NewTemplateRenderer(templatesDir string) (*TemplateRenderer, error) {
 
 			return aFloat * bFloat
 		},
+		// iterate creates a sequence of numbers from 0 to n-1 for range loops
+		"iterate": func(n int) []int {
+			result := make([]int, n)
+			for i := 0; i < n; i++ {
+				result[i] = i
+			}
+			return result
+		},
+		// sub subtracts two integers
+		"sub": func(a, b int) int {
+			return a - b
+		},
 	}
 
 	// Get layout and component patterns

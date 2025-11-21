@@ -1,0 +1,162 @@
+{{/*
+  Table Component - Catalyst UI Kit Style
+
+  Usage:
+    {{template "table" (dict
+      "Variant" "default"
+      "Dense" false
+      "Bleed" false
+      "Head" "<tr>...</tr>"
+      "Body" "<tr>...</tr>..."
+    )}}
+
+  Helper usage for rows:
+    {{template "table-row" (dict
+      "Href" "/inspections/123"
+      "Cells" (list "Cell 1" "Cell 2" "Cell 3")
+    )}}
+
+  Parameters:
+    - Head: Table header content (required)
+    - Body: Table body content (required)
+    - Variant: default, striped, grid (default: "default")
+    - Dense: Tighter spacing (default: false)
+    - Bleed: Extend to container edges (default: false)
+    - Class: Additional CSS classes
+
+  Variants:
+    - default: Simple borders between rows
+    - striped: Alternating row backgrounds
+    - grid: Borders on all cells
+*/}}
+
+{{define "table"}}
+<div class="flow-root {{.Class}}">
+  <div class="{{if .Bleed}}-mx-gutter{{end}} overflow-x-auto whitespace-nowrap">
+    <div class="inline-block min-w-full align-middle {{if .Bleed}}px-gutter{{else}}sm:px-0{{end}}">
+      <table class="{{template "table-classes" .}}">
+        <thead class="text-zinc-500 dark:text-zinc-400">
+          {{.Head}}
+        </thead>
+        <tbody>
+          {{.Body}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "table-classes"}}
+min-w-full text-left text-sm/6 text-zinc-950 dark:text-white
+{{$variant := or .Variant "default"}}
+{{if eq $variant "striped"}}
+  [&_tbody_tr:nth-child(odd)]:bg-zinc-950/[2.5%] dark:[&_tbody_tr:nth-child(odd)]:bg-white/[2.5%]
+{{else if eq $variant "grid"}}
+  [&_td]:border-b [&_td]:border-zinc-950/5 dark:[&_td]:border-white/5
+  [&_th]:border-b [&_th]:border-zinc-950/5 dark:[&_th]:border-white/5
+  [&_td:not(:last-child)]:border-r [&_td:not(:last-child)]:border-zinc-950/5
+  dark:[&_td:not(:last-child)]:border-white/5
+  [&_th:not(:last-child)]:border-r [&_th:not(:last-child)]:border-zinc-950/5
+  dark:[&_th:not(:last-child)]:border-white/5
+{{end}}
+{{end}}
+
+{{/*
+  Table Header Cell
+
+  Usage:
+    {{template "table-th" (dict "Content" "Name" "Class" "w-1/3")}}
+*/}}
+{{define "table-th"}}
+<th class="{{template "table-cell-classes" .}} font-medium">
+  {{.Content}}
+</th>
+{{end}}
+
+{{/*
+  Table Cell
+
+  Usage:
+    {{template "table-td" (dict "Content" "John Doe" "Class" "font-medium")}}
+*/}}
+{{define "table-td"}}
+<td class="{{template "table-cell-classes" .}}">
+  {{.Content}}
+</td>
+{{end}}
+
+{{define "table-cell-classes"}}
+relative px-4 py-4
+first:pl-gutter last:pr-gutter
+{{if .Dense}}
+  py-2
+{{end}}
+{{if .Class}}{{.Class}}{{end}}
+{{end}}
+
+{{/*
+  Clickable Table Row (with HTMX)
+
+  Usage:
+    {{template "table-row" (dict
+      "Href" "/inspections/123"
+      "HXGet" "/inspections/123"
+      "HXTarget" "#content"
+      "HXPushURL" "true"
+      "Cells" (list
+        (dict "Content" "Inspection #123")
+        (dict "Content" "2025-11-21")
+        (dict "Content" (template "badge" (dict "Content" "Completed" "Color" "green")))
+      )
+    )}}
+*/}}
+{{define "table-row"}}
+<tr {{if .Href}}onclick="window.location='{{.Href}}'"{{end}}
+    {{if .HXGet}}hx-get="{{.HXGet}}"{{end}}
+    {{if .HXPost}}hx-post="{{.HXPost}}"{{end}}
+    {{if .HXTarget}}hx-target="{{.HXTarget}}"{{end}}
+    {{if .HXSwap}}hx-swap="{{.HXSwap}}"{{end}}
+    {{if .HXPushURL}}hx-push-url="{{.HXPushURL}}"{{end}}
+    class="{{if or .Href .HXGet .HXPost}}cursor-pointer hover:bg-zinc-950/[2.5%] dark:hover:bg-white/[2.5%]{{end}}
+           transition-colors {{.Class}}">
+  {{range .Cells}}
+    <td class="{{template "table-cell-classes" .}}">
+      {{.Content}}
+    </td>
+  {{end}}
+</tr>
+{{end}}
+
+{{/*
+  Empty Table State
+
+  Usage:
+    {{template "table-empty" (dict
+      "Title" "No inspections"
+      "Description" "Create your first inspection to get started"
+      "Colspan" 5
+    )}}
+*/}}
+{{define "table-empty"}}
+<tr>
+  <td colspan="{{or .Colspan 999}}"
+      class="px-4 py-12 text-center">
+    <div class="flex flex-col items-center justify-center">
+      <p class="text-base/7 font-semibold text-zinc-950 dark:text-white">
+        {{or .Title "No items found"}}
+      </p>
+      {{if .Description}}
+        <p class="mt-2 text-sm/6 text-zinc-500 dark:text-zinc-400">
+          {{.Description}}
+        </p>
+      {{end}}
+      {{if .Action}}
+        <div class="mt-6">
+          {{template "button" .Action}}
+        </div>
+      {{end}}
+    </div>
+  </td>
+</tr>
+{{end}}
