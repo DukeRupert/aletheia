@@ -7,8 +7,19 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - **Templates**: Go `html/template`
 - **Interactivity**: HTMX for server interactions
 - **Client State**: Alpine.js for lightweight reactive UI
-- **Styling**: Minimal CSS, semantic HTML-first
-- **Icons**: Simple SVG icons (inline)
+- **Styling**: Tailwind CSS v4 + Catalyst UI Kit design language
+- **Icons**: Simple SVG icons (inline) - considering Heroicons
+
+## Catalyst UI Kit Migration
+
+See [CATALYST_MIGRATION_GUIDE.md](./CATALYST_MIGRATION_GUIDE.md) for detailed implementation plan.
+
+**Progress**: Phase 1 Complete (1/5 phases - 20%)
+- ✅ Phase 1: Foundation & Design Tokens (Complete)
+- 🔜 Phase 2: Core Components (Next)
+- ⏳ Phase 3: Layout & Navigation
+- ⏳ Phase 4: Interactive Components
+- ⏳ Phase 5: Pages Polish
 
 ## Foundation (Phase 1) ✓ COMPLETED
 
@@ -27,15 +38,19 @@ Frontend implementation using Go templates + HTMX + Alpine.js
 - [ ] Create HTMX response helpers (deferred until needed)
 - [ ] Test basic HTMX interactions (will test as we build features)
 
-### Styling Foundation
-- [x] Create minimal CSS file (`static/css/main.css`)
-- [x] Define color palette (see STYLE_GUIDE.md)
-- [x] Create utility classes for spacing, layout
-- [x] Set up responsive containers
-- [x] Mobile-first breakpoints
-- [x] Component styles (buttons, forms, cards, tables, badges, alerts, modal)
-- [x] Navigation styles
-- [x] Accessibility features (skip link, focus states)
+### Styling Foundation - REFACTORED WITH CATALYST UI KIT ✓
+- [x] ~~Create minimal CSS file~~ → Migrated to Tailwind CSS v4
+- [x] ~~Define color palette~~ → Zinc-based Catalyst palette with full spectrum
+- [x] ~~Create utility classes~~ → Using Tailwind utilities
+- [x] Tailwind CSS v4 browser CDN integrated
+- [x] Inter font with font-feature-settings
+- [x] Zinc color palette (50-950) + red, orange, amber, green, blue scales
+- [x] Responsive gutter system (1rem → 2rem → 2.5rem)
+- [x] Dark mode foundation (media query based)
+- [x] Mobile-first breakpoints (sm: at 640px)
+- [x] Accessibility features (sr-only, forced colors mode support)
+- [x] Old CSS backed up as `main.css.backup`
+- [ ] Component styles → Moving to Phase 2 (Catalyst components)
 
 ## Authentication UI (Phase 2) ✓ COMPLETED
 

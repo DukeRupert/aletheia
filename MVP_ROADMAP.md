@@ -113,18 +113,26 @@ A construction safety inspection platform using AI to detect safety violations f
 - [x] Implement violation confirmation/dismissal workflow
 - [x] Create violation update endpoint (add notes, change status)
 
-## Phase 7: Frontend Development (In Progress)
+## Phase 7: Frontend Development (In Progress - UI Refinement)
 
-> **Note:** Phase 7 (Reporting) has been deferred until after the UI is built. PDF generation is easier when HTML templates are already created.
+> **Note:** Phase 8 (Reporting) has been deferred until after the UI is built. PDF generation is easier when HTML templates are already created.
 
 See [UI_ROADMAP.md](./UI_ROADMAP.md) for detailed frontend implementation plan.
-See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for minimal styling guidelines.
+See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for original minimal styling guidelines.
+See [CATALYST_MIGRATION_GUIDE.md](./CATALYST_MIGRATION_GUIDE.md) for UI refinement with Catalyst design system.
 
 **Tech Stack:**
 - Go `html/template` for server-side rendering
 - HTMX for dynamic interactions
 - Alpine.js for client-side reactivity
-- Minimal CSS (semantic HTML-first)
+- Tailwind CSS v4 + Catalyst UI Kit design language
+
+**UI Refinement Status (Catalyst Migration):**
+- ✅ Phase 1: Foundation & Design Tokens (Complete - 2025-11-21)
+- 🔜 Phase 2: Core Components (Next)
+- ⏳ Phase 3: Layout & Navigation
+- ⏳ Phase 4: Interactive Components
+- ⏳ Phase 5: Pages Polish
 
 ### Authentication UI ✓ COMPLETED
 - [x] Login page (`/login`)
