@@ -3,44 +3,62 @@
 {{define "title"}}New Inspection - {{.Project.Name}} - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div style="max-width: 600px; margin: 3rem auto;">
-    <div class="card">
-      <h1>Create New Inspection</h1>
-      <p>Create a new safety inspection for {{.Project.Name}}.</p>
+<div class="mx-auto max-w-7xl">
+  {{template "page-header" (dict
+    "Title" "Create Inspection"
+    "Description" (printf "New safety inspection for %s" .Project.Name)
+  )}}
 
+  <div class="px-gutter pb-16">
+    <div class="mx-auto max-w-2xl">
       <form
         hx-post="/api/inspections"
         hx-target="#inspection-form"
         hx-swap="outerHTML"
         id="inspection-form"
-        class="stack"
-        style="margin-top: var(--space-lg);">
+        class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
 
         <input type="hidden" name="project_id" value="{{.Project.ID}}">
 
-        <div style="padding: var(--space-md); background: #f3f4f6; border-radius: 4px;">
-          <p style="margin: 0; font-size: 0.875rem;">
-            <strong>Project:</strong> {{.Project.Name}}
-          </p>
-          {{if .Project.Address.Valid}}
-          <p style="margin: var(--space-xs) 0 0 0; font-size: 0.875rem; color: #666;">
-            <strong>Location:</strong> {{.Project.Address.String}}
-            {{if .Project.City.Valid}}, {{.Project.City.String}}{{end}}
-            {{if .Project.State.Valid}}, {{.Project.State.String}}{{end}}
-          </p>
-          {{end}}
+        <!-- Project Info Box -->
+        <div class="rounded-lg bg-zinc-100 p-4 dark:bg-zinc-800 mb-6">
+          <dl class="space-y-2">
+            <div>
+              <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Project</dt>
+              <dd class="mt-1 text-sm text-zinc-950 dark:text-white">{{.Project.Name}}</dd>
+            </div>
+            {{if .Project.Address.Valid}}
+              <div>
+                <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Location</dt>
+                <dd class="mt-1 text-sm text-zinc-950 dark:text-white">
+                  {{.Project.Address.String}}{{if .Project.City.Valid}}, {{.Project.City.String}}{{end}}{{if .Project.State.Valid}}, {{.Project.State.String}}{{end}}
+                </dd>
+              </div>
+            {{end}}
+          </dl>
         </div>
 
-        <div style="padding: var(--space-md); background: #dbeafe; border-radius: 4px;">
-          <p style="margin: 0; font-size: 0.875rem; color: #1e40af;">
-            The inspection will be created in <strong>draft</strong> status. You can upload photos and the system will analyze them for safety violations.
-          </p>
-        </div>
+        <!-- Info Alert -->
+        {{template "alert" (dict
+          "Type" "info"
+          "Content" "The inspection will be created in draft status. You can upload photos and the system will analyze them for safety violations."
+          "Class" "mb-6"
+        )}}
 
-        <div style="display: flex; gap: var(--space-sm);">
-          <button type="submit" class="btn-primary">Create Inspection</button>
-          <a href="/projects/{{.Project.ID}}/inspections" class="btn-secondary">Cancel</a>
+        <!-- Actions -->
+        <div class="flex gap-4">
+          {{template "button" (dict
+            "Type" "submit"
+            "Content" "Create Inspection"
+            "Variant" "solid"
+            "Color" "blue"
+          )}}
+          <a href="/projects/{{.Project.ID}}/inspections">
+            {{template "button" (dict
+              "Content" "Cancel"
+              "Variant" "outline"
+            )}}
+          </a>
         </div>
       </form>
     </div>
