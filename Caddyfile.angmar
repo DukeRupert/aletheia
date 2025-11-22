@@ -1,0 +1,37 @@
+# Caddyfile for angmar.dev
+# Place this in /etc/caddy/Caddyfile or /etc/caddy/sites-enabled/aletheia.caddy
+
+aletheia.angmar.dev {
+    # Reverse proxy to the Docker container
+    reverse_proxy localhost:1323
+
+    # Enable gzip compression
+    encode gzip
+
+    # Logging
+    log {
+        output file /var/log/caddy/aletheia-access.log
+        format json
+    }
+
+    # Security headers
+    header {
+        # Enable HSTS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Prevent clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        # Prevent MIME sniffing
+        X-Content-Type-Options "nosniff"
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Remove Server header
+        -Server
+    }
+}
+
+# Optional: Redirect www to non-www
+www.aletheia.angmar.dev {
+    redir https://aletheia.angmar.dev{uri} permanent
+}

@@ -75,3 +75,18 @@ docker-compose-logs:
 .PHONY: docker-compose-restart
 docker-compose-restart:
 	docker compose -f docker-compose.prod.yml restart
+
+# Deployment helpers
+.PHONY: deploy-files
+deploy-files:
+	@if [ ! -f .env.prod ]; then \
+		echo "❌ Error: .env.prod not found. Create it first:"; \
+		echo "   cp example.env .env.prod"; \
+		echo "   # Edit .env.prod with production values"; \
+		exit 1; \
+	fi
+	./deploy.sh
+
+.PHONY: deploy-ssh
+deploy-ssh:
+	ssh dukerupert@angmar.dev "cd /home/dukerupert/aletheia && bash"
