@@ -3,9 +3,17 @@
 {{define "title"}}Verify Email - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div style="max-width: 400px; margin: 3rem auto;">
-    <div class="card">
+<div class="flex min-h-screen items-center justify-center px-4 py-12 bg-zinc-50 dark:bg-zinc-950">
+  <div class="w-full max-w-md">
+    <!-- Logo -->
+    <div class="flex justify-center mb-8">
+      <a href="/" class="text-2xl font-bold text-zinc-950 dark:text-white">
+        Aletheia
+      </a>
+    </div>
+
+    <!-- Card -->
+    <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
       {{if .Token}}
         <!-- Token provided in URL - auto-verify -->
         <div
@@ -15,41 +23,57 @@
           hx-target="#verify-content"
           hx-swap="innerHTML"
           id="verify-content">
-          <h1>Verifying Email...</h1>
-          <p>Please wait while we verify your email address.</p>
-          <div class="spinner" style="margin: var(--space-lg) auto;"></div>
+          <h1 class="text-2xl/8 font-semibold text-zinc-950 dark:text-white">
+            Verifying Email...
+          </h1>
+          <p class="mt-2 text-sm/6 text-zinc-500 dark:text-zinc-400">
+            Please wait while we verify your email address.
+          </p>
+          <div class="mt-8 flex justify-center">
+            <svg class="size-8 animate-spin text-blue-600 dark:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </div>
         </div>
       {{else}}
         <!-- Manual token entry -->
-        <h1>Verify Your Email</h1>
-        <p>Enter the verification code sent to your email address.</p>
+        <h1 class="text-2xl/8 font-semibold text-zinc-950 dark:text-white">
+          Verify Your Email
+        </h1>
+        <p class="mt-2 text-sm/6 text-zinc-500 dark:text-zinc-400">
+          Enter the verification code sent to your email address.
+        </p>
 
         <form
           hx-post="/api/auth/verify-email"
           hx-target="#verify-form"
           hx-swap="outerHTML"
           id="verify-form"
-          class="stack">
+          class="mt-8 space-y-6">
 
-          <div class="form-field">
-            <label for="token">Verification Code</label>
-            <input
-              type="text"
-              id="token"
-              name="token"
-              required
-              autofocus
-              placeholder="Enter verification code">
+          <!-- Verification Code field -->
+          <div class="space-y-1">
+            <label for="token" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              Verification Code
+            </label>
+            {{template "input" (dict "Type" "text" "Name" "token" "ID" "token" "Required" true "Autofocus" true "Placeholder" "Enter verification code")}}
           </div>
 
-          <button type="submit" class="btn-primary">Verify Email</button>
-
-          <hr style="margin: var(--space-lg) 0; border: 0; border-top: 1px solid var(--color-border);">
-
-          <div style="text-align: center;">
-            <p style="margin: 0;">Didn't receive the email? <a href="/resend-verification">Resend</a></p>
-          </div>
+          <!-- Submit button -->
+          {{template "button" (dict "Type" "submit" "Content" "Verify Email" "Variant" "solid" "Color" "blue" "Class" "w-full")}}
         </form>
+
+        <!-- Divider -->
+        {{template "divider" (dict "Class" "my-8")}}
+
+        <!-- Resend link -->
+        <div class="text-center text-sm/6 text-zinc-500 dark:text-zinc-400">
+          Didn't receive the email?
+          <a href="/resend-verification"
+             class="font-medium text-zinc-950 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300">
+            Resend
+          </a>
+        </div>
       {{end}}
     </div>
   </div>
