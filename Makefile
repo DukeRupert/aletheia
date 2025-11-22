@@ -38,3 +38,40 @@ test-cleanup:
 test-handlers:
 	@echo "Running handler tests..."
 	@go test ./internal/handlers/ -v
+
+# Docker commands
+.PHONY: docker-build
+docker-build:
+	docker build -t aletheia:latest .
+
+.PHONY: docker-build-tag
+docker-build-tag:
+	@if [ -z "$(TAG)" ]; then echo "Usage: make docker-build-tag TAG=v1.0.0"; exit 1; fi
+	docker build -t aletheia:$(TAG) -t aletheia:latest .
+
+.PHONY: docker-run
+docker-run:
+	docker run --rm -p 1323:1323 --env-file .env aletheia:latest
+
+.PHONY: docker-push
+docker-push:
+	@if [ -z "$(DOCKER_USERNAME)" ]; then echo "Usage: make docker-push DOCKER_USERNAME=youruser [TAG=latest]"; exit 1; fi
+	@TAG=$${TAG:-latest}; \
+	docker tag aletheia:$$TAG $(DOCKER_USERNAME)/aletheia:$$TAG && \
+	docker push $(DOCKER_USERNAME)/aletheia:$$TAG
+
+.PHONY: docker-compose-up
+docker-compose-up:
+	docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+.PHONY: docker-compose-down
+docker-compose-down:
+	docker compose -f docker-compose.prod.yml down
+
+.PHONY: docker-compose-logs
+docker-compose-logs:
+	docker compose -f docker-compose.prod.yml logs -f
+
+.PHONY: docker-compose-restart
+docker-compose-restart:
+	docker compose -f docker-compose.prod.yml restart
