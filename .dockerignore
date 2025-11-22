@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+LICENSE
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+bin/
+dist/
+
+# Development databases
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# Test files
+*_test.go
+testdata/
+
+# Uploads (local development)
+uploads/
+
+# Docker
+Dockerfile
+docker-compose.yaml
+docker-compose.prod.yml
+.dockerignore
+
+# CI/CD
+.github/
+
+# Temporary files
+tmp/
+temp/

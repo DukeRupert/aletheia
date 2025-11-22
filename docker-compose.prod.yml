@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Application
+  app:
+    image: ${DOCKER_USERNAME}/aletheia:${IMAGE_TAG:-latest}
+    container_name: aletheia-app
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "127.0.0.1:1323:1323"  # Only expose on localhost for Caddy reverse proxy
+    environment:
+      # Server configuration
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 1323
+      ENVIRONMENT: prod
+      LOG_LEVEL: info
+
+      # Database configuration
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOSTNAME: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+
+      # Security
+      JWT_SECRET: ${JWT_SECRET}
+
+      # Storage configuration (defaults to S3 for production)
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-s3}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-us-east-1}
+      STORAGE_S3_BASE_URL: ${STORAGE_S3_BASE_URL}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      # Email configuration
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-postmark}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME}
+      EMAIL_VERIFY_BASE_URL: ${EMAIL_VERIFY_BASE_URL}
+      POSTMARK_SERVER_TOKEN: ${POSTMARK_SERVER_TOKEN}
+
+      # Queue configuration
+      QUEUE_PROVIDER: postgres
+      QUEUE_WORKER_COUNT: ${QUEUE_WORKER_COUNT:-3}
+      QUEUE_POLL_INTERVAL: ${QUEUE_POLL_INTERVAL:-1s}
+      QUEUE_JOB_TIMEOUT: ${QUEUE_JOB_TIMEOUT:-60s}
+      QUEUE_ENABLE_RATE_LIMITING: ${QUEUE_ENABLE_RATE_LIMITING:-true}
+
+      # AI configuration
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      # Only needed if using local storage (backup/development)
+      - app_uploads:/app/uploads
+    networks:
+      - aletheia
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: aletheia-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - aletheia
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  # Watchtower for automatic updates
+  watchtower:
+    image: containrrr/watchtower
+    container_name: aletheia-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_POLL_INTERVAL=${WATCHTOWER_POLL_INTERVAL:-300}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+networks:
+  aletheia:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  app_uploads:
