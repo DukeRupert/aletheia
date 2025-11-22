@@ -3,144 +3,161 @@
 {{define "title"}}Photo Review - Aletheia{{end}}
 
 {{define "content"}}
-<div class="container">
-  <div class="stack" style="margin-top: var(--space-xl);">
-    <!-- Header -->
-    <div style="display: flex; justify-content: space-between; align-items: start;">
+<div class="mx-auto max-w-7xl">
+  <!-- Header -->
+  <div class="px-gutter pt-8 pb-6">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
       <div>
-        <h1>Photo Review</h1>
-        <p style="color: #666; margin-top: var(--space-xs);">
-          <strong>Inspection:</strong> #{{.Inspection.ID.String}}
-          {{if .ProjectName}} | <strong>Project:</strong> {{.ProjectName}}{{end}}
+        <h1 class="text-3xl/9 font-bold text-zinc-950 dark:text-white sm:text-4xl/10">
+          Photo Review
+        </h1>
+        <p class="mt-2 text-sm/6 text-zinc-600 dark:text-zinc-400">
+          <span class="font-medium">Inspection:</span> #{{.Inspection.ID.String}}
+          {{if .ProjectName}}
+            <span class="mx-2 text-zinc-400">•</span>
+            <span class="font-medium">Project:</span> {{.ProjectName}}
+          {{end}}
         </p>
       </div>
-      <a href="/inspections/{{.Inspection.ID.String}}" class="btn-secondary">Back to Inspection</a>
+      <a href="/inspections/{{.Inspection.ID.String}}">
+        {{template "button" (dict "Content" "Back to Inspection" "Variant" "outline")}}
+      </a>
     </div>
+  </div>
 
-    <div style="display: grid; gap: var(--space-lg); grid-template-columns: 1fr 1fr;">
-      <!-- Photo Display -->
-      <div class="card">
-        <h2 style="margin-bottom: var(--space-md);">Photo</h2>
+  <div class="px-gutter pb-16">
+    <div class="grid gap-8 lg:grid-cols-2">
+      <!-- Photo Display Card -->
+      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white mb-6">
+          Photo
+        </h2>
         <img
           src="{{.Photo.StorageUrl}}"
           alt="Inspection photo"
-          style="width: 100%; height: auto; border-radius: 4px; margin-bottom: var(--space-sm);">
-        <p style="color: #666; font-size: 0.875rem;">
+          class="w-full h-auto rounded-lg ring-1 ring-zinc-950/10 dark:ring-white/20 mb-4">
+        <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
           Uploaded: {{.Photo.CreatedAt.Time.Format "January 2, 2006 at 3:04 PM"}}
         </p>
       </div>
 
-      <!-- Violations List -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
-          <h2 style="margin: 0;">Detected Violations</h2>
-          <span style="color: #666; font-size: 0.875rem;">{{len .Violations}} violation(s)</span>
+      <!-- Violations List Card -->
+      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white">
+            Detected Violations
+          </h2>
+          <span class="text-sm/6 text-zinc-500 dark:text-zinc-400">
+            {{len .Violations}} violation(s)
+          </span>
         </div>
 
         {{if .Violations}}
-          <div class="stack">
+          <div class="space-y-4">
             {{range .Violations}}
-              <div id="violation-{{.ID.String}}" class="card" style="padding: var(--space-md); background:
-                {{if eq .Status "confirmed"}}#d1fae5
-                {{else if eq .Status "dismissed"}}#f3f4f6
-                {{else}}#fef2f2{{end}}; border-left: 4px solid
-                {{if eq .Status "confirmed"}}#059669
-                {{else if eq .Status "dismissed"}}#9ca3af
-                {{else if eq .Severity "critical"}}#dc2626
-                {{else if eq .Severity "high"}}#f97316
-                {{else if eq .Severity "medium"}}#fbbf24
-                {{else}}#94a3b8{{end}};">
+              <div id="violation-{{.ID.String}}" class="rounded-lg border-l-4 p-4
+                {{if eq .Status "confirmed"}}bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500
+                {{else if eq .Status "dismissed"}}bg-zinc-100 border-zinc-400 dark:bg-zinc-800 dark:border-zinc-600
+                {{else if eq .Severity "critical"}}bg-red-50 border-red-600 dark:bg-red-950/30 dark:border-red-500
+                {{else if eq .Severity "high"}}bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500
+                {{else if eq .Severity "medium"}}bg-yellow-50 border-yellow-600 dark:bg-yellow-950/30 dark:border-yellow-500
+                {{else}}bg-zinc-100 border-zinc-400 dark:bg-zinc-800 dark:border-zinc-600{{end}}">
 
-                <!-- Violation Header -->
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-sm);">
-                  <div style="display: flex; gap: var(--space-xs); align-items: center;">
-                    <span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
-                      {{if eq .Severity "critical"}}background: #dc2626; color: white;
-                      {{else if eq .Severity "high"}}background: #f97316; color: white;
-                      {{else if eq .Severity "medium"}}background: #fbbf24; color: #78350f;
-                      {{else}}background: #94a3b8; color: white;{{end}}">
-                      {{.Severity}}
-                    </span>
-                    <span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
-                      {{if eq .Status "confirmed"}}background: #059669; color: white;
-                      {{else if eq .Status "dismissed"}}background: #6b7280; color: white;
-                      {{else}}background: #3b82f6; color: white;{{end}}">
-                      {{.Status}}
-                    </span>
+                <!-- Badges Row -->
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                  <div class="flex items-center gap-2">
+                    <!-- Severity Badge -->
+                    {{if eq .Severity "critical"}}
+                      {{template "badge" (dict "Content" .Severity "Color" "red" "Size" "sm")}}
+                    {{else if eq .Severity "high"}}
+                      {{template "badge" (dict "Content" .Severity "Color" "orange" "Size" "sm")}}
+                    {{else if eq .Severity "medium"}}
+                      {{template "badge" (dict "Content" .Severity "Color" "yellow" "Size" "sm")}}
+                    {{else}}
+                      {{template "badge" (dict "Content" .Severity "Color" "zinc" "Size" "sm")}}
+                    {{end}}
+
+                    <!-- Status Badge -->
+                    {{if eq .Status "confirmed"}}
+                      {{template "badge" (dict "Content" .Status "Color" "green" "Size" "sm")}}
+                    {{else if eq .Status "dismissed"}}
+                      {{template "badge" (dict "Content" .Status "Color" "zinc" "Size" "sm")}}
+                    {{else}}
+                      {{template "badge" (dict "Content" .Status "Color" "blue" "Size" "sm")}}
+                    {{end}}
                   </div>
-                  <span style="font-size: 0.75rem; color: #64748b;">
+
+                  <!-- Confidence Score -->
+                  <span class="text-xs text-zinc-500 dark:text-zinc-400">
                     {{printf "%.0f%%" (mul .ConfidenceScore 100)}} confidence
                   </span>
                 </div>
 
-                <!-- Regulation Citation (prominent) -->
+                <!-- Safety Code Citation -->
                 {{if .SafetyCodeID.Valid}}
-                  <div style="margin-bottom: var(--space-sm); padding: var(--space-sm); background: #1e3a8a; border-radius: 4px;">
-                    <p style="font-size: 0.75rem; color: rgba(255,255,255,0.8); margin: 0 0 var(--space-2xs) 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                  <div class="mb-3 rounded-lg bg-blue-900 p-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-blue-200 mb-1">
                       Regulation Violated
                     </p>
-                    <p style="font-size: 0.95rem; color: white; margin: 0; font-weight: 700; font-family: monospace;">
+                    <p class="text-base font-bold text-white font-mono">
                       📋 {{index $.SafetyCodeMap (.SafetyCodeID.String)}}
                     </p>
                   </div>
                 {{end}}
 
-                <!-- Violation Description -->
-                <p style="font-size: 0.95rem; color: #1f2937; margin-bottom: var(--space-sm); line-height: 1.5;">
+                <!-- Description -->
+                <p class="text-sm/6 text-zinc-900 dark:text-zinc-100 mb-3">
                   {{.Description}}
                 </p>
 
+                <!-- Location -->
                 {{if .Location.Valid}}
-                  <p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-sm);">
-                    <strong>📍 Location:</strong> {{.Location.String}}
+                  <p class="text-sm/6 text-zinc-600 dark:text-zinc-400 mb-3">
+                    <span class="font-medium">📍 Location:</span> {{.Location.String}}
                   </p>
                 {{end}}
 
                 <!-- Action Buttons -->
                 {{if eq .Status "pending"}}
-                  <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-md);">
+                  <div class="flex gap-3 mt-4">
                     <button
                       hx-post="/api/violations/{{.ID.String}}/confirm"
                       hx-target="#violation-{{.ID.String}}"
                       hx-swap="outerHTML"
-                      class="btn-primary"
-                      style="flex: 1;">
+                      class="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 dark:bg-green-500 dark:hover:bg-green-400">
                       ✓ Confirm Violation
                     </button>
                     <button
                       hx-post="/api/violations/{{.ID.String}}/dismiss"
                       hx-target="#violation-{{.ID.String}}"
                       hx-swap="outerHTML"
-                      class="btn-secondary"
-                      style="flex: 1;">
+                      class="flex-1 rounded-lg border border-zinc-950/10 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
                       ✗ Dismiss
                     </button>
                   </div>
                 {{else if eq .Status "confirmed"}}
-                  <div style="margin-top: var(--space-md);">
-                    <p style="color: #059669; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
+                  <div class="mt-4">
+                    <p class="text-sm font-semibold text-green-700 dark:text-green-400 mb-2">
                       ✓ Confirmed by inspector
                     </p>
                     <button
                       hx-post="/api/violations/{{.ID.String}}/dismiss"
                       hx-target="#violation-{{.ID.String}}"
                       hx-swap="outerHTML"
-                      class="btn-secondary"
-                      style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+                      class="rounded-lg border border-zinc-950/10 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
                       Change to Dismissed
                     </button>
                   </div>
                 {{else if eq .Status "dismissed"}}
-                  <div style="margin-top: var(--space-md);">
-                    <p style="color: #6b7280; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
+                  <div class="mt-4">
+                    <p class="text-sm font-semibold text-zinc-600 dark:text-zinc-400 mb-2">
                       ✗ Dismissed by inspector
                     </p>
                     <button
                       hx-post="/api/violations/{{.ID.String}}/confirm"
                       hx-target="#violation-{{.ID.String}}"
                       hx-swap="outerHTML"
-                      class="btn-primary"
-                      style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+                      class="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-500 dark:bg-green-500 dark:hover:bg-green-400">
                       Change to Confirmed
                     </button>
                   </div>
@@ -149,28 +166,31 @@
             {{end}}
           </div>
         {{else}}
-          <div style="text-align: center; padding: var(--space-2xl); color: #666;">
-            <p>No violations detected for this photo.</p>
-            <p style="font-size: 0.875rem; margin-top: var(--space-xs);">This photo passed all safety checks.</p>
+          <div class="text-center py-12">
+            <p class="text-sm text-zinc-500 dark:text-zinc-400">No violations detected for this photo.</p>
+            <p class="mt-1 text-xs text-zinc-400 dark:text-zinc-500">This photo passed all safety checks.</p>
           </div>
         {{end}}
       </div>
     </div>
 
     <!-- Re-analyze Section -->
-    <div class="card">
-      <h2 style="margin-bottom: var(--space-sm);">Re-analyze Photo</h2>
-      <p style="color: #666; font-size: 0.875rem; margin-bottom: var(--space-md);">
+    <div class="mt-8 rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white mb-2">
+        Re-analyze Photo
+      </h2>
+      <p class="text-sm/6 text-zinc-600 dark:text-zinc-400 mb-6">
         If you believe there are additional violations or the AI missed something, provide additional context and re-analyze the photo.
       </p>
 
       <div x-data="{ analyzing: false }">
-        <textarea
-          id="reanalyze-context"
-          name="context"
-          placeholder="e.g., Look for missing hard hats on workers near the scaffolding..."
-          style="width: 100%; min-height: 80px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem; resize: vertical; margin-bottom: var(--space-sm);"
-        ></textarea>
+        {{template "textarea" (dict
+          "Name" "context"
+          "ID" "reanalyze-context"
+          "Rows" 4
+          "Placeholder" "e.g., Look for missing hard hats on workers near the scaffolding..."
+          "Class" "mb-4"
+        )}}
 
         <button
           hx-post="/api/photos/analyze"
@@ -179,24 +199,23 @@
           hx-trigger="click"
           @click="analyzing = true"
           hx-indicator="#analyze-status"
-          class="btn-primary"
           :disabled="analyzing"
-          style="width: 100%;">
+          class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400">
           <span x-show="!analyzing">Re-analyze with Context</span>
-          <span x-show="analyzing">Analyzing...</span>
+          <span x-show="analyzing" x-cloak>Analyzing...</span>
         </button>
 
-        <div id="analyze-status" style="margin-top: var(--space-sm); display: none;">
-          <div style="padding: var(--space-sm); background: #dbeafe; border-radius: 4px; color: #1e40af; font-size: 0.875rem; display: flex; align-items: center; gap: var(--space-xs);">
-            <svg style="width: 16px; height: 16px; animation: spin 1s linear infinite;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div id="analyze-status" class="mt-4 hidden">
+          <div class="flex items-center gap-3 rounded-lg bg-blue-50 px-4 py-3 text-sm/6 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+            <svg class="size-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>
             Analysis in progress. This may take 30-60 seconds...
           </div>
         </div>
 
-        <div id="analyze-complete" style="margin-top: var(--space-sm); display: none;">
-          <div style="padding: var(--space-sm); background: #d1fae5; border-radius: 4px; color: #059669; font-size: 0.875rem;">
+        <div id="analyze-complete" class="mt-4 hidden">
+          <div class="rounded-lg bg-green-50 px-4 py-3 text-sm/6 text-green-700 dark:bg-green-950/50 dark:text-green-300">
             ✓ Analysis complete! Refresh the page to see updated violations.
           </div>
         </div>
@@ -204,51 +223,62 @@
     </div>
 
     <!-- Manual Violation Entry Section -->
-    <div class="card">
-      <h2 style="margin-bottom: var(--space-sm);">Add Manual Violation</h2>
-      <p style="color: #666; font-size: 0.875rem; margin-bottom: var(--space-md);">
+    <div class="mt-8 rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white mb-2">
+        Add Manual Violation
+      </h2>
+      <p class="text-sm/6 text-zinc-600 dark:text-zinc-400 mb-6">
         If you've identified a violation that the AI missed, you can manually add it here.
       </p>
 
-      <form id="manual-violation-form" x-data="{ submitting: false }">
-        <div style="margin-bottom: var(--space-sm);">
-          <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
-            Safety Code/Regulation <span style="color: #dc2626;">*</span>
+      <form id="manual-violation-form" x-data="{ submitting: false }" class="space-y-4">
+        <!-- Safety Code -->
+        <div class="space-y-1">
+          <label for="safety-code" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+            Safety Code/Regulation <span class="text-red-500">*</span>
           </label>
-          <input
-            type="text"
-            id="safety-code"
-            name="safety_code"
-            placeholder="e.g., OSHA 1926.501"
-            required
-            style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;"
-          >
+          {{template "input" (dict
+            "Type" "text"
+            "Name" "safety_code"
+            "ID" "safety-code"
+            "Required" true
+            "Placeholder" "e.g., OSHA 1926.501"
+          )}}
         </div>
 
-        <div style="margin-bottom: var(--space-sm);">
-          <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
-            Description <span style="color: #dc2626;">*</span>
+        <!-- Description -->
+        <div class="space-y-1">
+          <label for="description" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+            Description <span class="text-red-500">*</span>
           </label>
-          <textarea
-            id="description"
-            name="description"
-            placeholder="Describe the safety violation you observed..."
-            required
-            style="width: 100%; min-height: 100px; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem; resize: vertical;"
-          ></textarea>
+          {{template "textarea" (dict
+            "Name" "description"
+            "ID" "description"
+            "Required" true
+            "Rows" 4
+            "Placeholder" "Describe the safety violation you observed..."
+          )}}
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); margin-bottom: var(--space-sm);">
-          <div>
-            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
-              Severity <span style="color: #dc2626;">*</span>
+        <!-- Severity and Location Grid -->
+        <div class="grid gap-4 sm:grid-cols-2">
+          <!-- Severity -->
+          <div class="space-y-1">
+            <label for="severity" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
+              Severity <span class="text-red-500">*</span>
             </label>
             <select
               id="severity"
               name="severity"
               required
-              style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;"
-            >
+              class="relative block w-full appearance-none rounded-lg border
+                     px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)]
+                     sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)]
+                     text-base/6 text-zinc-950 sm:text-sm/6
+                     border-zinc-950/10 hover:border-zinc-950/20
+                     dark:border-white/10 dark:text-white dark:hover:border-white/20
+                     bg-transparent dark:bg-white/5
+                     focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-blue-500">
               <option value="">Select severity...</option>
               <option value="critical">Critical</option>
               <option value="high">High</option>
@@ -257,17 +287,17 @@
             </select>
           </div>
 
-          <div>
-            <label style="display: block; font-weight: 600; margin-bottom: var(--space-xs); font-size: 0.875rem;">
+          <!-- Location -->
+          <div class="space-y-1">
+            <label for="location" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
               Location (optional)
             </label>
-            <input
-              type="text"
-              id="location"
-              name="location"
-              placeholder="e.g., Near scaffolding, left side"
-              style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;"
-            >
+            {{template "input" (dict
+              "Type" "text"
+              "Name" "location"
+              "ID" "location"
+              "Placeholder" "e.g., Near scaffolding, left side"
+            )}}
           </div>
         </div>
 
@@ -280,55 +310,51 @@
           hx-target="#manual-violation-status"
           hx-swap="innerHTML"
           @click="submitting = true"
-          class="btn-primary"
           :disabled="submitting"
-          style="width: 100%;">
+          class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400">
           <span x-show="!submitting">Add Violation</span>
-          <span x-show="submitting">Adding...</span>
+          <span x-show="submitting" x-cloak>Adding...</span>
         </button>
 
-        <div id="manual-violation-status" style="margin-top: var(--space-sm);"></div>
+        <div id="manual-violation-status"></div>
       </form>
     </div>
 
-    <!-- Actions -->
-    <div style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
-      <a href="/inspections/{{.Inspection.ID.String}}" class="btn-secondary">Back to Inspection</a>
-      <a href="/projects/{{.Inspection.ProjectID.String}}" class="btn-secondary">View Project</a>
+    <!-- Bottom Actions -->
+    <div class="mt-8 flex gap-4 flex-wrap">
+      <a href="/inspections/{{.Inspection.ID.String}}">
+        {{template "button" (dict "Content" "Back to Inspection" "Variant" "outline")}}
+      </a>
+      <a href="/projects/{{.Inspection.ProjectID.String}}">
+        {{template "button" (dict "Content" "View Project" "Variant" "outline")}}
+      </a>
     </div>
-
-    <style>
-      @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-    </style>
-
-    <script>
-      // Show status when analysis starts
-      document.body.addEventListener('htmx:beforeRequest', function(evt) {
-        if (evt.detail.pathInfo.requestPath.includes('/api/photos/analyze')) {
-          document.getElementById('analyze-status').style.display = 'block';
-          document.getElementById('analyze-complete').style.display = 'none';
-        }
-      });
-
-      // Show complete message when analysis finishes
-      document.body.addEventListener('htmx:afterRequest', function(evt) {
-        if (evt.detail.pathInfo.requestPath.includes('/api/photos/analyze')) {
-          document.getElementById('analyze-status').style.display = 'none';
-          if (evt.detail.successful) {
-            document.getElementById('analyze-complete').style.display = 'block';
-            // Clear the textarea
-            document.getElementById('reanalyze-context').value = '';
-            // Optionally reload after a delay
-            setTimeout(function() {
-              window.location.reload();
-            }, 2000);
-          }
-        }
-      });
-    </script>
   </div>
 </div>
+
+<script>
+  // Show status when analysis starts
+  document.body.addEventListener('htmx:beforeRequest', function(evt) {
+    if (evt.detail.pathInfo.requestPath.includes('/api/photos/analyze')) {
+      document.getElementById('analyze-status').classList.remove('hidden');
+      document.getElementById('analyze-complete').classList.add('hidden');
+    }
+  });
+
+  // Show complete message when analysis finishes
+  document.body.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.pathInfo.requestPath.includes('/api/photos/analyze')) {
+      document.getElementById('analyze-status').classList.add('hidden');
+      if (evt.detail.successful) {
+        document.getElementById('analyze-complete').classList.remove('hidden');
+        // Clear the textarea
+        document.getElementById('reanalyze-context').value = '';
+        // Reload after a delay
+        setTimeout(function() {
+          window.location.reload();
+        }, 2000);
+      }
+    }
+  });
+</script>
 {{end}}
