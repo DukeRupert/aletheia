@@ -16,14 +16,17 @@ import (
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/handlers"
+	"github.com/dukerupert/aletheia/internal/migrations"
 	"github.com/dukerupert/aletheia/internal/queue"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
 	"github.com/dukerupert/aletheia/internal/templates"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/pressly/goose/v3"
 )
 
 func main() {
@@ -72,6 +75,22 @@ func main() {
 	}
 
 	logger.Info("database connection pool established")
+
+	// Run migrations
+	logger.Info("running database migrations...")
+	goose.SetBaseFS(migrations.FS)
+	if err := goose.SetDialect("postgres"); err != nil {
+		log.Fatal("failed to set goose dialect:", err)
+	}
+
+	// Get stdlib sql.DB from pgx pool for goose
+	sqlDB := stdlib.OpenDBFromPool(pool)
+	defer sqlDB.Close()
+
+	if err := goose.Up(sqlDB, "."); err != nil {
+		log.Fatal("failed to run migrations:", err)
+	}
+	logger.Info("database migrations completed")
 
 	// Initialize storage service (configured via STORAGE_PROVIDER env var)
 	logger.Debug("storage service configuration",
@@ -191,6 +210,13 @@ func main() {
 	logger.Debug("starting worker pool")
 	go workerPool.Start(context.Background(), []string{"photo_analysis"})
 	logger.Info("worker pool started")
+
+	// Health check endpoint
+	e.GET("/health", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"status": "ok",
+		})
+	})
 
 	// Page routes (public)
 	e.GET("/", pageHandler.HomePage)
