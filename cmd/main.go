@@ -169,6 +169,11 @@ func main() {
 	intmiddleware.InitMetrics()
 	logger.Info("metrics initialized")
 
+	// Initialize session cache for improved performance
+	logger.Debug("initializing session cache")
+	sessionCache := session.NewSessionCache(pool)
+	logger.Info("session cache initialized", slog.Int("ttl_minutes", 5))
+
 	logger.Debug("initializing Echo web server")
 	e := echo.New()
 	e.Renderer = renderer
@@ -256,7 +261,7 @@ func main() {
 
 	// Protected page routes (require session)
 	protectedPages := e.Group("")
-	protectedPages.Use(session.SessionMiddleware(pool))
+	protectedPages.Use(session.CachedSessionMiddleware(sessionCache))
 	protectedPages.GET("/dashboard", pageHandler.DashboardPage)
 	protectedPages.GET("/profile", pageHandler.ProfilePage)
 	protectedPages.GET("/organizations", pageHandler.OrganizationsPage)
@@ -272,7 +277,7 @@ func main() {
 
 	// Protected API routes (require session)
 	protected := e.Group("/api")
-	protected.Use(session.SessionMiddleware(pool))
+	protected.Use(session.CachedSessionMiddleware(sessionCache))
 	protected.POST("/upload", uploadHandler.UploadImage)
 	protected.POST("/auth/logout", authHandler.Logout)
 	protected.GET("/auth/me", authHandler.Me)

@@ -2,10 +2,13 @@ package session
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/patrickmn/go-cache"
 )
 
 // SessionCache provides a caching layer for sessions to reduce database load.
@@ -29,8 +32,8 @@ import (
 //
 // Start with Option 1, migrate to Option 2 when scaling horizontally.
 type SessionCache struct {
-	db *pgxpool.Pool
-	// TODO: Add cache field (e.g., *cache.Cache from go-cache)
+	db    *pgxpool.Pool
+	cache *cache.Cache
 }
 
 // NewSessionCache creates a new session cache.
@@ -46,10 +49,12 @@ type SessionCache struct {
 // Usage in main.go:
 //   sessionCache := session.NewSessionCache(pool)
 func NewSessionCache(db *pgxpool.Pool) *SessionCache {
-	// TODO: Initialize cache with 5-minute expiration and 10-minute cleanup
-	// TODO: Return SessionCache with cache field populated
+	// Initialize cache with 5-minute default expiration and 10-minute cleanup interval
+	c := cache.New(5*time.Minute, 10*time.Minute)
+
 	return &SessionCache{
-		db: db,
+		db:    db,
+		cache: c,
 	}
 }
 
@@ -74,12 +79,22 @@ func NewSessionCache(db *pgxpool.Pool) *SessionCache {
 // Usage in middleware:
 //   session, err := sessionCache.GetSession(ctx, token)
 func (sc *SessionCache) GetSession(ctx context.Context, token string) (database.Session, error) {
-	// TODO: Check cache with token as key
-	// TODO: If cache hit, return cached session
-	// TODO: If cache miss, query database using database.New(sc.db).GetSessionByToken()
-	// TODO: If found in DB, store in cache with default expiration
-	// TODO: Return session or error
-	return database.Session{}, nil
+	// Check cache first (fast path)
+	if cached, found := sc.cache.Get(token); found {
+		return cached.(database.Session), nil
+	}
+
+	// Cache miss - query database
+	queries := database.New(sc.db)
+	session, err := queries.GetSessionByToken(ctx, token)
+	if err != nil {
+		return database.Session{}, err
+	}
+
+	// Store in cache for future requests
+	sc.cache.Set(token, session, cache.DefaultExpiration)
+
+	return session, nil
 }
 
 // GetSessionWithUser retrieves a session with associated user data.
@@ -99,14 +114,37 @@ func (sc *SessionCache) GetSession(ctx context.Context, token string) (database.
 // Usage in middleware:
 //   sessionUser, err := sessionCache.GetSessionWithUser(ctx, token)
 func (sc *SessionCache) GetSessionWithUser(ctx context.Context, token string) (SessionWithUser, error) {
-	// TODO: Define cache key (e.g., "session_user:" + token)
-	// TODO: Check cache
-	// TODO: On miss, query database for session
-	// TODO: Query database for user
-	// TODO: Combine into SessionWithUser struct
-	// TODO: Cache the result
-	// TODO: Return SessionWithUser or error
-	return SessionWithUser{}, nil
+	// Define cache key for combined session+user data
+	cacheKey := fmt.Sprintf("session_user:%s", token)
+
+	// Check cache first
+	if cached, found := sc.cache.Get(cacheKey); found {
+		return cached.(SessionWithUser), nil
+	}
+
+	// Cache miss - query database for session
+	queries := database.New(sc.db)
+	session, err := queries.GetSessionByToken(ctx, token)
+	if err != nil {
+		return SessionWithUser{}, err
+	}
+
+	// Query database for user
+	user, err := queries.GetUser(ctx, session.UserID)
+	if err != nil {
+		return SessionWithUser{}, err
+	}
+
+	// Combine into SessionWithUser struct
+	sessionWithUser := SessionWithUser{
+		Session: session,
+		User:    user,
+	}
+
+	// Cache the combined result
+	sc.cache.Set(cacheKey, sessionWithUser, cache.DefaultExpiration)
+
+	return sessionWithUser, nil
 }
 
 // SessionWithUser combines session and user data.
@@ -130,8 +168,12 @@ type SessionWithUser struct {
 //   sessionCache.InvalidateSession(token)
 //   queries.DeleteSession(ctx, sessionID)
 func (sc *SessionCache) InvalidateSession(token string) {
-	// TODO: Delete from cache by token key
-	// TODO: Also delete session_user:{token} if GetSessionWithUser is implemented
+	// Delete session from cache
+	sc.cache.Delete(token)
+
+	// Also delete session_user cache entry
+	cacheKey := fmt.Sprintf("session_user:%s", token)
+	sc.cache.Delete(cacheKey)
 }
 
 // InvalidateUserSessions removes all sessions for a user from cache.
@@ -151,9 +193,13 @@ func (sc *SessionCache) InvalidateSession(token string) {
 // Usage in handlers/auth.go:
 //   sessionCache.InvalidateUserSessions(userID)
 func (sc *SessionCache) InvalidateUserSessions(userID uuid.UUID) {
-	// TODO: Implement user session invalidation strategy
-	// TODO: For now, can be a no-op (sessions will expire naturally)
-	// TODO: Future: maintain user_id -> []tokens mapping for immediate invalidation
+	// No-op for now - sessions will expire naturally from cache (5 min)
+	// Future enhancement: maintain user_id -> []tokens mapping for immediate invalidation
+	// This is acceptable because:
+	// 1. Cache TTL is only 5 minutes
+	// 2. Database still validates on cache miss
+	// 3. For security-critical operations (password change), can clear entire cache
+	_ = userID // Acknowledge parameter
 }
 
 // Clear removes all entries from the cache.
@@ -165,7 +211,7 @@ func (sc *SessionCache) InvalidateUserSessions(userID uuid.UUID) {
 // Usage in tests:
 //   sessionCache.Clear()
 func (sc *SessionCache) Clear() {
-	// TODO: Call cache.Flush() or equivalent
+	sc.cache.Flush()
 }
 
 // Stats returns cache statistics for monitoring.
@@ -183,10 +229,19 @@ func (sc *SessionCache) Clear() {
 //     "evictions": 10
 //   }
 func (sc *SessionCache) Stats() CacheStats {
-	// TODO: Retrieve statistics from cache implementation
-	// TODO: Calculate hit rate
-	// TODO: Return CacheStats struct
-	return CacheStats{}
+	// Note: go-cache doesn't track hits/misses/evictions natively
+	// We can only report item count
+	// For detailed metrics, consider using a Redis cache or wrapping get/set methods
+
+	items := sc.cache.ItemCount()
+
+	return CacheStats{
+		Hits:      0, // Not tracked by go-cache
+		Misses:    0, // Not tracked by go-cache
+		HitRate:   0, // Cannot calculate without hits/misses
+		Items:     items,
+		Evictions: 0, // Not tracked by go-cache
+	}
 }
 
 // CacheStats contains cache performance metrics.
