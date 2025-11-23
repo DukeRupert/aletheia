@@ -32,3 +32,4 @@ vendor/ # If using Go Modules, this might not be needed if not committing vendor
 
 # Environment variables
 .env
+.env.prod
