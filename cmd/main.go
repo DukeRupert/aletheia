@@ -189,6 +189,14 @@ func main() {
 	logger.Debug("configuring metrics middleware")
 	e.Use(intmiddleware.MetricsMiddleware())
 
+	// Rate limiting middleware - protect against abuse and DoS attacks
+	logger.Debug("configuring rate limiting middleware")
+	rateLimiter := intmiddleware.NewRateLimiter(logger)
+	e.Use(rateLimiter.Middleware())
+	logger.Info("rate limiting initialized",
+		slog.Float64("rate_per_sec", 100.0),
+		slog.Int("burst", 200))
+
 	// HTMX response middleware
 	logger.Debug("configuring HTMX middleware")
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -253,14 +261,20 @@ func main() {
 	e.GET("/verify", pageHandler.VerifyEmailPage)
 	e.GET("/forgot-password", pageHandler.ForgotPasswordPage)
 
-	// Public API routes
-	e.POST("/api/auth/register", authHandler.Register)
-	e.POST("/api/auth/login", authHandler.Login)
-	e.POST("/api/auth/verify-email", authHandler.VerifyEmail)
-	e.POST("/api/auth/resend-verification", authHandler.ResendVerification)
-	e.POST("/api/auth/request-password-reset", authHandler.RequestPasswordReset)
-	e.POST("/api/auth/verify-reset-token", authHandler.VerifyResetToken)
-	e.POST("/api/auth/reset-password", authHandler.ResetPassword)
+	// Public API routes - Auth endpoints with strict rate limiting
+	logger.Debug("configuring auth endpoints with strict rate limiting")
+	authGroup := e.Group("/api/auth")
+	authGroup.Use(intmiddleware.StrictRateLimitMiddleware(logger))
+	authGroup.POST("/register", authHandler.Register)
+	authGroup.POST("/login", authHandler.Login)
+	authGroup.POST("/verify-email", authHandler.VerifyEmail)
+	authGroup.POST("/resend-verification", authHandler.ResendVerification)
+	authGroup.POST("/request-password-reset", authHandler.RequestPasswordReset)
+	authGroup.POST("/verify-reset-token", authHandler.VerifyResetToken)
+	authGroup.POST("/reset-password", authHandler.ResetPassword)
+	logger.Info("auth endpoints configured with strict rate limiting",
+		slog.Float64("rate_per_min", 5.0),
+		slog.Int("burst", 10))
 
 	// Protected page routes (require session)
 	protectedPages := e.Group("")
@@ -279,8 +293,13 @@ func main() {
 	protectedPages.GET("/photos/:id", pageHandler.PhotoDetailPage)
 
 	// Protected API routes (require session)
+	logger.Debug("configuring protected API routes with per-user rate limiting")
 	protected := e.Group("/api")
 	protected.Use(session.CachedSessionMiddleware(sessionCache))
+	protected.Use(intmiddleware.PerUserRateLimitMiddleware(logger))
+	logger.Info("protected API routes configured with per-user rate limiting",
+		slog.Float64("rate_per_min", 100.0),
+		slog.Int("burst", 150))
 	protected.POST("/upload", uploadHandler.UploadImage)
 	protected.POST("/auth/logout", authHandler.Logout)
 	protected.GET("/auth/me", authHandler.Me)
