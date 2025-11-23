@@ -2,28 +2,32 @@ package handlers
 
 import (
 	"log/slog"
+	"net/http"
+	"time"
 
+	"github.com/dukerupert/aletheia/internal/queue"
+	"github.com/dukerupert/aletheia/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
-	"github.com/yourusername/aletheia/internal/queue"
-	"github.com/yourusername/aletheia/internal/storage"
 )
 
 // HealthHandler provides comprehensive health check endpoints for monitoring.
 type HealthHandler struct {
-	db      *pgxpool.Pool
-	storage storage.FileStorage
-	queue   queue.Queue
-	logger  *slog.Logger
+	db        *pgxpool.Pool
+	storage   storage.FileStorage
+	queue     queue.Queue
+	logger    *slog.Logger
+	startTime time.Time
 }
 
 // NewHealthHandler creates a new health check handler.
 func NewHealthHandler(db *pgxpool.Pool, storage storage.FileStorage, queue queue.Queue, logger *slog.Logger) *HealthHandler {
 	return &HealthHandler{
-		db:      db,
-		storage: storage,
-		queue:   queue,
-		logger:  logger,
+		db:        db,
+		storage:   storage,
+		queue:     queue,
+		logger:    logger,
+		startTime: time.Now(),
 	}
 }
 
@@ -39,8 +43,9 @@ func NewHealthHandler(db *pgxpool.Pool, storage storage.FileStorage, queue queue
 //
 // Route: GET /health
 func (h *HealthHandler) HealthCheck(c echo.Context) error {
-	// TODO: Return JSON with status "ok"
-	return nil
+	return c.JSON(http.StatusOK, map[string]string{
+		"status": "ok",
+	})
 }
 
 // ReadinessCheck checks if the application is ready to serve traffic.
@@ -75,13 +80,47 @@ func (h *HealthHandler) HealthCheck(c echo.Context) error {
 //
 // Route: GET /health/ready
 func (h *HealthHandler) ReadinessCheck(c echo.Context) error {
-	// TODO: Check database: h.db.Ping(ctx)
-	// TODO: Check storage health (if interface supports it)
-	// TODO: Check queue health (if interface supports it)
-	// TODO: Collect all check results
-	// TODO: Return 200 if all healthy, 503 if any unhealthy
-	// TODO: Include details about each check in response
-	return nil
+	ctx := c.Request().Context()
+	checks := make(map[string]string)
+	healthy := true
+
+	// Check database connectivity
+	if err := h.db.Ping(ctx); err != nil {
+		checks["database"] = "failed: " + err.Error()
+		healthy = false
+		h.logger.Error("database health check failed", slog.String("error", err.Error()))
+	} else {
+		checks["database"] = "ok"
+	}
+
+	// Check storage - just verify it exists (no health check in interface)
+	if h.storage != nil {
+		checks["storage"] = "ok"
+	} else {
+		checks["storage"] = "failed: not initialized"
+		healthy = false
+	}
+
+	// Check queue - verify it exists
+	if h.queue != nil {
+		checks["queue"] = "ok"
+	} else {
+		checks["queue"] = "failed: not initialized"
+		healthy = false
+	}
+
+	// Determine response status
+	status := "healthy"
+	statusCode := http.StatusOK
+	if !healthy {
+		status = "unhealthy"
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	return c.JSON(statusCode, map[string]interface{}{
+		"status": status,
+		"checks": checks,
+	})
 }
 
 // LivenessCheck checks if the application is alive.
@@ -96,8 +135,7 @@ func (h *HealthHandler) ReadinessCheck(c echo.Context) error {
 //
 // Route: GET /health/live
 func (h *HealthHandler) LivenessCheck(c echo.Context) error {
-	// TODO: Return 204 No Content
-	return nil
+	return c.NoContent(http.StatusNoContent)
 }
 
 // DetailedHealthCheck provides detailed system information for debugging.
@@ -133,10 +171,67 @@ func (h *HealthHandler) LivenessCheck(c echo.Context) error {
 //
 // Route: GET /health/detailed
 func (h *HealthHandler) DetailedHealthCheck(c echo.Context) error {
-	// TODO: Collect database pool stats: h.db.Stat()
-	// TODO: Collect queue stats if interface supports it
-	// TODO: Include application version and uptime
-	// TODO: Include storage provider information
-	// TODO: Return comprehensive JSON response
-	return nil
+	ctx := c.Request().Context()
+
+	// Calculate uptime
+	uptime := time.Since(h.startTime)
+
+	// Collect database pool statistics
+	dbStats := h.db.Stat()
+	databaseInfo := map[string]interface{}{
+		"status":               "ok",
+		"total_connections":    dbStats.TotalConns(),
+		"idle_connections":     dbStats.IdleConns(),
+		"acquired_connections": dbStats.AcquiredConns(),
+		"max_connections":      dbStats.MaxConns(),
+	}
+
+	// Check database connectivity
+	if err := h.db.Ping(ctx); err != nil {
+		databaseInfo["status"] = "failed: " + err.Error()
+		h.logger.Error("database ping failed in detailed health check", slog.String("error", err.Error()))
+	}
+
+	// Collect queue statistics
+	queueInfo := map[string]interface{}{
+		"status": "ok",
+	}
+
+	// Try to get stats for common queue (photo_analysis)
+	if h.queue != nil {
+		stats, err := h.queue.GetQueueStats(ctx, "photo_analysis")
+		if err != nil {
+			queueInfo["status"] = "failed: " + err.Error()
+			h.logger.Error("failed to get queue stats", slog.String("error", err.Error()))
+		} else {
+			queueInfo["pending_jobs"] = stats.PendingJobs
+			queueInfo["processing_jobs"] = stats.ProcessingJobs
+			queueInfo["completed_jobs"] = stats.CompletedJobs
+			queueInfo["failed_jobs"] = stats.FailedJobs
+		}
+	}
+
+	// Storage info
+	storageInfo := map[string]interface{}{
+		"status": "ok",
+	}
+	if h.storage == nil {
+		storageInfo["status"] = "not initialized"
+	}
+
+	// Build response
+	response := map[string]interface{}{
+		"status":         "healthy",
+		"uptime_seconds": int(uptime.Seconds()),
+		"database":       databaseInfo,
+		"queue":          queueInfo,
+		"storage":        storageInfo,
+	}
+
+	// Overall health status
+	if databaseInfo["status"] != "ok" || queueInfo["status"] != "ok" || storageInfo["status"] != "ok" {
+		response["status"] = "degraded"
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

@@ -202,6 +202,7 @@ func main() {
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
 	photoHandler := handlers.NewPhotoHandler(queries, queueService, logger)
 	violationHandler := handlers.NewViolationHandler(queries, logger)
+	healthHandler := handlers.NewHealthHandler(pool, fileStorage, queueService, logger)
 	logger.Info("all handlers initialized")
 
 	// Register queue job handlers
@@ -216,12 +217,12 @@ func main() {
 	go workerPool.Start(context.Background(), []string{"photo_analysis"})
 	logger.Info("worker pool started")
 
-	// Health check endpoint
-	e.GET("/health", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{
-			"status": "ok",
-		})
-	})
+	// Health check endpoints
+	logger.Debug("configuring health check endpoints")
+	e.GET("/health", healthHandler.HealthCheck)           // Basic uptime check
+	e.GET("/health/live", healthHandler.LivenessCheck)    // Kubernetes liveness probe
+	e.GET("/health/ready", healthHandler.ReadinessCheck)  // Kubernetes readiness probe
+	e.GET("/health/detailed", healthHandler.DetailedHealthCheck) // Detailed system info
 
 	// Page routes (public)
 	e.GET("/", pageHandler.HomePage)

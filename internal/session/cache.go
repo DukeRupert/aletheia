@@ -3,9 +3,9 @@ package session
 import (
 	"context"
 
+	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/yourusername/aletheia/internal/database"
 )
 
 // SessionCache provides a caching layer for sessions to reduce database load.
