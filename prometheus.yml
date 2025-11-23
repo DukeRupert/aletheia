@@ -1,0 +1,106 @@
+# Prometheus Configuration for Aletheia
+# This file configures Prometheus to scrape metrics from the Aletheia application
+
+global:
+  # How frequently to scrape targets by default
+  scrape_interval: 15s
+
+  # How long until a scrape request times out
+  scrape_timeout: 10s
+
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager)
+  external_labels:
+    monitor: 'aletheia-monitor'
+    environment: 'development'
+
+# Alertmanager configuration (optional - uncomment when ready to use)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - 'localhost:9093'
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'
+# rule_files:
+#   - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Aletheia Application Metrics
+  - job_name: 'aletheia'
+
+    # Override the global default and scrape targets from this job every 5 seconds
+    scrape_interval: 5s
+
+    # Metrics path defaults to '/metrics'
+    metrics_path: /metrics
+
+    # Scheme defaults to 'http'
+    scheme: http
+
+    static_configs:
+      # Use host.docker.internal when Prometheus runs in Docker
+      # Use localhost when Prometheus runs natively
+      - targets: ['host.docker.internal:1323']
+        labels:
+          service: 'aletheia'
+          component: 'web-server'
+
+    # Add additional metadata to scraped metrics
+    metric_relabel_configs:
+      # Drop some noisy Go runtime metrics if needed
+      # - source_labels: [__name__]
+      #   regex: 'go_gc_.*'
+      #   action: drop
+
+  # Aletheia Health Checks (separate job for monitoring)
+  - job_name: 'aletheia-health'
+    scrape_interval: 30s
+    metrics_path: /health/ready
+    scheme: http
+
+    static_configs:
+      - targets: ['host.docker.internal:1323']
+        labels:
+          service: 'aletheia'
+          component: 'health-check'
+
+  # Prometheus Self-Monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+# Additional scrape configs for future services
+# Uncomment and modify as needed:
+
+  # PostgreSQL Exporter (install postgres_exporter separately)
+  # - job_name: 'postgres'
+  #   scrape_interval: 10s
+  #   static_configs:
+  #     - targets: ['localhost:9187']
+  #       labels:
+  #         service: 'postgresql'
+  #         database: 'aletheia'
+
+  # Node Exporter (system metrics - install node_exporter separately)
+  # - job_name: 'node'
+  #   scrape_interval: 10s
+  #   static_configs:
+  #     - targets: ['localhost:9100']
+  #       labels:
+  #         service: 'node-exporter'
+  #         instance: 'aletheia-server'
+
+  # Redis Exporter (if using Redis queue - install redis_exporter separately)
+  # - job_name: 'redis'
+  #   scrape_interval: 10s
+  #   static_configs:
+  #     - targets: ['localhost:9121']
+  #       labels:
+  #         service: 'redis'

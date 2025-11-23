@@ -28,6 +28,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pressly/goose/v3"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -163,6 +164,11 @@ func main() {
 	}
 	logger.Info("template renderer initialized")
 
+	// Initialize Prometheus metrics
+	logger.Debug("initializing Prometheus metrics")
+	intmiddleware.InitMetrics()
+	logger.Info("metrics initialized")
+
 	logger.Debug("initializing Echo web server")
 	e := echo.New()
 	e.Renderer = renderer
@@ -170,6 +176,10 @@ func main() {
 	// Request ID middleware - must be early in the chain for tracing
 	logger.Debug("configuring request ID middleware")
 	e.Use(intmiddleware.RequestIDMiddleware(logger))
+
+	// Metrics middleware - must be after request ID for proper correlation
+	logger.Debug("configuring metrics middleware")
+	e.Use(intmiddleware.MetricsMiddleware())
 
 	// HTMX response middleware
 	logger.Debug("configuring HTMX middleware")
@@ -223,6 +233,10 @@ func main() {
 	e.GET("/health/live", healthHandler.LivenessCheck)    // Kubernetes liveness probe
 	e.GET("/health/ready", healthHandler.ReadinessCheck)  // Kubernetes readiness probe
 	e.GET("/health/detailed", healthHandler.DetailedHealthCheck) // Detailed system info
+
+	// Prometheus metrics endpoint
+	logger.Debug("configuring Prometheus metrics endpoint")
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	// Page routes (public)
 	e.GET("/", pageHandler.HomePage)
