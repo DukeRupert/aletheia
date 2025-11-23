@@ -15,6 +15,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/email"
+	apperrors "github.com/dukerupert/aletheia/internal/errors"
 	"github.com/dukerupert/aletheia/internal/handlers"
 	intmiddleware "github.com/dukerupert/aletheia/internal/middleware"
 	"github.com/dukerupert/aletheia/internal/migrations"
@@ -180,6 +181,11 @@ func main() {
 	e.Renderer = renderer
 	e.Validator = validation.NewValidator()
 	logger.Info("input validator initialized")
+
+	// Error handling middleware - must be first to catch all errors and panics
+	logger.Debug("configuring error handling middleware")
+	e.Use(apperrors.ErrorHandlerMiddleware(logger))
+	logger.Info("error handling middleware initialized")
 
 	// Request ID middleware - must be early in the chain for tracing
 	logger.Debug("configuring request ID middleware")

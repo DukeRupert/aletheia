@@ -1,10 +1,14 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/labstack/echo/v4"
 )
 
@@ -45,15 +49,28 @@ type AppError struct {
 
 // Error implements the error interface.
 func (e *AppError) Error() string {
-	// TODO: Return formatted error string including code and message
-	// TODO: Include wrapped error if present
-	return ""
+	// Build error string with code and message
+	var parts []string
+	if e.Code != "" {
+		parts = append(parts, fmt.Sprintf("[%s]", e.Code))
+	}
+	if e.Message != "" {
+		parts = append(parts, e.Message)
+	}
+
+	result := strings.Join(parts, " ")
+
+	// Include wrapped error if present
+	if e.Err != nil {
+		result = fmt.Sprintf("%s: %v", result, e.Err)
+	}
+
+	return result
 }
 
 // Unwrap implements error unwrapping for errors.Is and errors.As.
 func (e *AppError) Unwrap() error {
-	// TODO: Return wrapped error
-	return nil
+	return e.Err
 }
 
 // WithField adds a context field to the error.
@@ -65,15 +82,31 @@ func (e *AppError) Unwrap() error {
 // Usage:
 //   return err.WithField("user_id", userID).WithField("email", email)
 func (e *AppError) WithField(key string, value interface{}) *AppError {
-	// TODO: Add key-value pair to Fields map
-	// TODO: Return self for chaining
+	// Initialize Fields map if nil
+	if e.Fields == nil {
+		e.Fields = make(map[string]interface{})
+	}
+
+	// Add key-value pair to Fields map
+	e.Fields[key] = value
+
+	// Return self for chaining
 	return e
 }
 
 // WithFields adds multiple context fields at once.
 func (e *AppError) WithFields(fields map[string]interface{}) *AppError {
-	// TODO: Merge fields map into Fields
-	// TODO: Return self for chaining
+	// Initialize Fields map if nil
+	if e.Fields == nil {
+		e.Fields = make(map[string]interface{})
+	}
+
+	// Merge fields map into Fields
+	for k, v := range fields {
+		e.Fields[k] = v
+	}
+
+	// Return self for chaining
 	return e
 }
 
@@ -88,12 +121,34 @@ func (e *AppError) WithFields(fields map[string]interface{}) *AppError {
 //   appErr.LogError(logger)
 //   return echo.NewHTTPError(appErr.StatusCode, appErr.Message)
 func (e *AppError) LogError(logger *slog.Logger) {
-	// TODO: Create log attributes from Fields
-	// TODO: Add error code and message
-	// TODO: Add underlying error if present
-	// TODO: Log at appropriate level based on status code
-	//       - 5xx: Error level
-	//       - 4xx: Warn or Info level
+	// Create log attributes from Fields
+	attrs := make([]slog.Attr, 0, len(e.Fields)+3)
+
+	// Add error code and message
+	attrs = append(attrs, slog.String("error_code", e.Code))
+	attrs = append(attrs, slog.String("error_message", e.Message))
+
+	// Add underlying error if present
+	if e.Err != nil {
+		attrs = append(attrs, slog.String("underlying_error", e.Err.Error()))
+	}
+
+	// Add all Fields
+	for k, v := range e.Fields {
+		attrs = append(attrs, slog.Any(k, v))
+	}
+
+	// Log at appropriate level based on status code
+	if e.StatusCode >= 500 {
+		// 5xx errors are server errors - log at Error level
+		logger.LogAttrs(nil, slog.LevelError, "application error", attrs...)
+	} else if e.StatusCode >= 400 {
+		// 4xx errors are client errors - log at Warn level
+		logger.LogAttrs(nil, slog.LevelWarn, "client error", attrs...)
+	} else {
+		// Other errors - log at Info level
+		logger.LogAttrs(nil, slog.LevelInfo, "error", attrs...)
+	}
 }
 
 // ToEchoError converts AppError to Echo's HTTPError format.
@@ -104,10 +159,14 @@ func (e *AppError) LogError(logger *slog.Logger) {
 //
 // Returns error that Echo will convert to HTTP response.
 func (e *AppError) ToEchoError() error {
-	// TODO: Create echo.HTTPError with status code
-	// TODO: Set message as response body
-	// TODO: Optionally include error code in response
-	return nil
+	// Create response body with code and message
+	response := map[string]interface{}{
+		"code":    e.Code,
+		"message": e.Message,
+	}
+
+	// Create echo.HTTPError with status code and response body
+	return echo.NewHTTPError(e.StatusCode, response)
 }
 
 // Common error constructors
@@ -121,8 +180,13 @@ func (e *AppError) ToEchoError() error {
 // Usage:
 //   return errors.NewBadRequestError("INVALID_EMAIL", "email format is invalid", nil)
 func NewBadRequestError(code, message string, err error) *AppError {
-	// TODO: Create AppError with StatusCode 400
-	return nil
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		Err:        err,
+		StatusCode: http.StatusBadRequest,
+		Fields:     make(map[string]interface{}),
+	}
 }
 
 // NewUnauthorizedError creates a 401 Unauthorized error.
@@ -134,8 +198,13 @@ func NewBadRequestError(code, message string, err error) *AppError {
 // Usage:
 //   return errors.NewUnauthorizedError("INVALID_CREDENTIALS", "email or password is incorrect", nil)
 func NewUnauthorizedError(code, message string, err error) *AppError {
-	// TODO: Create AppError with StatusCode 401
-	return nil
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		Err:        err,
+		StatusCode: http.StatusUnauthorized,
+		Fields:     make(map[string]interface{}),
+	}
 }
 
 // NewForbiddenError creates a 403 Forbidden error.
@@ -147,8 +216,13 @@ func NewUnauthorizedError(code, message string, err error) *AppError {
 // Usage:
 //   return errors.NewForbiddenError("INSUFFICIENT_PERMISSIONS", "you don't have access to this organization", nil)
 func NewForbiddenError(code, message string, err error) *AppError {
-	// TODO: Create AppError with StatusCode 403
-	return nil
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		Err:        err,
+		StatusCode: http.StatusForbidden,
+		Fields:     make(map[string]interface{}),
+	}
 }
 
 // NewNotFoundError creates a 404 Not Found error.
@@ -160,8 +234,13 @@ func NewForbiddenError(code, message string, err error) *AppError {
 // Usage:
 //   return errors.NewNotFoundError("INSPECTION_NOT_FOUND", "inspection not found", nil)
 func NewNotFoundError(code, message string, err error) *AppError {
-	// TODO: Create AppError with StatusCode 404
-	return nil
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		Err:        err,
+		StatusCode: http.StatusNotFound,
+		Fields:     make(map[string]interface{}),
+	}
 }
 
 // NewConflictError creates a 409 Conflict error.
@@ -173,8 +252,13 @@ func NewNotFoundError(code, message string, err error) *AppError {
 // Usage:
 //   return errors.NewConflictError("EMAIL_EXISTS", "an account with this email already exists", err)
 func NewConflictError(code, message string, err error) *AppError {
-	// TODO: Create AppError with StatusCode 409
-	return nil
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		Err:        err,
+		StatusCode: http.StatusConflict,
+		Fields:     make(map[string]interface{}),
+	}
 }
 
 // NewInternalError creates a 500 Internal Server Error.
@@ -187,8 +271,13 @@ func NewConflictError(code, message string, err error) *AppError {
 // Usage:
 //   return errors.NewInternalError("DATABASE_ERROR", "failed to save inspection", err)
 func NewInternalError(code, message string, err error) *AppError {
-	// TODO: Create AppError with StatusCode 500
-	return nil
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		Err:        err,
+		StatusCode: http.StatusInternalServerError,
+		Fields:     make(map[string]interface{}),
+	}
 }
 
 // NewServiceUnavailableError creates a 503 Service Unavailable error.
@@ -201,8 +290,13 @@ func NewInternalError(code, message string, err error) *AppError {
 // Usage:
 //   return errors.NewServiceUnavailableError("AI_SERVICE_DOWN", "AI service temporarily unavailable", err)
 func NewServiceUnavailableError(code, message string, err error) *AppError {
-	// TODO: Create AppError with StatusCode 503
-	return nil
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		Err:        err,
+		StatusCode: http.StatusServiceUnavailable,
+		Fields:     make(map[string]interface{}),
+	}
 }
 
 // Predefined common errors
@@ -237,13 +331,51 @@ var (
 func ErrorHandlerMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// TODO: Call next(c) and capture error
-			// TODO: If error is AppError, log with context
-			// TODO: If error is echo.HTTPError, log appropriately
-			// TODO: If error is unexpected, log as internal error
-			// TODO: Return appropriate HTTP response
-			// TODO: Handle panics with defer/recover
-			return nil
+			// Handle panics with defer/recover
+			defer func() {
+				if r := recover(); r != nil {
+					// Log panic
+					logger.Error("panic recovered",
+						slog.Any("panic", r),
+						slog.String("path", c.Path()),
+						slog.String("method", c.Request().Method))
+
+					// Return internal server error
+					err := NewInternalError("PANIC", "an unexpected error occurred", fmt.Errorf("%v", r))
+					c.JSON(err.StatusCode, err.ToEchoError())
+				}
+			}()
+
+			// Call next handler and capture error
+			err := next(c)
+			if err == nil {
+				return nil
+			}
+
+			// Check if error is AppError
+			var appErr *AppError
+			if errors.As(err, &appErr) {
+				// Log with full context
+				appErr.LogError(logger)
+				// Return as Echo error
+				return appErr.ToEchoError()
+			}
+
+			// Check if error is echo.HTTPError
+			var echoErr *echo.HTTPError
+			if errors.As(err, &echoErr) {
+				// Log echo HTTP errors
+				logger.Warn("HTTP error",
+					slog.Int("status", echoErr.Code),
+					slog.Any("message", echoErr.Message),
+					slog.String("path", c.Path()))
+				return err
+			}
+
+			// Unexpected error - wrap as internal error
+			internalErr := NewInternalError("UNEXPECTED_ERROR", "an internal error occurred", err)
+			internalErr.LogError(logger)
+			return internalErr.ToEchoError()
 		}
 	}
 }
@@ -266,11 +398,29 @@ func ErrorHandlerMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 //       return errors.WrapDatabaseError(err, "USER_FETCH_FAILED", "failed to fetch user")
 //   }
 func WrapDatabaseError(err error, code, message string) *AppError {
-	// TODO: Check if err is pgx.ErrNoRows -> return NotFoundError
-	// TODO: Check if err is unique constraint violation -> return ConflictError
-	// TODO: Check if err is foreign key violation -> return BadRequestError
-	// TODO: Default: return InternalError
-	return nil
+	// Check if err is pgx.ErrNoRows -> return NotFoundError
+	if errors.Is(err, pgx.ErrNoRows) {
+		return NewNotFoundError(code, message, err)
+	}
+
+	// Check if err is a PostgreSQL error
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		// Check error code for specific constraint violations
+		switch pgErr.Code {
+		case "23505": // unique_violation
+			return NewConflictError(code, message, err)
+		case "23503": // foreign_key_violation
+			return NewBadRequestError(code, message, err)
+		case "23502": // not_null_violation
+			return NewBadRequestError(code, message, err)
+		case "23514": // check_violation
+			return NewBadRequestError(code, message, err)
+		}
+	}
+
+	// Default: return InternalError for unknown database errors
+	return NewInternalError(code, message, err)
 }
 
 // IsErrorCode checks if an error has a specific error code.
@@ -284,7 +434,11 @@ func WrapDatabaseError(err error, code, message string) *AppError {
 //       // handle specific error
 //   }
 func IsErrorCode(err error, code string) bool {
-	// TODO: Use errors.As to extract AppError
-	// TODO: Compare Code field
+	// Use errors.As to extract AppError
+	var appErr *AppError
+	if errors.As(err, &appErr) {
+		// Compare Code field
+		return appErr.Code == code
+	}
 	return false
 }
