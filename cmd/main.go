@@ -16,6 +16,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/handlers"
+	intmiddleware "github.com/dukerupert/aletheia/internal/middleware"
 	"github.com/dukerupert/aletheia/internal/migrations"
 	"github.com/dukerupert/aletheia/internal/queue"
 	"github.com/dukerupert/aletheia/internal/session"
@@ -166,6 +167,10 @@ func main() {
 	e := echo.New()
 	e.Renderer = renderer
 
+	// Request ID middleware - must be early in the chain for tracing
+	logger.Debug("configuring request ID middleware")
+	e.Use(intmiddleware.RequestIDMiddleware(logger))
+
 	// HTMX response middleware
 	logger.Debug("configuring HTMX middleware")
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -309,13 +314,16 @@ func main() {
 		LogError:    true,
 		HandleError: true, // forwards error to the global error handler, so it can decide appropriate status code
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			// Use request-scoped logger that includes request_id
+			requestLogger := intmiddleware.GetRequestLogger(c)
+
 			if v.Error == nil {
-				logger.LogAttrs(context.Background(), slog.LevelInfo, "REQUEST",
+				requestLogger.LogAttrs(context.Background(), slog.LevelInfo, "REQUEST",
 					slog.String("uri", v.URI),
 					slog.Int("status", v.Status),
 				)
 			} else {
-				logger.LogAttrs(context.Background(), slog.LevelError, "REQUEST_ERROR",
+				requestLogger.LogAttrs(context.Background(), slog.LevelError, "REQUEST_ERROR",
 					slog.String("uri", v.URI),
 					slog.Int("status", v.Status),
 					slog.String("err", v.Error.Error()),

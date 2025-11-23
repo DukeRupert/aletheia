@@ -3,6 +3,7 @@ package middleware
 import (
 	"log/slog"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -24,13 +25,23 @@ import (
 func RequestIDMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// TODO: Generate unique request ID (UUID v4)
-			// TODO: Add to response header: X-Request-ID
-			// TODO: Store in Echo context: c.Set("request_id", requestID)
-			// TODO: Create child logger with request_id field
-			// TODO: Store child logger in context for handlers to use
-			// TODO: Call next(c)
-			return nil
+			// Generate unique request ID (UUID v4)
+			requestID := uuid.New().String()
+
+			// Add to response header: X-Request-ID
+			c.Response().Header().Set(echo.HeaderXRequestID, requestID)
+
+			// Store in Echo context for handlers to access
+			c.Set("request_id", requestID)
+
+			// Create child logger with request_id field for consistent logging
+			requestLogger := logger.With(slog.String("request_id", requestID))
+
+			// Store child logger in context for handlers to use
+			c.Set("logger", requestLogger)
+
+			// Continue with request processing
+			return next(c)
 		}
 	}
 }
@@ -45,9 +56,13 @@ func RequestIDMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 //   requestID := middleware.GetRequestID(c)
 //   job.CorrelationID = requestID
 func GetRequestID(c echo.Context) string {
-	// TODO: Retrieve request_id from context
-	// TODO: Return empty string if not found
-	return ""
+	// Retrieve request_id from context
+	requestID, ok := c.Get("request_id").(string)
+	if !ok {
+		// Return empty string if not found or wrong type
+		return ""
+	}
+	return requestID
 }
 
 // GetRequestLogger retrieves the request-scoped logger from the Echo context.
@@ -60,7 +75,11 @@ func GetRequestID(c echo.Context) string {
 //   logger := middleware.GetRequestLogger(c)
 //   logger.Info("processing request", slog.String("user_id", userID))
 func GetRequestLogger(c echo.Context) *slog.Logger {
-	// TODO: Retrieve logger from context
-	// TODO: Fall back to default logger if not found
-	return nil
+	// Retrieve logger from context
+	logger, ok := c.Get("logger").(*slog.Logger)
+	if !ok {
+		// Fall back to default logger if not found
+		return slog.Default()
+	}
+	return logger
 }
