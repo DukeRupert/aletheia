@@ -1,7 +1,14 @@
 package validation
 
 import (
-	"github.com/labstack/echo/v4"
+	"errors"
+	"fmt"
+	"mime/multipart"
+	"net/http"
+	"strings"
+	"unicode"
+
+	"github.com/go-playground/validator/v10"
 )
 
 // Validator provides input validation using go-playground/validator.
@@ -20,7 +27,7 @@ import (
 //
 // Library: github.com/go-playground/validator/v10
 type Validator struct {
-	// TODO: Add validator.Validate field
+	validate *validator.Validate
 }
 
 // NewValidator creates a new validator instance.
@@ -33,11 +40,16 @@ type Validator struct {
 // Usage in main.go:
 //   e.Validator = validation.NewValidator()
 func NewValidator() *Validator {
-	// TODO: Create validator.New()
-	// TODO: Register custom validators (RegisterValidation)
-	// TODO: Register custom error message formatters
-	// TODO: Return Validator
-	return &Validator{}
+	// Create new validator instance
+	v := validator.New()
+
+	// Note: Custom validators (safecode, uniqueemail, etc.) would be registered here
+	// but require database access. For now, we use standard validators.
+	// Custom validators can be added later via RegisterCustomValidators()
+
+	return &Validator{
+		validate: v,
+	}
 }
 
 // Validate validates a struct using its validation tags.
@@ -62,10 +74,23 @@ func NewValidator() *Validator {
 //       return err
 //   }
 func (v *Validator) Validate(i interface{}) error {
-	// TODO: Call validator.Struct(i)
-	// TODO: Handle validation errors
-	// TODO: Format errors into readable messages
-	// TODO: Return formatted error
+	// Validate the struct using validator tags
+	if err := v.validate.Struct(i); err != nil {
+		// Check if it's validation errors
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			// Format the validation errors into user-friendly messages
+			formattedErrors := FormatValidationErrors(validationErrors)
+
+			// Return a single error message listing all validation failures
+			var errorMessages []string
+			for field, message := range formattedErrors {
+				errorMessages = append(errorMessages, fmt.Sprintf("%s: %s", field, message))
+			}
+			return errors.New(strings.Join(errorMessages, "; "))
+		}
+		// Return the original error if it's not validation errors
+		return err
+	}
 	return nil
 }
 
@@ -197,16 +222,61 @@ func validateOrganizationAccess(fl interface{}) bool {
 //
 // Returns map of field -> error message.
 func FormatValidationErrors(err error) map[string]string {
-	// TODO: Type assert to validator.ValidationErrors
-	// TODO: Iterate over field errors
-	// TODO: For each error, generate user-friendly message based on tag:
-	//       - "required" -> "is required"
-	//       - "email" -> "must be a valid email address"
-	//       - "min=X" -> "must be at least X characters"
-	//       - "max=X" -> "must be no more than X characters"
-	//       - "uuid" -> "must be a valid UUID"
-	// TODO: Return map of field -> message
-	return nil
+	errors := make(map[string]string)
+
+	// Type assert to validator.ValidationErrors
+	validationErrors, ok := err.(validator.ValidationErrors)
+	if !ok {
+		// If it's not validation errors, return generic error
+		errors["_error"] = err.Error()
+		return errors
+	}
+
+	// Iterate over each field error
+	for _, fieldErr := range validationErrors {
+		fieldName := strings.ToLower(fieldErr.Field())
+
+		// Generate user-friendly message based on validation tag
+		switch fieldErr.Tag() {
+		case "required":
+			errors[fieldName] = "is required"
+		case "email":
+			errors[fieldName] = "must be a valid email address"
+		case "min":
+			if fieldErr.Type().Kind() == 24 { // string type
+				errors[fieldName] = fmt.Sprintf("must be at least %s characters", fieldErr.Param())
+			} else {
+				errors[fieldName] = fmt.Sprintf("must be at least %s", fieldErr.Param())
+			}
+		case "max":
+			if fieldErr.Type().Kind() == 24 { // string type
+				errors[fieldName] = fmt.Sprintf("must be no more than %s characters", fieldErr.Param())
+			} else {
+				errors[fieldName] = fmt.Sprintf("must be no more than %s", fieldErr.Param())
+			}
+		case "uuid":
+			errors[fieldName] = "must be a valid UUID"
+		case "alphanum":
+			errors[fieldName] = "must contain only letters and numbers"
+		case "gte":
+			errors[fieldName] = fmt.Sprintf("must be greater than or equal to %s", fieldErr.Param())
+		case "lte":
+			errors[fieldName] = fmt.Sprintf("must be less than or equal to %s", fieldErr.Param())
+		case "gt":
+			errors[fieldName] = fmt.Sprintf("must be greater than %s", fieldErr.Param())
+		case "lt":
+			errors[fieldName] = fmt.Sprintf("must be less than %s", fieldErr.Param())
+		case "len":
+			errors[fieldName] = fmt.Sprintf("must be exactly %s characters", fieldErr.Param())
+		case "oneof":
+			errors[fieldName] = fmt.Sprintf("must be one of: %s", fieldErr.Param())
+		default:
+			// Generic error message for unknown validation tags
+			errors[fieldName] = fmt.Sprintf("failed validation: %s", fieldErr.Tag())
+		}
+	}
+
+	return errors
 }
 
 // PasswordComplexity validates password complexity requirements.
@@ -228,13 +298,46 @@ func FormatValidationErrors(err error) map[string]string {
 //       return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 //   }
 func PasswordComplexity(password string) error {
-	// TODO: Check length >= 12
-	// TODO: Check for uppercase letter
-	// TODO: Check for lowercase letter
-	// TODO: Check for number
-	// TODO: Check for special character (!@#$%^&*()_+-=[]{}|;:,.<>?)
-	// TODO: Return error with specific message if any requirement fails
-	// TODO: Return nil if all requirements met
+	// Check minimum length (12 characters)
+	if len(password) < 12 {
+		return errors.New("password must be at least 12 characters long")
+	}
+
+	var (
+		hasUpper   bool
+		hasLower   bool
+		hasNumber  bool
+		hasSpecial bool
+	)
+
+	// Check for required character types
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsNumber(char):
+			hasNumber = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+
+	// Return specific error messages for missing requirements
+	if !hasUpper {
+		return errors.New("password must contain at least one uppercase letter")
+	}
+	if !hasLower {
+		return errors.New("password must contain at least one lowercase letter")
+	}
+	if !hasNumber {
+		return errors.New("password must contain at least one number")
+	}
+	if !hasSpecial {
+		return errors.New("password must contain at least one special character")
+	}
+
 	return nil
 }
 
@@ -250,11 +353,20 @@ func PasswordComplexity(password string) error {
 // Usage:
 //   req.Username = validation.SanitizeInput(req.Username)
 func SanitizeInput(input string) string {
-	// TODO: Trim leading/trailing whitespace
-	// TODO: Remove null bytes
-	// TODO: Remove other control characters if needed
-	// TODO: Consider using bluemonday for HTML sanitization if accepting rich text
-	return ""
+	// Trim leading/trailing whitespace
+	input = strings.TrimSpace(input)
+
+	// Remove null bytes and other control characters
+	var builder strings.Builder
+	for _, r := range input {
+		// Keep printable characters, tabs, newlines, and carriage returns
+		// Filter out other control characters (including null bytes)
+		if r == '\t' || r == '\n' || r == '\r' || !unicode.IsControl(r) {
+			builder.WriteRune(r)
+		}
+	}
+
+	return builder.String()
 }
 
 // ValidateFileUpload validates file uploads.
@@ -274,12 +386,47 @@ func SanitizeInput(input string) string {
 // Usage in upload handler:
 //   err := validation.ValidateFileUpload(fileHeader, 10*1024*1024, []string{"image/jpeg", "image/png", "image/webp"})
 func ValidateFileUpload(fileHeader interface{}, maxSize int64, allowedTypes []string) error {
-	// TODO: Check file size against maxSize
-	// TODO: Open file and read first 512 bytes
-	// TODO: Use http.DetectContentType to get MIME type
-	// TODO: Check MIME type against allowedTypes
-	// TODO: Return error if validation fails
-	// TODO: Consider checking file extension as additional validation
+	// Type assert to multipart.FileHeader
+	header, ok := fileHeader.(*multipart.FileHeader)
+	if !ok {
+		return errors.New("invalid file header")
+	}
+
+	// Check file size against maxSize
+	if header.Size > maxSize {
+		return fmt.Errorf("file size exceeds maximum allowed size of %d bytes", maxSize)
+	}
+
+	// Open the file to read its content
+	file, err := header.Open()
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	// Read first 512 bytes for content type detection
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Use http.DetectContentType to get MIME type
+	contentType := http.DetectContentType(buffer[:n])
+
+	// Check if the detected MIME type is in the allowed list
+	allowed := false
+	for _, allowedType := range allowedTypes {
+		if contentType == allowedType {
+			allowed = true
+			break
+		}
+	}
+
+	if !allowed {
+		return fmt.Errorf("file type %s is not allowed (allowed types: %s)", contentType, strings.Join(allowedTypes, ", "))
+	}
+
 	return nil
 }
 
@@ -299,8 +446,14 @@ func ValidateFileUpload(fileHeader interface{}, maxSize int64, allowedTypes []st
 //     }
 //   }
 func ValidationErrorResponse(err error) map[string]interface{} {
-	// TODO: Call FormatValidationErrors(err)
-	// TODO: Build response map with "error" and "fields" keys
-	// TODO: Return formatted response
-	return nil
+	// Format the validation errors
+	fieldErrors := FormatValidationErrors(err)
+
+	// Build response map with "error" and "fields" keys
+	response := map[string]interface{}{
+		"error":  "validation failed",
+		"fields": fieldErrors,
+	}
+
+	return response
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
 	"github.com/dukerupert/aletheia/internal/templates"
+	"github.com/dukerupert/aletheia/internal/validation"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -177,6 +178,8 @@ func main() {
 	logger.Debug("initializing Echo web server")
 	e := echo.New()
 	e.Renderer = renderer
+	e.Validator = validation.NewValidator()
+	logger.Info("input validator initialized")
 
 	// Request ID middleware - must be early in the chain for tracing
 	logger.Debug("configuring request ID middleware")
