@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -71,7 +73,11 @@ func (h *InspectionHandler) CreateInspection(c echo.Context) error {
 	// Get project to find its organization
 	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get project")
 	}
 
 	// Verify user is a member of the organization that owns this project
@@ -152,13 +158,19 @@ func (h *InspectionHandler) GetInspection(c echo.Context) error {
 	// Get inspection
 	inspection, err := queries.GetInspection(ctx, inspectionUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+		}
 		h.logger.Error("failed to get inspection", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get inspection")
 	}
 
 	// Get project to find its organization
 	project, err := queries.GetProject(ctx, inspection.ProjectID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
 		h.logger.Error("failed to get project for inspection", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get inspection details")
 	}
@@ -221,7 +233,11 @@ func (h *InspectionHandler) ListInspections(c echo.Context) error {
 	// Get project to find its organization
 	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get project")
 	}
 
 	// Verify user is a member of the organization
@@ -304,12 +320,19 @@ func (h *InspectionHandler) UpdateInspectionStatus(c echo.Context) error {
 	// Get inspection
 	inspection, err := queries.GetInspection(ctx, inspectionUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+		}
+		h.logger.Error("failed to get inspection", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get inspection")
 	}
 
 	// Get project to find its organization
 	project, err := queries.GetProject(ctx, inspection.ProjectID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
 		h.logger.Error("failed to get project for inspection", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get inspection details")
 	}

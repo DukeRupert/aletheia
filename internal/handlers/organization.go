@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -158,8 +160,11 @@ func (h *OrganizationHandler) GetOrganization(c echo.Context) error {
 	queries := database.New(h.pool)
 	org, err := queries.GetOrganization(ctx, orgUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "organization not found")
+		}
 		h.logger.Error("failed to get organization", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "organization not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get organization")
 	}
 
 	return c.JSON(http.StatusOK, GetOrganizationResponse{
@@ -474,8 +479,11 @@ func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
 	queries := database.New(h.pool)
 	targetUser, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		h.logger.Warn("user not found for organization invite", slog.String("email", req.Email))
-		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
+		h.logger.Error("failed to get user by email", slog.String("email", req.Email), slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to find user")
 	}
 
 	// Check if user is already a member
@@ -583,7 +591,11 @@ func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
 	queries := database.New(h.pool)
 	targetMember, err := queries.GetOrganizationMember(ctx, memberUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "member not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "member not found")
+		}
+		h.logger.Error("failed to get organization member", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get member")
 	}
 
 	// Verify member belongs to this organization
@@ -668,7 +680,11 @@ func (h *OrganizationHandler) RemoveOrganizationMember(c echo.Context) error {
 	queries := database.New(h.pool)
 	targetMember, err := queries.GetOrganizationMember(ctx, memberUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "member not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "member not found")
+		}
+		h.logger.Error("failed to get organization member", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get member")
 	}
 
 	// Verify member belongs to this organization
