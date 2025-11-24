@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -38,6 +39,10 @@ type CreateOrganizationResponse struct {
 
 // CreateOrganization creates a new organization and adds the creating user as owner
 func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -61,24 +66,24 @@ func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
 	}
 
 	// Begin transaction to ensure atomicity
-	tx, err := h.pool.Begin(c.Request().Context())
+	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		h.logger.Error("failed to begin transaction", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create organization")
 	}
-	defer tx.Rollback(c.Request().Context()) // Rollback if not committed
+	defer tx.Rollback(ctx) // Rollback if not committed
 
 	queries := database.New(tx)
 
 	// Create organization
-	org, err := queries.CreateOrganization(c.Request().Context(), req.Name)
+	org, err := queries.CreateOrganization(ctx, req.Name)
 	if err != nil {
 		h.logger.Error("failed to create organization", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create organization")
 	}
 
 	// Add creator as owner
-	_, err = queries.AddOrganizationMember(c.Request().Context(), database.AddOrganizationMemberParams{
+	_, err = queries.AddOrganizationMember(ctx, database.AddOrganizationMemberParams{
 		OrganizationID: org.ID,
 		UserID:         uuidToPgUUID(userID),
 		Role:           database.OrganizationRoleOwner,
@@ -89,7 +94,7 @@ func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
 	}
 
 	// Commit transaction
-	if err := tx.Commit(c.Request().Context()); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		h.logger.Error("failed to commit transaction", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create organization")
 	}
@@ -121,6 +126,10 @@ type GetOrganizationResponse struct {
 
 // GetOrganization retrieves an organization by ID
 func (h *OrganizationHandler) GetOrganization(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -140,14 +149,14 @@ func (h *OrganizationHandler) GetOrganization(c echo.Context) error {
 	}
 
 	// Check if user is a member of the organization
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID)
 	if err != nil {
 		return err
 	}
 
 	// Get organization
 	queries := database.New(h.pool)
-	org, err := queries.GetOrganization(c.Request().Context(), orgUUID)
+	org, err := queries.GetOrganization(ctx, orgUUID)
 	if err != nil {
 		h.logger.Error("failed to get organization", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusNotFound, "organization not found")
@@ -175,6 +184,10 @@ type ListOrganizationsResponse struct {
 
 // ListOrganizations lists all organizations the authenticated user is a member of
 func (h *OrganizationHandler) ListOrganizations(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -185,7 +198,7 @@ func (h *OrganizationHandler) ListOrganizations(c echo.Context) error {
 	queries := database.New(h.pool)
 
 	// Get all organizations with user membership details in a single query (avoids N+1 problem)
-	orgs, err := queries.ListUserOrganizationsWithDetails(c.Request().Context(), uuidToPgUUID(userID))
+	orgs, err := queries.ListUserOrganizationsWithDetails(ctx, uuidToPgUUID(userID))
 	if err != nil {
 		h.logger.Error("failed to list user organizations", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to list organizations")
@@ -221,6 +234,10 @@ type UpdateOrganizationResponse struct {
 
 // UpdateOrganization updates an organization (owner/admin only)
 func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -246,7 +263,7 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 	}
 
 	// Check if user is owner or admin
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
@@ -272,7 +289,7 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 	}
 
 	queries := database.New(h.pool)
-	org, err := queries.UpdateOrganization(c.Request().Context(), params)
+	org, err := queries.UpdateOrganization(ctx, params)
 	if err != nil {
 		h.logger.Error("failed to update organization", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update organization")
@@ -289,6 +306,10 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 
 // DeleteOrganization deletes an organization (owner only)
 func (h *OrganizationHandler) DeleteOrganization(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -308,14 +329,14 @@ func (h *OrganizationHandler) DeleteOrganization(c echo.Context) error {
 	}
 
 	// Check if user is owner (only owners can delete)
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner)
 	if err != nil {
 		return err
 	}
 
 	// Delete organization
 	queries := database.New(h.pool)
-	err = queries.DeleteOrganization(c.Request().Context(), orgUUID)
+	err = queries.DeleteOrganization(ctx, orgUUID)
 	if err != nil {
 		h.logger.Error("failed to delete organization", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete organization")
@@ -340,6 +361,10 @@ type ListOrganizationMembersResponse struct {
 
 // ListOrganizationMembers lists all members of an organization
 func (h *OrganizationHandler) ListOrganizationMembers(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -359,14 +384,14 @@ func (h *OrganizationHandler) ListOrganizationMembers(c echo.Context) error {
 	}
 
 	// Check if user is a member of the organization
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID)
 	if err != nil {
 		return err
 	}
 
 	// Get organization members
 	queries := database.New(h.pool)
-	members, err := queries.ListOrganizationMembers(c.Request().Context(), orgUUID)
+	members, err := queries.ListOrganizationMembers(ctx, orgUUID)
 	if err != nil {
 		h.logger.Error("failed to list organization members", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to list organization members")
@@ -403,6 +428,10 @@ type AddOrganizationMemberResponse struct {
 
 // AddOrganizationMember adds a new member to the organization (owner/admin only)
 func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -436,21 +465,21 @@ func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
 
 	// Find user by email
 	queries := database.New(h.pool)
-	targetUser, err := queries.GetUserByEmail(c.Request().Context(), req.Email)
+	targetUser, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		h.logger.Warn("user not found for organization invite", slog.String("email", req.Email))
 		return echo.NewHTTPError(http.StatusNotFound, "user not found")
 	}
 
 	// Check if user is already a member
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+	_, err = queries.GetOrganizationMemberByUserAndOrg(ctx, database.GetOrganizationMemberByUserAndOrgParams{
 		OrganizationID: orgUUID,
 		UserID:         targetUser.ID,
 	})
@@ -470,7 +499,7 @@ func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
 	}
 
 	// Add member
-	newMember, err := queries.AddOrganizationMember(c.Request().Context(), database.AddOrganizationMemberParams{
+	newMember, err := queries.AddOrganizationMember(ctx, database.AddOrganizationMemberParams{
 		OrganizationID: orgUUID,
 		UserID:         targetUser.ID,
 		Role:           role,
@@ -506,6 +535,10 @@ type UpdateOrganizationMemberResponse struct {
 
 // UpdateOrganizationMember updates a member's role (owner/admin only)
 func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -541,14 +574,14 @@ func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
 
 	// Get the member being updated
 	queries := database.New(h.pool)
-	targetMember, err := queries.GetOrganizationMember(c.Request().Context(), memberUUID)
+	targetMember, err := queries.GetOrganizationMember(ctx, memberUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "member not found")
 	}
@@ -575,7 +608,7 @@ func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
 	}
 
 	// Update member role
-	updatedMember, err := queries.UpdateOrganizationMemberRole(c.Request().Context(), database.UpdateOrganizationMemberRoleParams{
+	updatedMember, err := queries.UpdateOrganizationMemberRole(ctx, database.UpdateOrganizationMemberRoleParams{
 		ID:   memberUUID,
 		Role: role,
 	})
@@ -597,6 +630,10 @@ func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
 
 // RemoveOrganizationMember removes a member from the organization (owner/admin only)
 func (h *OrganizationHandler) RemoveOrganizationMember(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -622,14 +659,14 @@ func (h *OrganizationHandler) RemoveOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
 
 	// Get the member being removed
 	queries := database.New(h.pool)
-	targetMember, err := queries.GetOrganizationMember(c.Request().Context(), memberUUID)
+	targetMember, err := queries.GetOrganizationMember(ctx, memberUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "member not found")
 	}
@@ -645,7 +682,7 @@ func (h *OrganizationHandler) RemoveOrganizationMember(c echo.Context) error {
 	}
 
 	// Remove member
-	err = queries.RemoveOrganizationMember(c.Request().Context(), memberUUID)
+	err = queries.RemoveOrganizationMember(ctx, memberUUID)
 	if err != nil {
 		h.logger.Error("failed to remove organization member", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to remove member")
