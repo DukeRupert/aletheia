@@ -86,3 +86,48 @@ func requireOrganizationMembership(
 
 	return &membership, nil
 }
+
+// getOrganizationIDFromPhoto retrieves the organization ID associated with a photo
+// by traversing the photo → inspection → project → organization relationship
+func getOrganizationIDFromPhoto(
+	ctx context.Context,
+	queries *database.Queries,
+	photoID pgtype.UUID,
+) (pgtype.UUID, error) {
+	photo, err := queries.GetPhoto(ctx, photoID)
+	if err != nil {
+		return pgtype.UUID{}, echo.NewHTTPError(http.StatusNotFound, "Photo not found")
+	}
+
+	inspection, err := queries.GetInspection(ctx, photo.InspectionID)
+	if err != nil {
+		return pgtype.UUID{}, echo.NewHTTPError(http.StatusNotFound, "Inspection not found")
+	}
+
+	project, err := queries.GetProject(ctx, inspection.ProjectID)
+	if err != nil {
+		return pgtype.UUID{}, echo.NewHTTPError(http.StatusNotFound, "Project not found")
+	}
+
+	return project.OrganizationID, nil
+}
+
+// getOrganizationIDFromInspection retrieves the organization ID associated with an inspection
+// by traversing the inspection → project → organization relationship
+func getOrganizationIDFromInspection(
+	ctx context.Context,
+	queries *database.Queries,
+	inspectionID pgtype.UUID,
+) (pgtype.UUID, error) {
+	inspection, err := queries.GetInspection(ctx, inspectionID)
+	if err != nil {
+		return pgtype.UUID{}, echo.NewHTTPError(http.StatusNotFound, "Inspection not found")
+	}
+
+	project, err := queries.GetProject(ctx, inspection.ProjectID)
+	if err != nil {
+		return pgtype.UUID{}, echo.NewHTTPError(http.StatusNotFound, "Project not found")
+	}
+
+	return project.OrganizationID, nil
+}

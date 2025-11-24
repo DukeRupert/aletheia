@@ -1,27 +1,32 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"math/big"
 	"net/http"
 
 	"github.com/dukerupert/aletheia/internal/database"
+	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
 
 // ViolationHandler handles detected violation HTTP requests
 type ViolationHandler struct {
 	db     *database.Queries
+	pool   *pgxpool.Pool
 	logger *slog.Logger
 }
 
 // NewViolationHandler creates a new violation handler
-func NewViolationHandler(db *database.Queries, logger *slog.Logger) *ViolationHandler {
+func NewViolationHandler(pool *pgxpool.Pool, db *database.Queries, logger *slog.Logger) *ViolationHandler {
 	return &ViolationHandler{
 		db:     db,
+		pool:   pool,
 		logger: logger,
 	}
 }
@@ -52,12 +57,31 @@ type ViolationResponse struct {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/inspections/{inspection_id}/violations [get]
 func (h *ViolationHandler) ListViolationsByInspection(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	inspectionIDStr := c.Param("inspection_id")
 	inspectionID, err := uuid.Parse(inspectionIDStr)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid inspection_id format")
+	}
+
+	// Authorization: verify user has access to this inspection's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromInspection(ctx, h.db, pgtype.UUID{Bytes: inspectionID, Valid: true})
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
 	}
 
 	// Check if status filter is provided
@@ -133,7 +157,9 @@ func (h *ViolationHandler) ListViolationsByInspection(c echo.Context) error {
 // @Failure 404 {object} ErrorResponse
 // @Router /api/violations/{violation_id} [get]
 func (h *ViolationHandler) GetViolation(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	violationIDStr := c.Param("violation_id")
 	violationID, err := uuid.Parse(violationIDStr)
@@ -148,6 +174,23 @@ func (h *ViolationHandler) GetViolation(c echo.Context) error {
 			slog.String("error", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+	}
+
+	// Authorization: verify user has access to this violation's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, violation.PhotoID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
 	}
 
 	// Convert to response format
@@ -196,12 +239,41 @@ type UpdateViolationRequest struct {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/violations/{violation_id} [patch]
 func (h *ViolationHandler) UpdateViolation(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	violationIDStr := c.Param("violation_id")
 	violationID, err := uuid.Parse(violationIDStr)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid violation_id format")
+	}
+
+	// Get violation first to check authorization
+	violation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
+	if err != nil {
+		h.logger.Error("violation not found",
+			slog.String("violation_id", violationID.String()),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+	}
+
+	// Authorization: verify user has access to this violation's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, violation.PhotoID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
 	}
 
 	// Parse request
@@ -230,7 +302,7 @@ func (h *ViolationHandler) UpdateViolation(c echo.Context) error {
 	}
 
 	// Update violation
-	violation, err := h.db.UpdateDetectedViolationNotes(ctx, params)
+	violation, err = h.db.UpdateDetectedViolationNotes(ctx, params)
 	if err != nil {
 		h.logger.Error("failed to update violation",
 			slog.String("violation_id", violationID.String()),
@@ -282,12 +354,41 @@ func (h *ViolationHandler) UpdateViolation(c echo.Context) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/violations/{violation_id} [delete]
 func (h *ViolationHandler) DeleteViolation(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	violationIDStr := c.Param("violation_id")
 	violationID, err := uuid.Parse(violationIDStr)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid violation_id format")
+	}
+
+	// Get violation first to check authorization
+	violation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
+	if err != nil {
+		h.logger.Error("violation not found",
+			slog.String("violation_id", violationID.String()),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+	}
+
+	// Authorization: verify user has access to this violation's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, violation.PhotoID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
 	}
 
 	err = h.db.DeleteDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
@@ -308,12 +409,41 @@ func (h *ViolationHandler) DeleteViolation(c echo.Context) error {
 
 // ConfirmViolation marks a violation as confirmed
 func (h *ViolationHandler) ConfirmViolation(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	violationIDStr := c.Param("id")
 	violationID, err := uuid.Parse(violationIDStr)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid violation_id format")
+	}
+
+	// Get violation first to check authorization
+	existingViolation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
+	if err != nil {
+		h.logger.Error("violation not found",
+			slog.String("violation_id", violationID.String()),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+	}
+
+	// Authorization: verify user has access to this violation's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, existingViolation.PhotoID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
 	}
 
 	// Update violation status to confirmed
@@ -366,12 +496,41 @@ func (h *ViolationHandler) ConfirmViolation(c echo.Context) error {
 
 // DismissViolation marks a violation as dismissed
 func (h *ViolationHandler) DismissViolation(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	violationIDStr := c.Param("id")
 	violationID, err := uuid.Parse(violationIDStr)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid violation_id format")
+	}
+
+	// Get violation first to check authorization
+	existingViolation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
+	if err != nil {
+		h.logger.Error("violation not found",
+			slog.String("violation_id", violationID.String()),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+	}
+
+	// Authorization: verify user has access to this violation's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, existingViolation.PhotoID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
 	}
 
 	// Update violation status to dismissed
@@ -604,7 +763,9 @@ type CreateManualViolationRequest struct {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/violations/manual [post]
 func (h *ViolationHandler) CreateManualViolation(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	var req CreateManualViolationRequest
 	if err := c.Bind(&req); err != nil {
@@ -636,6 +797,32 @@ func (h *ViolationHandler) CreateManualViolation(c echo.Context) error {
 			return c.HTML(http.StatusNotFound, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Photo not found</div>`)
 		}
 		return echo.NewHTTPError(http.StatusNotFound, "Photo not found")
+	}
+
+	// Authorization: verify user has access to this photo's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return c.HTML(http.StatusUnauthorized, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Unauthorized</div>`)
+		}
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, photo.ID)
+	if err != nil {
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return c.HTML(http.StatusForbidden, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Access denied</div>`)
+		}
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return c.HTML(http.StatusForbidden, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">You are not a member of this organization</div>`)
+		}
+		return err
 	}
 
 	// Try to find matching safety code in database

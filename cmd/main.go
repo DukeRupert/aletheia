@@ -277,7 +277,7 @@ func main() {
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
 	photoHandler := handlers.NewPhotoHandler(pool, queries, queueService, logger)
-	violationHandler := handlers.NewViolationHandler(queries, logger)
+	violationHandler := handlers.NewViolationHandler(pool, queries, logger)
 	healthHandler := handlers.NewHealthHandler(pool, fileStorage, queueService, logger)
 
 	// Suppress unused variable warning until audit logging is integrated
