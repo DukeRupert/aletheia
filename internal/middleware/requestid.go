@@ -7,6 +7,16 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// contextKey is a typed key for context values to prevent collisions
+type contextKey string
+
+const (
+	// requestIDKey is the context key for request ID
+	requestIDKey contextKey = "request_id"
+	// loggerKey is the context key for request-scoped logger
+	loggerKey contextKey = "logger"
+)
+
 // RequestIDMiddleware adds a unique request ID to each incoming request for distributed tracing.
 //
 // Purpose:
@@ -32,13 +42,13 @@ func RequestIDMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 			c.Response().Header().Set(echo.HeaderXRequestID, requestID)
 
 			// Store in Echo context for handlers to access
-			c.Set("request_id", requestID)
+			c.Set(string(requestIDKey), requestID)
 
 			// Create child logger with request_id field for consistent logging
 			requestLogger := logger.With(slog.String("request_id", requestID))
 
 			// Store child logger in context for handlers to use
-			c.Set("logger", requestLogger)
+			c.Set(string(loggerKey), requestLogger)
 
 			// Continue with request processing
 			return next(c)
@@ -57,7 +67,7 @@ func RequestIDMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 //   job.CorrelationID = requestID
 func GetRequestID(c echo.Context) string {
 	// Retrieve request_id from context
-	requestID, ok := c.Get("request_id").(string)
+	requestID, ok := c.Get(string(requestIDKey)).(string)
 	if !ok {
 		// Return empty string if not found or wrong type
 		return ""
@@ -76,7 +86,7 @@ func GetRequestID(c echo.Context) string {
 //   logger.Info("processing request", slog.String("user_id", userID))
 func GetRequestLogger(c echo.Context) *slog.Logger {
 	// Retrieve logger from context
-	logger, ok := c.Get("logger").(*slog.Logger)
+	logger, ok := c.Get(string(loggerKey)).(*slog.Logger)
 	if !ok {
 		// Fall back to default logger if not found
 		return slog.Default()

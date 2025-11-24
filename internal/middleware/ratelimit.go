@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -30,6 +31,29 @@ import (
 // Rate limit strategy:
 // - Global: 100 requests/second per IP, burst of 200
 // - Stricter for auth endpoints: 5 requests/minute per IP
+//
+// SECURITY IMPORTANT: IP-based rate limiting configuration
+//
+// This rate limiter uses c.RealIP() to extract the client's IP address. To prevent
+// IP spoofing attacks (where attackers bypass rate limits by forging X-Forwarded-For
+// headers), you MUST properly configure Echo's IPExtractor in production:
+//
+// Production configuration (main.go):
+//   e.IPExtractor = echo.ExtractIPFromXFFHeader(
+//       echo.TrustLoopback(true),   // Trust localhost
+//       echo.TrustLinkLocal(false), // Don't trust link-local
+//       echo.TrustPrivateNet(true), // Trust private networks (adjust based on your setup)
+//   )
+//
+// Alternative for environments behind a known proxy:
+//   e.IPExtractor = echo.ExtractIPDirect() // Only if not behind proxy
+//
+// If misconfigured, attackers can:
+// - Bypass rate limits by spoofing X-Forwarded-For headers
+// - Perform unlimited requests by rotating fake IPs
+// - Execute brute force attacks without being throttled
+//
+// See: https://echo.labstack.com/docs/ip-address
 type RateLimiter struct {
 	limiters  sync.Map // IP address -> *limiterEntry
 	logger    *slog.Logger
@@ -111,14 +135,14 @@ func (rl *RateLimiter) Middleware() echo.MiddlewareFunc {
 
 				// Set Retry-After header (1 second)
 				c.Response().Header().Set("Retry-After", "1")
-				c.Response().Header().Set("X-RateLimit-Limit", "100")
+				c.Response().Header().Set("X-RateLimit-Limit", fmt.Sprintf("%.0f", rl.config.GlobalRate))
 				c.Response().Header().Set("X-RateLimit-Remaining", "0")
 
 				return echo.NewHTTPError(http.StatusTooManyRequests, "rate limit exceeded")
 			}
 
 			// Add rate limit headers
-			c.Response().Header().Set("X-RateLimit-Limit", "100")
+			c.Response().Header().Set("X-RateLimit-Limit", fmt.Sprintf("%.0f", rl.config.GlobalRate))
 
 			return next(c)
 		}
@@ -290,13 +314,13 @@ func (rl *StrictRateLimiter) Middleware() echo.MiddlewareFunc {
 					slog.String("method", c.Request().Method))
 
 				c.Response().Header().Set("Retry-After", "60")
-				c.Response().Header().Set("X-RateLimit-Limit", "5")
+				c.Response().Header().Set("X-RateLimit-Limit", fmt.Sprintf("%.0f", rl.config.StrictRate*60))
 				c.Response().Header().Set("X-RateLimit-Remaining", "0")
 
 				return echo.NewHTTPError(http.StatusTooManyRequests, "too many authentication attempts, please try again later")
 			}
 
-			c.Response().Header().Set("X-RateLimit-Limit", "5")
+			c.Response().Header().Set("X-RateLimit-Limit", fmt.Sprintf("%.0f", rl.config.StrictRate*60))
 			return next(c)
 		}
 	}
@@ -426,13 +450,13 @@ func (rl *PerUserRateLimiter) Middleware() echo.MiddlewareFunc {
 					slog.String("method", c.Request().Method))
 
 				c.Response().Header().Set("Retry-After", "60")
-				c.Response().Header().Set("X-RateLimit-Limit-User", "100")
+				c.Response().Header().Set("X-RateLimit-Limit-User", fmt.Sprintf("%.0f", rl.config.UserRate*60))
 				c.Response().Header().Set("X-RateLimit-Remaining-User", "0")
 
 				return echo.NewHTTPError(http.StatusTooManyRequests, "user rate limit exceeded")
 			}
 
-			c.Response().Header().Set("X-RateLimit-Limit-User", "100")
+			c.Response().Header().Set("X-RateLimit-Limit-User", fmt.Sprintf("%.0f", rl.config.UserRate*60))
 			return next(c)
 		}
 	}

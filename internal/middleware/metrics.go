@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -17,12 +18,6 @@ var (
 	httpRequestsInFlight prometheus.Gauge
 	httpRequestSizeBytes *prometheus.HistogramVec
 	httpResponseSizeBytes *prometheus.HistogramVec
-
-	// Queue metrics
-	queueJobsTotal *prometheus.CounterVec
-	queueJobDuration *prometheus.HistogramVec
-	queueDepth *prometheus.GaugeVec
-	queueWorkersActive *prometheus.GaugeVec
 
 	// metricsInitOnce ensures metrics are initialized exactly once
 	metricsInitOnce sync.Once
@@ -78,10 +73,33 @@ func MetricsMiddleware() echo.MiddlewareFunc {
 			// Get method and path
 			method := c.Request().Method
 			path := c.Path()
-			status := strconv.Itoa(c.Response().Status)
+
+			// Get status code, handling edge cases
+			status := c.Response().Status
+
+			// Handle errors that might not have set a status code
+			if status == 0 && err != nil {
+				// Default to 500 for errors without explicit status
+				status = http.StatusInternalServerError
+				// Check if error is an Echo HTTPError with specific code
+				if he, ok := err.(*echo.HTTPError); ok {
+					status = he.Code
+				}
+			}
+
+			// Check if request was cancelled
+			if c.Request().Context().Err() != nil {
+				// Request was cancelled - track separately for accurate monitoring
+				// Use 499 (Client Closed Request) as nginx convention
+				if status == 0 {
+					status = 499
+				}
+			}
+
+			statusStr := strconv.Itoa(status)
 
 			// Record metrics
-			httpRequestsTotal.WithLabelValues(method, path, status).Inc()
+			httpRequestsTotal.WithLabelValues(method, path, statusStr).Inc()
 			httpRequestDuration.WithLabelValues(method, path).Observe(duration)
 			httpRequestSizeBytes.WithLabelValues(method, path).Observe(requestSize)
 			httpResponseSizeBytes.WithLabelValues(method, path).Observe(float64(c.Response().Size))
@@ -160,99 +178,10 @@ func InitMetrics() {
 			},
 			[]string{"method", "path"},
 		)
-
-		// Queue job counter
-		queueJobsTotal = promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "queue_jobs_total",
-				Help: "Total number of queue jobs processed",
-			},
-			[]string{"job_type", "status"},
-		)
-
-		// Queue job duration histogram
-		queueJobDuration = promauto.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    "queue_job_duration_seconds",
-				Help:    "Queue job processing duration in seconds",
-				Buckets: []float64{0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0},
-			},
-			[]string{"job_type"},
-		)
-
-		// Queue depth gauge
-		queueDepth = promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "queue_depth",
-				Help: "Number of jobs pending in queue",
-			},
-			[]string{"queue_name"},
-		)
-
-		// Active workers gauge
-		queueWorkersActive = promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "queue_workers_active",
-				Help: "Number of workers currently processing jobs",
-			},
-			[]string{"queue_name"},
-		)
 	})
 }
 
-// RecordQueueJobMetrics records metrics for background queue jobs.
-//
-// Purpose:
-// - Track job processing time
-// - Count jobs by type and status (success/failure)
-// - Monitor queue depth
-// - Separate from HTTP metrics since jobs are async
-//
-// Metrics:
-// - queue_jobs_total (counter) - labels: job_type, status
-// - queue_job_duration_seconds (histogram) - labels: job_type
-// - queue_depth (gauge) - labels: queue_name
-// - queue_workers_active (gauge) - labels: queue_name
-//
-// Usage in queue/postgres.go:
-//   defer middleware.RecordQueueJobMetrics(jobType, startTime, err)
-func RecordQueueJobMetrics(jobType string, duration float64, err error) {
-	// Determine status based on error
-	status := "success"
-	if err != nil {
-		status = "failed"
-	}
-
-	// Increment job counter with status label
-	queueJobsTotal.WithLabelValues(jobType, status).Inc()
-
-	// Record job duration in histogram
-	queueJobDuration.WithLabelValues(jobType).Observe(duration)
-}
-
-// UpdateQueueDepth updates the queue depth gauge.
-//
-// Purpose:
-// - Provide visibility into queue backlog
-// - Alert when queue depth exceeds thresholds
-// - Should be called periodically or on enqueue/dequeue
-//
-// Usage in queue/postgres.go:
-//   middleware.UpdateQueueDepth(queueName, depth)
-func UpdateQueueDepth(queueName string, depth int64) {
-	// Set gauge value for queue_depth with queue_name label
-	queueDepth.WithLabelValues(queueName).Set(float64(depth))
-}
-
-// UpdateActiveWorkers updates the active workers gauge.
-//
-// Purpose:
-// - Track how many workers are currently processing jobs
-// - Detect worker pool issues (all workers stuck, no workers running)
-//
-// Usage in queue/worker.go:
-//   middleware.UpdateActiveWorkers(queueName, activeCount)
-func UpdateActiveWorkers(queueName string, count int) {
-	// Set gauge value for queue_workers_active with queue_name label
-	queueWorkersActive.WithLabelValues(queueName).Set(float64(count))
-}
+// NOTE: Queue metrics have been removed as they were not being used.
+// If you need queue metrics in the future, you can add them to the InitMetrics()
+// function above and create corresponding recording functions to call from
+// queue/worker.go and queue/postgres.go code.
