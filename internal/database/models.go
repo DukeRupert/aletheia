@@ -7,6 +7,7 @@ package database
 import (
 	"database/sql/driver"
 	"fmt"
+	"net/netip"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -225,6 +226,21 @@ func (ns NullViolationStatus) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.ViolationStatus), nil
+}
+
+type AuditLog struct {
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	Action         string             `json:"action"`
+	ResourceType   string             `json:"resource_type"`
+	ResourceID     pgtype.UUID        `json:"resource_id"`
+	OldValues      []byte             `json:"old_values"`
+	NewValues      []byte             `json:"new_values"`
+	IpAddress      *netip.Addr        `json:"ip_address"`
+	UserAgent      pgtype.Text        `json:"user_agent"`
+	RequestID      pgtype.Text        `json:"request_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type DetectedViolation struct {

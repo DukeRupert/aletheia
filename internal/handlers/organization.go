@@ -3,11 +3,17 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
+)
+
+const (
+	// RFC3339Format is the date/time format used for API responses
+	RFC3339Format = "2006-01-02T15:04:05Z07:00"
 )
 
 type OrganizationHandler struct {
@@ -49,11 +55,24 @@ func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
+	// Sanitize and validate name
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "organization name is required")
 	}
+	if len(req.Name) > 255 {
+		return echo.NewHTTPError(http.StatusBadRequest, "organization name too long (max 255 characters)")
+	}
 
-	queries := database.New(h.pool)
+	// Begin transaction to ensure atomicity
+	tx, err := h.pool.Begin(c.Request().Context())
+	if err != nil {
+		h.logger.Error("failed to begin transaction", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create organization")
+	}
+	defer tx.Rollback(c.Request().Context()) // Rollback if not committed
+
+	queries := database.New(tx)
 
 	// Create organization
 	org, err := queries.CreateOrganization(c.Request().Context(), req.Name)
@@ -73,6 +92,12 @@ func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create organization")
 	}
 
+	// Commit transaction
+	if err := tx.Commit(c.Request().Context()); err != nil {
+		h.logger.Error("failed to commit transaction", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create organization")
+	}
+
 	h.logger.Info("organization created", slog.String("org_id", org.ID.String()), slog.String("user_id", userID.String()))
 
 	// Check if this is an HTMX request
@@ -86,7 +111,7 @@ func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
 	return c.JSON(http.StatusCreated, CreateOrganizationResponse{
 		ID:        org.ID.String(),
 		Name:      org.Name,
-		CreatedAt: org.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt: org.CreatedAt.Time.Format(RFC3339Format),
 	})
 }
 
@@ -142,8 +167,8 @@ func (h *OrganizationHandler) GetOrganization(c echo.Context) error {
 	return c.JSON(http.StatusOK, GetOrganizationResponse{
 		ID:        org.ID.String(),
 		Name:      org.Name,
-		CreatedAt: org.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: org.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt: org.CreatedAt.Time.Format(RFC3339Format),
+		UpdatedAt: org.UpdatedAt.Time.Format(RFC3339Format),
 	})
 }
 
@@ -170,30 +195,22 @@ func (h *OrganizationHandler) ListOrganizations(c echo.Context) error {
 
 	queries := database.New(h.pool)
 
-	// Get all organization memberships for user
-	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	// Get all organizations with user membership details in a single query (avoids N+1 problem)
+	orgs, err := queries.ListUserOrganizationsWithDetails(c.Request().Context(), uuidToPgUUID(userID))
 	if err != nil {
 		h.logger.Error("failed to list user organizations", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to list organizations")
 	}
 
-	// Fetch organization details for each membership
-	organizations := make([]OrganizationSummary, 0, len(memberships))
-	for _, membership := range memberships {
-		org, err := queries.GetOrganization(c.Request().Context(), membership.OrganizationID)
-		if err != nil {
-			h.logger.Warn("failed to get organization for membership",
-				slog.String("org_id", membership.OrganizationID.String()),
-				slog.String("err", err.Error()))
-			continue
-		}
-
-		organizations = append(organizations, OrganizationSummary{
+	// Build response
+	organizations := make([]OrganizationSummary, len(orgs))
+	for i, org := range orgs {
+		organizations[i] = OrganizationSummary{
 			ID:        org.ID.String(),
 			Name:      org.Name,
-			Role:      string(membership.Role),
-			CreatedAt: org.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		})
+			Role:      string(org.Role),
+			CreatedAt: org.CreatedAt.Time.Format(RFC3339Format),
+		}
 	}
 
 	return c.JSON(http.StatusOK, ListOrganizationsResponse{
@@ -257,13 +274,24 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can update organization")
 	}
 
-	// Update organization
-	params := database.UpdateOrganizationParams{
-		ID: orgUUID,
+	// Validate that at least one field is being updated
+	if req.Name == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "no fields to update")
 	}
 
-	if req.Name != nil {
-		params.Name = *req.Name
+	// Sanitize and validate name
+	sanitizedName := strings.TrimSpace(*req.Name)
+	if sanitizedName == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "organization name cannot be empty")
+	}
+	if len(sanitizedName) > 255 {
+		return echo.NewHTTPError(http.StatusBadRequest, "organization name too long (max 255 characters)")
+	}
+
+	// Update organization
+	params := database.UpdateOrganizationParams{
+		ID:   orgUUID,
+		Name: sanitizedName,
 	}
 
 	org, err := queries.UpdateOrganization(c.Request().Context(), params)
@@ -277,7 +305,7 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 	return c.JSON(http.StatusOK, UpdateOrganizationResponse{
 		ID:        org.ID.String(),
 		Name:      org.Name,
-		UpdatedAt: org.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: org.UpdatedAt.Time.Format(RFC3339Format),
 	})
 }
 
@@ -390,7 +418,7 @@ func (h *OrganizationHandler) ListOrganizationMembers(c echo.Context) error {
 			ID:        member.ID.String(),
 			UserID:    member.UserID.String(),
 			Role:      string(member.Role),
-			CreatedAt: member.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt: member.CreatedAt.Time.Format(RFC3339Format),
 		}
 	}
 
@@ -512,7 +540,7 @@ func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
 		ID:        newMember.ID.String(),
 		UserID:    newMember.UserID.String(),
 		Role:      string(newMember.Role),
-		CreatedAt: newMember.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt: newMember.CreatedAt.Time.Format(RFC3339Format),
 	})
 }
 

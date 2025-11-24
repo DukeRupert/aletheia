@@ -16,6 +16,18 @@ SELECT * FROM organization_members
 WHERE user_id = $1
 ORDER BY created_at DESC;
 
+-- name: ListUserOrganizationsWithDetails :many
+SELECT
+  o.id,
+  o.name,
+  o.created_at,
+  o.updated_at,
+  om.role
+FROM organizations o
+INNER JOIN organization_members om ON o.id = om.organization_id
+WHERE om.user_id = $1
+ORDER BY o.created_at DESC;
+
 -- name: AddOrganizationMember :one
 INSERT INTO organization_members (
   organization_id,

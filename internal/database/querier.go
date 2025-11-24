@@ -68,6 +68,7 @@ type Querier interface {
 	ListSafetyCodesByLocation(ctx context.Context, arg ListSafetyCodesByLocationParams) ([]SafetyCode, error)
 	ListSafetyCodesByStateProvince(ctx context.Context, stateProvince pgtype.Text) ([]SafetyCode, error)
 	ListUserOrganizations(ctx context.Context, userID pgtype.UUID) ([]OrganizationMember, error)
+	ListUserOrganizationsWithDetails(ctx context.Context, userID pgtype.UUID) ([]ListUserOrganizationsWithDetailsRow, error)
 	ListUsers(ctx context.Context, status UserStatus) ([]User, error)
 	RemoveOrganizationMember(ctx context.Context, id pgtype.UUID) error
 	ResetUserPassword(ctx context.Context, arg ResetUserPasswordParams) (User, error)

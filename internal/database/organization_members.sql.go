@@ -146,6 +146,53 @@ func (q *Queries) ListUserOrganizations(ctx context.Context, userID pgtype.UUID)
 	return items, nil
 }
 
+const listUserOrganizationsWithDetails = `-- name: ListUserOrganizationsWithDetails :many
+SELECT
+  o.id,
+  o.name,
+  o.created_at,
+  o.updated_at,
+  om.role
+FROM organizations o
+INNER JOIN organization_members om ON o.id = om.organization_id
+WHERE om.user_id = $1
+ORDER BY o.created_at DESC
+`
+
+type ListUserOrganizationsWithDetailsRow struct {
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	Role      OrganizationRole   `json:"role"`
+}
+
+func (q *Queries) ListUserOrganizationsWithDetails(ctx context.Context, userID pgtype.UUID) ([]ListUserOrganizationsWithDetailsRow, error) {
+	rows, err := q.db.Query(ctx, listUserOrganizationsWithDetails, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserOrganizationsWithDetailsRow{}
+	for rows.Next() {
+		var i ListUserOrganizationsWithDetailsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeOrganizationMember = `-- name: RemoveOrganizationMember :exec
 DELETE FROM organization_members
 WHERE id = $1
