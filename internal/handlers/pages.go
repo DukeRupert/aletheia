@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -27,8 +28,11 @@ func NewPageHandler(pool *pgxpool.Pool, logger *slog.Logger) *PageHandler {
 
 // getUserDisplayInfo fetches user from DB and returns display name for nav
 func (h *PageHandler) getUserDisplayInfo(c echo.Context, userID [16]byte) map[string]interface{} {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	queries := database.New(h.pool)
-	user, err := queries.GetUser(c.Request().Context(), uuidToPgUUID(userID))
+	user, err := queries.GetUser(ctx, uuidToPgUUID(userID))
 	if err != nil {
 		// Fallback to generic name if user fetch fails
 		return map[string]interface{}{"Name": "User"}
@@ -121,6 +125,10 @@ func (h *PageHandler) ForgotPasswordPage(c echo.Context) error {
 
 // ProjectsPage renders the projects list page
 func (h *PageHandler) ProjectsPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -130,7 +138,7 @@ func (h *PageHandler) ProjectsPage(c echo.Context) error {
 	queries := database.New(h.pool)
 
 	// Get user's organizations to get their projects
-	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	memberships, err := queries.ListUserOrganizations(ctx, uuidToPgUUID(userID))
 	if err != nil {
 		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
 		memberships = []database.OrganizationMember{}
@@ -139,7 +147,7 @@ func (h *PageHandler) ProjectsPage(c echo.Context) error {
 	// Get all projects from user's organizations
 	var allProjects []database.Project
 	for _, membership := range memberships {
-		projects, err := queries.ListProjects(c.Request().Context(), membership.OrganizationID)
+		projects, err := queries.ListProjects(ctx, membership.OrganizationID)
 		if err != nil {
 			h.logger.Error("failed to list projects", slog.String("err", err.Error()))
 			continue
@@ -157,6 +165,10 @@ func (h *PageHandler) ProjectsPage(c echo.Context) error {
 
 // NewProjectPage renders the new project form page
 func (h *PageHandler) NewProjectPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -166,7 +178,7 @@ func (h *PageHandler) NewProjectPage(c echo.Context) error {
 	queries := database.New(h.pool)
 
 	// Get user's organizations where they can create projects (owner/admin)
-	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	memberships, err := queries.ListUserOrganizations(ctx, uuidToPgUUID(userID))
 	if err != nil {
 		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
 		memberships = []database.OrganizationMember{}
@@ -176,7 +188,7 @@ func (h *PageHandler) NewProjectPage(c echo.Context) error {
 	var organizations []database.Organization
 	for _, membership := range memberships {
 		if membership.Role == database.OrganizationRoleOwner || membership.Role == database.OrganizationRoleAdmin {
-			org, err := queries.GetOrganization(c.Request().Context(), membership.OrganizationID)
+			org, err := queries.GetOrganization(ctx, membership.OrganizationID)
 			if err != nil {
 				continue
 			}
@@ -194,6 +206,10 @@ func (h *PageHandler) NewProjectPage(c echo.Context) error {
 
 // OrganizationsPage renders the organizations list page
 func (h *PageHandler) OrganizationsPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -203,7 +219,7 @@ func (h *PageHandler) OrganizationsPage(c echo.Context) error {
 	queries := database.New(h.pool)
 
 	// Get user's organizations
-	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	memberships, err := queries.ListUserOrganizations(ctx, uuidToPgUUID(userID))
 	if err != nil {
 		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
 		memberships = []database.OrganizationMember{}
@@ -219,7 +235,7 @@ func (h *PageHandler) OrganizationsPage(c echo.Context) error {
 
 	var organizations []OrgWithRole
 	for _, membership := range memberships {
-		org, err := queries.GetOrganization(c.Request().Context(), membership.OrganizationID)
+		org, err := queries.GetOrganization(ctx, membership.OrganizationID)
 		if err != nil {
 			h.logger.Warn("failed to get organization", slog.String("err", err.Error()))
 			continue
@@ -257,6 +273,10 @@ func (h *PageHandler) NewOrganizationPage(c echo.Context) error {
 
 // ProjectDetailPage renders the project detail/edit page
 func (h *PageHandler) ProjectDetailPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -277,14 +297,14 @@ func (h *PageHandler) ProjectDetailPage(c echo.Context) error {
 	}
 
 	// Get project
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
 		h.logger.Error("failed to get project", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusNotFound, "project not found")
 	}
 
 	// Verify user is a member of the organization that owns this project
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+	_, err = queries.GetOrganizationMemberByUserAndOrg(ctx, database.GetOrganizationMemberByUserAndOrgParams{
 		OrganizationID: project.OrganizationID,
 		UserID:         uuidToPgUUID(userID),
 	})
@@ -305,6 +325,10 @@ func (h *PageHandler) ProjectDetailPage(c echo.Context) error {
 
 // ProfilePage renders the user profile page
 func (h *PageHandler) ProfilePage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -314,7 +338,7 @@ func (h *PageHandler) ProfilePage(c echo.Context) error {
 	queries := database.New(h.pool)
 
 	// Get user details
-	user, err := queries.GetUser(c.Request().Context(), uuidToPgUUID(userID))
+	user, err := queries.GetUser(ctx, uuidToPgUUID(userID))
 	if err != nil {
 		h.logger.Error("failed to get user", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusNotFound, "user not found")
