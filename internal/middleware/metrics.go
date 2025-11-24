@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -22,6 +23,9 @@ var (
 	queueJobDuration *prometheus.HistogramVec
 	queueDepth *prometheus.GaugeVec
 	queueWorkersActive *prometheus.GaugeVec
+
+	// metricsInitOnce ensures metrics are initialized exactly once
+	metricsInitOnce sync.Once
 )
 
 // MetricsMiddleware collects application metrics for monitoring and observability.
@@ -92,7 +96,11 @@ func MetricsMiddleware() echo.MiddlewareFunc {
 // Purpose:
 // - Create and register all Prometheus metric collectors
 // - Define metric names, help text, and labels
-// - Should be called once during application startup before MetricsMiddleware
+// - Safe to call multiple times (only initializes once using sync.Once)
+//
+// Thread Safety:
+// - Uses sync.Once to prevent Prometheus registration panics
+// - Can be safely called from tests or multiple initialization paths
 //
 // Metrics to initialize:
 // - Counter: http_requests_total
@@ -104,89 +112,92 @@ func MetricsMiddleware() echo.MiddlewareFunc {
 // Usage in main.go:
 //   middleware.InitMetrics()
 func InitMetrics() {
-	// HTTP request counter
-	httpRequestsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "http_requests_total",
-			Help: "Total number of HTTP requests",
-		},
-		[]string{"method", "path", "status"},
-	)
+	// Ensure metrics are initialized exactly once, even if called multiple times
+	metricsInitOnce.Do(func() {
+		// HTTP request counter
+		httpRequestsTotal = promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "http_requests_total",
+				Help: "Total number of HTTP requests",
+			},
+			[]string{"method", "path", "status"},
+		)
 
-	// HTTP request duration histogram
-	httpRequestDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "http_request_duration_seconds",
-			Help:    "HTTP request latency in seconds",
-			Buckets: []float64{0.001, 0.01, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0},
-		},
-		[]string{"method", "path"},
-	)
+		// HTTP request duration histogram
+		httpRequestDuration = promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "http_request_duration_seconds",
+				Help:    "HTTP request latency in seconds",
+				Buckets: []float64{0.001, 0.01, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0},
+			},
+			[]string{"method", "path"},
+		)
 
-	// HTTP requests currently in flight
-	httpRequestsInFlight = promauto.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "http_requests_in_flight",
-			Help: "Number of HTTP requests currently being processed",
-		},
-	)
+		// HTTP requests currently in flight
+		httpRequestsInFlight = promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "http_requests_in_flight",
+				Help: "Number of HTTP requests currently being processed",
+			},
+		)
 
-	// HTTP request size histogram
-	httpRequestSizeBytes = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "http_request_size_bytes",
-			Help:    "HTTP request size in bytes",
-			Buckets: prometheus.ExponentialBuckets(100, 10, 8), // 100B to 10MB
-		},
-		[]string{"method", "path"},
-	)
+		// HTTP request size histogram
+		httpRequestSizeBytes = promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "http_request_size_bytes",
+				Help:    "HTTP request size in bytes",
+				Buckets: prometheus.ExponentialBuckets(100, 10, 8), // 100B to 10MB
+			},
+			[]string{"method", "path"},
+		)
 
-	// HTTP response size histogram
-	httpResponseSizeBytes = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "http_response_size_bytes",
-			Help:    "HTTP response size in bytes",
-			Buckets: prometheus.ExponentialBuckets(100, 10, 8), // 100B to 10MB
-		},
-		[]string{"method", "path"},
-	)
+		// HTTP response size histogram
+		httpResponseSizeBytes = promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "http_response_size_bytes",
+				Help:    "HTTP response size in bytes",
+				Buckets: prometheus.ExponentialBuckets(100, 10, 8), // 100B to 10MB
+			},
+			[]string{"method", "path"},
+		)
 
-	// Queue job counter
-	queueJobsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "queue_jobs_total",
-			Help: "Total number of queue jobs processed",
-		},
-		[]string{"job_type", "status"},
-	)
+		// Queue job counter
+		queueJobsTotal = promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "queue_jobs_total",
+				Help: "Total number of queue jobs processed",
+			},
+			[]string{"job_type", "status"},
+		)
 
-	// Queue job duration histogram
-	queueJobDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "queue_job_duration_seconds",
-			Help:    "Queue job processing duration in seconds",
-			Buckets: []float64{0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0},
-		},
-		[]string{"job_type"},
-	)
+		// Queue job duration histogram
+		queueJobDuration = promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "queue_job_duration_seconds",
+				Help:    "Queue job processing duration in seconds",
+				Buckets: []float64{0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0},
+			},
+			[]string{"job_type"},
+		)
 
-	// Queue depth gauge
-	queueDepth = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "queue_depth",
-			Help: "Number of jobs pending in queue",
-		},
-		[]string{"queue_name"},
-	)
+		// Queue depth gauge
+		queueDepth = promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "queue_depth",
+				Help: "Number of jobs pending in queue",
+			},
+			[]string{"queue_name"},
+		)
 
-	// Active workers gauge
-	queueWorkersActive = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "queue_workers_active",
-			Help: "Number of workers currently processing jobs",
-		},
-		[]string{"queue_name"},
-	)
+		// Active workers gauge
+		queueWorkersActive = promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "queue_workers_active",
+				Help: "Number of workers currently processing jobs",
+			},
+			[]string{"queue_name"},
+		)
+	})
 }
 
 // RecordQueueJobMetrics records metrics for background queue jobs.
