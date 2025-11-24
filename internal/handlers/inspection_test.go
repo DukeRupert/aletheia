@@ -11,6 +11,7 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/dukerupert/aletheia/internal/validation"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -41,6 +42,7 @@ func TestCreateInspection(t *testing.T) {
 	handler := NewInspectionHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := fmt.Sprintf(`{"project_id":"%s"}`, project.ID.String())
 	req := httptest.NewRequest(http.MethodPost, "/api/inspections", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -83,6 +85,7 @@ func TestCreateInspectionUnauthorized(t *testing.T) {
 	handler := NewInspectionHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := fmt.Sprintf(`{"project_id":"%s"}`, project.ID.String())
 	req := httptest.NewRequest(http.MethodPost, "/api/inspections", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -128,6 +131,7 @@ func TestGetInspection(t *testing.T) {
 	handler := NewInspectionHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/inspections/"+inspection.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -183,6 +187,7 @@ func TestListInspections(t *testing.T) {
 	handler := NewInspectionHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/projects/"+project.ID.String()+"/inspections", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -230,6 +235,7 @@ func TestUpdateInspectionStatus(t *testing.T) {
 	handler := NewInspectionHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"status":"in_progress"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/inspections/"+inspection.ID.String()+"/status", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -296,6 +302,7 @@ func TestUpdateInspectionStatusForbiddenForNonInspector(t *testing.T) {
 	handler := NewInspectionHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"status":"in_progress"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/inspections/"+inspection.ID.String()+"/status", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)

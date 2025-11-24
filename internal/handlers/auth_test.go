@@ -14,6 +14,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/dukerupert/aletheia/internal/validation"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -76,6 +77,7 @@ func TestRegister(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "testuser@example.com"
 	testUsername := "testuser"
@@ -149,6 +151,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "duplicate@example.com"
 
@@ -223,6 +226,7 @@ func TestRegisterValidation(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	tests := []struct {
 		name           string
@@ -309,6 +313,7 @@ func TestLogin(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "logintest@example.com"
 	testPassword := "securepassword123"
@@ -409,6 +414,7 @@ func TestLoginInvalidPassword(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "invalidpw@example.com"
 	testPassword := "correctpassword"
@@ -481,6 +487,7 @@ func TestLoginNonExistentUser(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	loginBody := LoginRequest{
 		Email:    "nonexistent@example.com",
@@ -527,6 +534,7 @@ func TestLogout(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "logouttest@example.com"
 	testPassword := "securepassword123"
@@ -642,6 +650,7 @@ func TestLogoutWithoutSession(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
 	rec := httptest.NewRecorder()
@@ -682,6 +691,7 @@ func TestMeEndpoint(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "metest@example.com"
 	testPassword := "securepassword123"
@@ -807,6 +817,7 @@ func TestMeEndpointWithoutSession(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	rec := httptest.NewRecorder()
@@ -847,6 +858,7 @@ func TestUpdateProfile(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "updateprofile@example.com"
 	testPassword := "securepassword123"
@@ -991,6 +1003,7 @@ func TestUpdateProfilePartial(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "partialupdate@example.com"
 	testPassword := "securepassword123"
@@ -1101,6 +1114,7 @@ func TestUpdateProfileWithoutSession(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	newFirstName := "Should"
 	newLastName := "Fail"
@@ -1149,6 +1163,7 @@ func TestVerifyEmail(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "verifytest@example.com"
 	testUsername := "verifytest"
@@ -1247,6 +1262,7 @@ func TestVerifyEmailInvalidToken(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	// Test with invalid token
 	verifyBody := VerifyEmailRequest{
@@ -1293,6 +1309,7 @@ func TestVerifyEmailAlreadyVerified(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "alreadyverified@example.com"
 	testUsername := "alreadyverified"
@@ -1383,6 +1400,7 @@ func TestResendVerification(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "resendtest@example.com"
 	testUsername := "resendtest"
@@ -1474,6 +1492,7 @@ func TestResendVerificationNonExistentEmail(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	// Test with non-existent email
 	resendBody := ResendVerificationRequest{
@@ -1518,6 +1537,7 @@ func TestResendVerificationAlreadyVerified(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "alreadyverifiedresend@example.com"
 	testUsername := "alreadyverifiedresend"
@@ -1607,6 +1627,7 @@ func TestRequestPasswordReset(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "resettest@example.com"
 	testUsername := "resettest"
@@ -1690,6 +1711,7 @@ func TestRequestPasswordResetNonExistentEmail(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	// Request password reset for non-existent email
 	resetReq := RequestPasswordResetRequest{
@@ -1734,6 +1756,7 @@ func TestVerifyResetToken(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "verifyreset@example.com"
 	testUsername := "verifyreset"
@@ -1823,6 +1846,7 @@ func TestVerifyResetTokenInvalid(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	// Test with invalid token
 	verifyReq := VerifyResetTokenRequest{
@@ -1869,6 +1893,7 @@ func TestResetPassword(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	testEmail := "resetpasswordtest@example.com"
 	testUsername := "resetpasswordtest"
@@ -2009,6 +2034,7 @@ func TestResetPasswordInvalidToken(t *testing.T) {
 	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 
 	// Try to reset password with invalid token
 	resetPasswordReq := ResetPasswordRequest{

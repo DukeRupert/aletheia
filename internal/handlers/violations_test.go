@@ -12,6 +12,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/dukerupert/aletheia/internal/validation"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -106,6 +107,7 @@ func TestListViolationsByInspection(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/inspections/"+uuid.UUID(inspection.ID.Bytes).String()+"/violations", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -169,6 +171,7 @@ func TestListViolationsByInspection_WithStatusFilter(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/inspections/"+uuid.UUID(inspection.ID.Bytes).String()+"/violations?status=confirmed", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -220,6 +223,7 @@ func TestGetViolation(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/violations/"+uuid.UUID(violation.ID.Bytes).String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -255,6 +259,7 @@ func TestGetViolation_NotFound(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	nonExistentID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/violations/"+nonExistentID.String(), nil)
 	req.AddCookie(&http.Cookie{
@@ -303,6 +308,7 @@ func TestUpdateViolation(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	newStatus := "confirmed"
 	newDescription := "Confirmed violation - inspector verified missing hard hat"
 	reqBody := fmt.Sprintf(`{"status":"%s","description":"%s"}`, newStatus, newDescription)
@@ -358,6 +364,7 @@ func TestUpdateViolation_StatusOnly(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"status":"dismissed"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/violations/"+uuid.UUID(violation.ID.Bytes).String(), bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -410,6 +417,7 @@ func TestDeleteViolation(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodDelete, "/api/violations/"+uuid.UUID(violation.ID.Bytes).String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -441,6 +449,7 @@ func TestDeleteViolation_NotFound(t *testing.T) {
 	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	nonExistentID := uuid.New()
 	req := httptest.NewRequest(http.MethodDelete, "/api/violations/"+nonExistentID.String(), nil)
 	req.AddCookie(&http.Cookie{

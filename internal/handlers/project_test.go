@@ -11,6 +11,7 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/dukerupert/aletheia/internal/validation"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -44,6 +45,7 @@ func TestCreateProject(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := fmt.Sprintf(`{"organization_id":"%s","name":"Test Project"}`, org.ID.String())
 	req := httptest.NewRequest(http.MethodPost, "/api/projects", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -94,6 +96,7 @@ func TestCreateProjectForbiddenForMember(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := fmt.Sprintf(`{"organization_id":"%s","name":"Test Project"}`, org.ID.String())
 	req := httptest.NewRequest(http.MethodPost, "/api/projects", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -136,6 +139,7 @@ func TestGetProject(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/projects/"+project.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -186,6 +190,7 @@ func TestGetProjectUnauthorized(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/projects/"+project.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -238,6 +243,7 @@ func TestListProjects(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/projects", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -279,6 +285,7 @@ func TestListProjectsUnauthorized(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/projects", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -324,6 +331,7 @@ func TestUpdateProject(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	newName := "New Name"
 	reqBody := fmt.Sprintf(`{"name":"%s"}`, newName)
 	req := httptest.NewRequest(http.MethodPut, "/api/projects/"+project.ID.String(), bytes.NewBufferString(reqBody))
@@ -383,6 +391,7 @@ func TestUpdateProjectForbiddenForMember(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"name":"New Name"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/projects/"+project.ID.String(), bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -428,6 +437,7 @@ func TestDeleteProject(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodDelete, "/api/projects/"+project.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -483,6 +493,7 @@ func TestDeleteProjectForbiddenForMember(t *testing.T) {
 	handler := NewProjectHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodDelete, "/api/projects/"+project.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,

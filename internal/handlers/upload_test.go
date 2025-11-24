@@ -13,6 +13,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/dukerupert/aletheia/internal/storage"
+	"github.com/dukerupert/aletheia/internal/validation"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 )
@@ -64,6 +65,7 @@ func TestUploadPhoto(t *testing.T) {
 	assert.NoError(t, err)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodPost, "/api/upload", body)
 	req.Header.Set(echo.HeaderContentType, writer.FormDataContentType())
 	req.AddCookie(&http.Cookie{
@@ -141,6 +143,7 @@ func TestUploadPhotoUnauthorized(t *testing.T) {
 	assert.NoError(t, err)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodPost, "/api/upload", body)
 	req.Header.Set(echo.HeaderContentType, writer.FormDataContentType())
 	req.AddCookie(&http.Cookie{
@@ -203,6 +206,7 @@ func TestListPhotos(t *testing.T) {
 	handler := NewUploadHandler(fileStorage, pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/inspections/"+inspection.ID.String()+"/photos", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -262,6 +266,7 @@ func TestGetPhoto(t *testing.T) {
 	handler := NewUploadHandler(fileStorage, pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/photos/"+photo.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -325,6 +330,7 @@ func TestGetPhotoUnauthorized(t *testing.T) {
 	handler := NewUploadHandler(fileStorage, pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/photos/"+photo.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,

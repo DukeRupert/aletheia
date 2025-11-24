@@ -15,6 +15,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/dukerupert/aletheia/internal/validation"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -107,6 +108,7 @@ func TestCreateOrganization(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"name":"Test Organization"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/organizations", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -167,6 +169,7 @@ func TestGetOrganization(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -218,6 +221,7 @@ func TestGetOrganizationUnauthorized(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -270,6 +274,7 @@ func TestListOrganizations(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/organizations", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -313,6 +318,7 @@ func TestUpdateOrganization(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	newName := "New Name"
 	reqBody := fmt.Sprintf(`{"name":"%s"}`, newName)
 	req := httptest.NewRequest(http.MethodPut, "/api/organizations/"+org.ID.String(), bytes.NewBufferString(reqBody))
@@ -362,6 +368,7 @@ func TestUpdateOrganizationForbiddenForMember(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"name":"New Name"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/organizations/"+org.ID.String(), bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -407,6 +414,7 @@ func TestDeleteOrganization(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodDelete, "/api/organizations/"+org.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -458,6 +466,7 @@ func TestListOrganizationMembers(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/members", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -508,6 +517,7 @@ func TestAddOrganizationMember(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := fmt.Sprintf(`{"email":"%s","role":"member"}`, newMember.Email)
 	req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/members", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -564,6 +574,7 @@ func TestAddOrganizationMemberAlreadyExists(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := fmt.Sprintf(`{"email":"%s","role":"admin"}`, existingMember.Email)
 	req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/members", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -615,6 +626,7 @@ func TestUpdateOrganizationMember(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"role":"admin"}`
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/organizations/%s/members/%s", org.ID.String(), member.ID.String()), bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -669,6 +681,7 @@ func TestRemoveOrganizationMember(t *testing.T) {
 	handler := NewOrganizationHandler(pool, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/organizations/%s/members/%s", org.ID.String(), member.ID.String()), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,

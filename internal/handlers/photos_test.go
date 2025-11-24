@@ -13,6 +13,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/queue"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/dukerupert/aletheia/internal/validation"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -98,6 +99,7 @@ func TestAnalyzePhoto(t *testing.T) {
 	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := fmt.Sprintf(`{"photo_id":"%s"}`, uuid.UUID(photo.ID.Bytes).String())
 	req := httptest.NewRequest(http.MethodPost, "/api/photos/analyze", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -146,6 +148,7 @@ func TestAnalyzePhoto_InvalidPhotoID(t *testing.T) {
 	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	reqBody := `{"photo_id":"invalid-uuid"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/photos/analyze", bytes.NewBufferString(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -177,6 +180,7 @@ func TestAnalyzePhoto_PhotoNotFound(t *testing.T) {
 	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	nonExistentID := uuid.New()
 	reqBody := fmt.Sprintf(`{"photo_id":"%s"}`, nonExistentID.String())
 	req := httptest.NewRequest(http.MethodPost, "/api/photos/analyze", bytes.NewBufferString(reqBody))
@@ -238,6 +242,7 @@ func TestGetPhotoAnalysisStatus(t *testing.T) {
 	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/photos/analyze/"+job.ID.String(), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -273,6 +278,7 @@ func TestGetPhotoAnalysisStatus_InvalidJobID(t *testing.T) {
 	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	req := httptest.NewRequest(http.MethodGet, "/api/photos/analyze/invalid-uuid", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  session.SessionCookieName,
@@ -304,6 +310,7 @@ func TestGetPhotoAnalysisStatus_JobNotFound(t *testing.T) {
 	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
+	e.Validator = validation.NewValidator()
 	nonExistentJobID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/photos/analyze/"+nonExistentJobID.String(), nil)
 	req.AddCookie(&http.Cookie{
