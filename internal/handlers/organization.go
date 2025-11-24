@@ -7,6 +7,8 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -26,6 +28,49 @@ func NewOrganizationHandler(pool *pgxpool.Pool, logger *slog.Logger) *Organizati
 		pool:   pool,
 		logger: logger,
 	}
+}
+
+// requireOrganizationMembership checks if the user is a member and returns the membership.
+// If allowedRoles is provided, also checks that the user has one of those roles.
+// Returns the membership and any error encountered.
+func (h *OrganizationHandler) requireOrganizationMembership(
+	c echo.Context,
+	userID uuid.UUID,
+	orgUUID pgtype.UUID,
+	allowedRoles ...database.OrganizationRole,
+) (*database.OrganizationMember, error) {
+	queries := database.New(h.pool)
+
+	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
+		OrganizationID: orgUUID,
+		UserID:         uuidToPgUUID(userID),
+	})
+	if err != nil {
+		h.logger.Warn("user not authorized to access organization",
+			slog.String("user_id", userID.String()),
+			slog.String("org_id", orgUUID.String()))
+		return nil, echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
+	}
+
+	// Check role if specified
+	if len(allowedRoles) > 0 {
+		hasRole := false
+		for _, role := range allowedRoles {
+			if membership.Role == role {
+				hasRole = true
+				break
+			}
+		}
+		if !hasRole {
+			h.logger.Warn("user does not have required role",
+				slog.String("user_id", userID.String()),
+				slog.String("org_id", orgUUID.String()),
+				slog.String("user_role", string(membership.Role)))
+			return nil, echo.NewHTTPError(http.StatusForbidden, "insufficient permissions")
+		}
+	}
+
+	return &membership, nil
 }
 
 // CreateOrganizationRequest is the request payload for creating an organization
@@ -137,8 +182,6 @@ func (h *OrganizationHandler) GetOrganization(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "organization id is required")
 	}
 
-	queries := database.New(h.pool)
-
 	// Parse organization ID
 	orgUUID, err := parseUUID(orgID)
 	if err != nil {
@@ -146,18 +189,13 @@ func (h *OrganizationHandler) GetOrganization(c echo.Context) error {
 	}
 
 	// Check if user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = h.requireOrganizationMembership(c, userID, orgUUID)
 	if err != nil {
-		h.logger.Warn("user not authorized to access organization",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
+		return err
 	}
 
 	// Get organization
+	queries := database.New(h.pool)
 	org, err := queries.GetOrganization(c.Request().Context(), orgUUID)
 	if err != nil {
 		h.logger.Error("failed to get organization", slog.String("err", err.Error()))
@@ -250,8 +288,6 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	queries := database.New(h.pool)
-
 	// Parse organization ID
 	orgUUID, err := parseUUID(orgID)
 	if err != nil {
@@ -259,19 +295,9 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 	}
 
 	// Check if user is owner or admin
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
-		h.logger.Warn("user not authorized to update organization",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
-	}
-
-	if membership.Role != database.OrganizationRoleOwner && membership.Role != database.OrganizationRoleAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can update organization")
+		return err
 	}
 
 	// Validate that at least one field is being updated
@@ -294,6 +320,7 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 		Name: sanitizedName,
 	}
 
+	queries := database.New(h.pool)
 	org, err := queries.UpdateOrganization(c.Request().Context(), params)
 	if err != nil {
 		h.logger.Error("failed to update organization", slog.String("err", err.Error()))
@@ -323,31 +350,20 @@ func (h *OrganizationHandler) DeleteOrganization(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "organization id is required")
 	}
 
-	queries := database.New(h.pool)
-
 	// Parse organization ID
 	orgUUID, err := parseUUID(orgID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid organization id")
 	}
 
-	// Check if user is owner
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	// Check if user is owner (only owners can delete)
+	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner)
 	if err != nil {
-		h.logger.Warn("user not authorized to delete organization",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
-	}
-
-	if membership.Role != database.OrganizationRoleOwner {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners can delete organization")
+		return err
 	}
 
 	// Delete organization
+	queries := database.New(h.pool)
 	err = queries.DeleteOrganization(c.Request().Context(), orgUUID)
 	if err != nil {
 		h.logger.Error("failed to delete organization", slog.String("err", err.Error()))
@@ -385,8 +401,6 @@ func (h *OrganizationHandler) ListOrganizationMembers(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "organization id is required")
 	}
 
-	queries := database.New(h.pool)
-
 	// Parse organization ID
 	orgUUID, err := parseUUID(orgID)
 	if err != nil {
@@ -394,18 +408,13 @@ func (h *OrganizationHandler) ListOrganizationMembers(c echo.Context) error {
 	}
 
 	// Check if user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = h.requireOrganizationMembership(c, userID, orgUUID)
 	if err != nil {
-		h.logger.Warn("user not authorized to access organization members",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
+		return err
 	}
 
 	// Get organization members
+	queries := database.New(h.pool)
 	members, err := queries.ListOrganizationMembers(c.Request().Context(), orgUUID)
 	if err != nil {
 		h.logger.Error("failed to list organization members", slog.String("err", err.Error()))
@@ -469,8 +478,6 @@ func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "role is required")
 	}
 
-	queries := database.New(h.pool)
-
 	// Parse organization ID
 	orgUUID, err := parseUUID(orgID)
 	if err != nil {
@@ -478,22 +485,13 @@ func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
-		h.logger.Warn("user not authorized to add organization member",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
-	}
-
-	if membership.Role != database.OrganizationRoleOwner && membership.Role != database.OrganizationRoleAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can add members")
+		return err
 	}
 
 	// Find user by email
+	queries := database.New(h.pool)
 	targetUser, err := queries.GetUserByEmail(c.Request().Context(), req.Email)
 	if err != nil {
 		h.logger.Warn("user not found for organization invite", slog.String("email", req.Email))
@@ -580,8 +578,6 @@ func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "role is required")
 	}
 
-	queries := database.New(h.pool)
-
 	// Parse IDs
 	orgUUID, err := parseUUID(orgID)
 	if err != nil {
@@ -594,22 +590,13 @@ func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	requesterMembership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
-		h.logger.Warn("user not authorized to update organization member",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
-	}
-
-	if requesterMembership.Role != database.OrganizationRoleOwner && requesterMembership.Role != database.OrganizationRoleAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can update member roles")
+		return err
 	}
 
 	// Get the member being updated
+	queries := database.New(h.pool)
 	targetMember, err := queries.GetOrganizationMember(c.Request().Context(), memberUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "member not found")
@@ -672,8 +659,6 @@ func (h *OrganizationHandler) RemoveOrganizationMember(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "organization id and member id are required")
 	}
 
-	queries := database.New(h.pool)
-
 	// Parse IDs
 	orgUUID, err := parseUUID(orgID)
 	if err != nil {
@@ -686,22 +671,13 @@ func (h *OrganizationHandler) RemoveOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	requesterMembership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
-		h.logger.Warn("user not authorized to remove organization member",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
-	}
-
-	if requesterMembership.Role != database.OrganizationRoleOwner && requesterMembership.Role != database.OrganizationRoleAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can remove members")
+		return err
 	}
 
 	// Get the member being removed
+	queries := database.New(h.pool)
 	targetMember, err := queries.GetOrganizationMember(c.Request().Context(), memberUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "member not found")
