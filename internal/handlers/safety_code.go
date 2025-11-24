@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -44,6 +45,10 @@ type SafetyCodeResponse struct {
 
 // CreateSafetyCode creates a new safety code
 func (h *SafetyCodeHandler) CreateSafetyCode(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	_, ok := session.GetUserID(c)
 	if !ok {
@@ -76,7 +81,7 @@ func (h *SafetyCodeHandler) CreateSafetyCode(c echo.Context) error {
 	}
 
 	// Create safety code
-	safetyCode, err := queries.CreateSafetyCode(c.Request().Context(), database.CreateSafetyCodeParams{
+	safetyCode, err := queries.CreateSafetyCode(ctx, database.CreateSafetyCodeParams{
 		Code:          req.Code,
 		Description:   req.Description,
 		Country:       country,
@@ -96,6 +101,10 @@ func (h *SafetyCodeHandler) CreateSafetyCode(c echo.Context) error {
 
 // GetSafetyCode retrieves a safety code by ID
 func (h *SafetyCodeHandler) GetSafetyCode(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	_, ok := session.GetUserID(c)
 	if !ok {
@@ -117,7 +126,7 @@ func (h *SafetyCodeHandler) GetSafetyCode(c echo.Context) error {
 	}
 
 	// Get safety code
-	safetyCode, err := queries.GetSafetyCode(c.Request().Context(), safetyCodeUUID)
+	safetyCode, err := queries.GetSafetyCode(ctx, safetyCodeUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
 	}
@@ -132,6 +141,10 @@ type ListSafetyCodesResponse struct {
 
 // ListSafetyCodes lists all safety codes with optional filtering
 func (h *SafetyCodeHandler) ListSafetyCodes(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	_, ok := session.GetUserID(c)
 	if !ok {
@@ -150,13 +163,13 @@ func (h *SafetyCodeHandler) ListSafetyCodes(c echo.Context) error {
 
 	if country != "" {
 		// Filter by country
-		safetyCodes, err = queries.ListSafetyCodesByCountry(c.Request().Context(), pgtype.Text{String: country, Valid: true})
+		safetyCodes, err = queries.ListSafetyCodesByCountry(ctx, pgtype.Text{String: country, Valid: true})
 	} else if stateProvince != "" {
 		// Filter by state/province
-		safetyCodes, err = queries.ListSafetyCodesByStateProvince(c.Request().Context(), pgtype.Text{String: stateProvince, Valid: true})
+		safetyCodes, err = queries.ListSafetyCodesByStateProvince(ctx, pgtype.Text{String: stateProvince, Valid: true})
 	} else {
 		// List all
-		safetyCodes, err = queries.ListSafetyCodes(c.Request().Context())
+		safetyCodes, err = queries.ListSafetyCodes(ctx)
 	}
 
 	if err != nil {
@@ -184,6 +197,10 @@ type UpdateSafetyCodeRequest struct {
 
 // UpdateSafetyCode updates an existing safety code
 func (h *SafetyCodeHandler) UpdateSafetyCode(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	_, ok := session.GetUserID(c)
 	if !ok {
@@ -210,7 +227,7 @@ func (h *SafetyCodeHandler) UpdateSafetyCode(c echo.Context) error {
 	}
 
 	// Get existing safety code to use as base values
-	existingSafetyCode, err := queries.GetSafetyCode(c.Request().Context(), safetyCodeUUID)
+	existingSafetyCode, err := queries.GetSafetyCode(ctx, safetyCodeUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
 	}
@@ -237,7 +254,7 @@ func (h *SafetyCodeHandler) UpdateSafetyCode(c echo.Context) error {
 	}
 
 	// Update safety code
-	safetyCode, err := queries.UpdateSafetyCode(c.Request().Context(), database.UpdateSafetyCodeParams{
+	safetyCode, err := queries.UpdateSafetyCode(ctx, database.UpdateSafetyCodeParams{
 		ID:            safetyCodeUUID,
 		Code:          code,
 		Description:   description,
@@ -257,6 +274,10 @@ func (h *SafetyCodeHandler) UpdateSafetyCode(c echo.Context) error {
 
 // DeleteSafetyCode deletes a safety code by ID
 func (h *SafetyCodeHandler) DeleteSafetyCode(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	_, ok := session.GetUserID(c)
 	if !ok {
@@ -278,13 +299,13 @@ func (h *SafetyCodeHandler) DeleteSafetyCode(c echo.Context) error {
 	}
 
 	// Check if safety code exists
-	_, err = queries.GetSafetyCode(c.Request().Context(), safetyCodeUUID)
+	_, err = queries.GetSafetyCode(ctx, safetyCodeUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
 	}
 
 	// Delete safety code
-	if err := queries.DeleteSafetyCode(c.Request().Context(), safetyCodeUUID); err != nil {
+	if err := queries.DeleteSafetyCode(ctx, safetyCodeUUID); err != nil {
 		h.logger.Error("failed to delete safety code", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete safety code")
 	}

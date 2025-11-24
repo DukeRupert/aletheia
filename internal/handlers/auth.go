@@ -166,7 +166,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	// Save verification token to database
-	if err := queries.SetVerificationToken(c.Request().Context(), database.SetVerificationTokenParams{
+	if err := queries.SetVerificationToken(ctx, database.SetVerificationTokenParams{
 		ID:                user.ID,
 		VerificationToken: pgtype.Text{String: verificationToken, Valid: true},
 	}); err != nil {
@@ -317,6 +317,10 @@ func (h *AuthHandler) Login(c echo.Context) error {
 
 // Logout handles user logout
 func (h *AuthHandler) Logout(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Try to get user ID from session context for logging
 	userID, hasUserID := session.GetUserID(c)
 
@@ -332,7 +336,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	}
 
 	// Delete session from database
-	if err := session.DestroySession(c.Request().Context(), h.db, cookie.Value); err != nil {
+	if err := session.DestroySession(ctx, h.db, cookie.Value); err != nil{
 		h.logger.Error("failed to destroy session", slog.String("err", err.Error()))
 		// Continue to clear cookie even if database delete fails
 	}
@@ -418,6 +422,10 @@ type UpdateProfileResponse struct {
 
 // UpdateProfile updates the current user's profile information
 func (h *AuthHandler) UpdateProfile(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user ID from context (set by session middleware)
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -443,7 +451,7 @@ func (h *AuthHandler) UpdateProfile(c echo.Context) error {
 	}
 
 	// Update user
-	user, err := queries.UpdateUser(c.Request().Context(), database.UpdateUserParams{
+	user, err := queries.UpdateUser(ctx, database.UpdateUserParams{
 		ID:        pgtype.UUID{Bytes: userID, Valid: true},
 		FirstName: firstName,
 		LastName:  lastName,
@@ -481,6 +489,10 @@ type VerifyEmailRequest struct {
 
 // VerifyEmail verifies a user's email address using the verification token
 func (h *AuthHandler) VerifyEmail(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	var req VerifyEmailRequest
 	if err := c.Bind(&req); err != nil {
 		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
@@ -494,7 +506,7 @@ func (h *AuthHandler) VerifyEmail(c echo.Context) error {
 	queries := database.New(h.db)
 
 	// Find user by verification token
-	user, err := queries.GetUserByVerificationToken(c.Request().Context(), pgtype.Text{
+	user, err := queries.GetUserByVerificationToken(ctx, pgtype.Text{
 		String: req.Token,
 		Valid:  true,
 	})
@@ -508,7 +520,7 @@ func (h *AuthHandler) VerifyEmail(c echo.Context) error {
 	}
 
 	// Verify the user's email
-	verifiedUser, err := queries.VerifyUserEmail(c.Request().Context(), user.ID)
+	verifiedUser, err := queries.VerifyUserEmail(ctx, user.ID)
 	if err != nil {
 		h.logger.Error("failed to verify user email", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "verification failed")
@@ -547,6 +559,10 @@ type ResendVerificationRequest struct {
 
 // ResendVerification resends the verification email to a user
 func (h *AuthHandler) ResendVerification(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	var req ResendVerificationRequest
 	if err := c.Bind(&req); err != nil {
 		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
@@ -560,7 +576,7 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 	queries := database.New(h.db)
 
 	// Get user by email
-	user, err := queries.GetUserByEmail(c.Request().Context(), req.Email)
+	user, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			// Don't reveal if email exists or not for security
@@ -592,7 +608,7 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 	}
 
 	// Save verification token to database
-	if err := queries.SetVerificationToken(c.Request().Context(), database.SetVerificationTokenParams{
+	if err := queries.SetVerificationToken(ctx, database.SetVerificationTokenParams{
 		ID:                user.ID,
 		VerificationToken: pgtype.Text{String: verificationToken, Valid: true},
 	}); err != nil {
@@ -736,6 +752,10 @@ type VerifyResetTokenRequest struct {
 
 // VerifyResetToken verifies that a password reset token is valid
 func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	var req VerifyResetTokenRequest
 	if err := c.Bind(&req); err != nil {
 		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
@@ -749,7 +769,7 @@ func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
 	queries := database.New(h.db)
 
 	// Find user by reset token
-	user, err := queries.GetUserByResetToken(c.Request().Context(), pgtype.Text{
+	user, err := queries.GetUserByResetToken(ctx, pgtype.Text{
 		String: req.Token,
 		Valid:  true,
 	})
@@ -790,6 +810,10 @@ type ResetPasswordRequest struct {
 
 // ResetPassword resets a user's password using a valid reset token
 func (h *AuthHandler) ResetPassword(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	var req ResetPasswordRequest
 	if err := c.Bind(&req); err != nil {
 		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
@@ -808,7 +832,7 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 	queries := database.New(h.db)
 
 	// Find user by reset token
-	user, err := queries.GetUserByResetToken(c.Request().Context(), pgtype.Text{
+	user, err := queries.GetUserByResetToken(ctx, pgtype.Text{
 		String: req.Token,
 		Valid:  true,
 	})
@@ -839,7 +863,7 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 	}
 
 	// Reset password and clear reset token
-	updatedUser, err := queries.ResetUserPassword(c.Request().Context(), database.ResetUserPasswordParams{
+	updatedUser, err := queries.ResetUserPassword(ctx, database.ResetUserPasswordParams{
 		ID:           user.ID,
 		PasswordHash: passwordHash,
 	})
@@ -849,7 +873,7 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 	}
 
 	// Invalidate all existing sessions for security
-	if err := queries.DeleteUserSessions(c.Request().Context(), user.ID); err != nil {
+	if err := queries.DeleteUserSessions(ctx, user.ID); err != nil{
 		// Log but don't fail - password was already reset
 		h.logger.Warn("failed to invalidate sessions after password reset",
 			slog.String("user_id", user.ID.String()),
