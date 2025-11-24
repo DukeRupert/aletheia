@@ -7,15 +7,8 @@ import (
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
-)
-
-const (
-	// RFC3339Format is the date/time format used for API responses
-	RFC3339Format = "2006-01-02T15:04:05Z07:00"
 )
 
 type OrganizationHandler struct {
@@ -30,48 +23,6 @@ func NewOrganizationHandler(pool *pgxpool.Pool, logger *slog.Logger) *Organizati
 	}
 }
 
-// requireOrganizationMembership checks if the user is a member and returns the membership.
-// If allowedRoles is provided, also checks that the user has one of those roles.
-// Returns the membership and any error encountered.
-func (h *OrganizationHandler) requireOrganizationMembership(
-	c echo.Context,
-	userID uuid.UUID,
-	orgUUID pgtype.UUID,
-	allowedRoles ...database.OrganizationRole,
-) (*database.OrganizationMember, error) {
-	queries := database.New(h.pool)
-
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
-	if err != nil {
-		h.logger.Warn("user not authorized to access organization",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgUUID.String()))
-		return nil, echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
-	}
-
-	// Check role if specified
-	if len(allowedRoles) > 0 {
-		hasRole := false
-		for _, role := range allowedRoles {
-			if membership.Role == role {
-				hasRole = true
-				break
-			}
-		}
-		if !hasRole {
-			h.logger.Warn("user does not have required role",
-				slog.String("user_id", userID.String()),
-				slog.String("org_id", orgUUID.String()),
-				slog.String("user_role", string(membership.Role)))
-			return nil, echo.NewHTTPError(http.StatusForbidden, "insufficient permissions")
-		}
-	}
-
-	return &membership, nil
-}
 
 // CreateOrganizationRequest is the request payload for creating an organization
 type CreateOrganizationRequest struct {
@@ -189,7 +140,7 @@ func (h *OrganizationHandler) GetOrganization(c echo.Context) error {
 	}
 
 	// Check if user is a member of the organization
-	_, err = h.requireOrganizationMembership(c, userID, orgUUID)
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID)
 	if err != nil {
 		return err
 	}
@@ -295,7 +246,7 @@ func (h *OrganizationHandler) UpdateOrganization(c echo.Context) error {
 	}
 
 	// Check if user is owner or admin
-	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
@@ -357,7 +308,7 @@ func (h *OrganizationHandler) DeleteOrganization(c echo.Context) error {
 	}
 
 	// Check if user is owner (only owners can delete)
-	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner)
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner)
 	if err != nil {
 		return err
 	}
@@ -408,7 +359,7 @@ func (h *OrganizationHandler) ListOrganizationMembers(c echo.Context) error {
 	}
 
 	// Check if user is a member of the organization
-	_, err = h.requireOrganizationMembership(c, userID, orgUUID)
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID)
 	if err != nil {
 		return err
 	}
@@ -485,7 +436,7 @@ func (h *OrganizationHandler) AddOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
@@ -590,7 +541,7 @@ func (h *OrganizationHandler) UpdateOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
@@ -671,7 +622,7 @@ func (h *OrganizationHandler) RemoveOrganizationMember(c echo.Context) error {
 	}
 
 	// Check if requester is owner or admin
-	_, err = h.requireOrganizationMembership(c, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
