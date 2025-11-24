@@ -76,13 +76,29 @@ jobs:
 
       - name: Run tests
         env:
+          # Database Configuration
           DB_USER: postgres
           DB_PASSWORD: postgres
           DB_HOSTNAME: localhost
           DB_PORT: 5432
           DB_NAME: aletheia_test
+          # Authentication
           JWT_SECRET: test-secret-for-ci
+          # Server Configuration
+          SERVER_HOST: localhost
+          SERVER_PORT: 1323
           ENVIRONMENT: dev
+          LOG_LEVEL: info
+          # Service Providers (use mocks for CI)
+          EMAIL_PROVIDER: mock
+          EMAIL_FROM_ADDRESS: test@example.com
+          EMAIL_FROM_NAME: Aletheia Test
+          EMAIL_VERIFY_BASE_URL: http://localhost:1323
+          STORAGE_PROVIDER: local
+          STORAGE_LOCAL_PATH: ./uploads
+          STORAGE_LOCAL_URL: http://localhost:1323/uploads
+          AI_PROVIDER: mock
+          QUEUE_PROVIDER: postgres
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
