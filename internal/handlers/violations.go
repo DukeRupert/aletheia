@@ -461,7 +461,7 @@ func (h *ViolationHandler) ConfirmViolation(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to confirm violation",
 			slog.String("violation_id", violationIDStr),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to confirm violation")
 	}
@@ -550,7 +550,7 @@ func (h *ViolationHandler) DismissViolation(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to dismiss violation",
 			slog.String("violation_id", violationIDStr),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to dismiss violation")
 	}

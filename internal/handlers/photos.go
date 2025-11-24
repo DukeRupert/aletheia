@@ -84,7 +84,7 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to parse photo_id",
 			slog.String("photo_id_raw", req.PhotoID),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid photo_id format")
 	}
@@ -94,7 +94,7 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("photo not found",
 			slog.String("photo_id", photoID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Photo not found")
 	}
@@ -104,7 +104,7 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("inspection not found",
 			slog.String("inspection_id", photo.InspectionID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Inspection not found")
 	}
@@ -114,7 +114,7 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("project not found",
 			slog.String("project_id", inspection.ProjectID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Project not found")
 	}
@@ -161,7 +161,7 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to enqueue photo analysis job",
 			slog.String("photo_id", photoID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to enqueue analysis job")
 	}
@@ -233,7 +233,7 @@ func (h *PhotoHandler) GetPhotoAnalysisStatus(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("job not found",
 			slog.String("job_id", jobID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Job not found")
 	}
@@ -259,7 +259,7 @@ func (h *PhotoHandler) GetPhotoAnalysisStatus(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("inspection not found",
 			slog.String("inspection_id", photo.InspectionID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Inspection not found")
 	}
@@ -269,7 +269,7 @@ func (h *PhotoHandler) GetPhotoAnalysisStatus(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("project not found",
 			slog.String("project_id", inspection.ProjectID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Project not found")
 	}
@@ -346,7 +346,7 @@ func (h *PhotoHandler) GetPhotoAnalysisStatus(c echo.Context) error {
 		if err != nil {
 			h.logger.Error("failed to list violations",
 				slog.String("photo_id", photoID.String()),
-				slog.String("error", err.Error()),
+				slog.String("err", err.Error()),
 			)
 			violations = []database.DetectedViolation{}
 		}

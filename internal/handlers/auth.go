@@ -20,15 +20,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const (
-	// dbTimeout is the maximum time to wait for database operations
-	dbTimeout = 5 * time.Second
-)
-
-// withDBTimeout creates a context with timeout for database operations
-func withDBTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, dbTimeout)
-}
 
 type AuthHandler struct {
 	db           *pgxpool.Pool
@@ -139,7 +130,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	// Create user with timeout
-	ctx, cancel := withDBTimeout(c.Request().Context())
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
 	defer cancel()
 
 	user, err := queries.CreateUser(ctx, database.CreateUserParams{
@@ -238,7 +229,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Get user by email with timeout
-	ctx, cancel := withDBTimeout(c.Request().Context())
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
 	defer cancel()
 
 	queries := database.New(h.db)
@@ -380,6 +371,10 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 
 // Me returns the current authenticated user's information
 func (h *AuthHandler) Me(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user ID from context (set by session middleware)
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -388,7 +383,7 @@ func (h *AuthHandler) Me(c echo.Context) error {
 
 	// Get user from database
 	queries := database.New(h.db)
-	user, err := queries.GetUser(c.Request().Context(), pgtype.UUID{
+	user, err := queries.GetUser(ctx, pgtype.UUID{
 		Bytes: userID,
 		Valid: true,
 	})
@@ -643,7 +638,7 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 	queries := database.New(h.db)
 
 	// Get user by email with timeout
-	ctx, cancel := withDBTimeout(c.Request().Context())
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
 	defer cancel()
 
 	user, err := queries.GetUserByEmail(ctx, req.Email)
@@ -858,7 +853,7 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 		// Log but don't fail - password was already reset
 		h.logger.Warn("failed to invalidate sessions after password reset",
 			slog.String("user_id", user.ID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 	}
 

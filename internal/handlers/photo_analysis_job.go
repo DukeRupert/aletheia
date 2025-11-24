@@ -154,7 +154,7 @@ func (h *PhotoAnalysisJobHandler) Handle(ctx context.Context, job *queue.Job) (m
 	if err != nil {
 		h.logger.Warn("failed to delete pending/dismissed violations before re-analysis",
 			slog.String("photo_id", photoID.String()),
-			slog.String("error", err.Error()),
+			slog.String("err", err.Error()),
 		)
 		// Don't fail the job, continue with creating new violations
 	} else {
@@ -196,7 +196,7 @@ func (h *PhotoAnalysisJobHandler) Handle(ctx context.Context, job *queue.Job) (m
 		if err != nil {
 			h.logger.Error("failed to create detected violation",
 				slog.String("photo_id", photoID.String()),
-				slog.String("error", err.Error()),
+				slog.String("err", err.Error()),
 			)
 			continue
 		}

@@ -56,7 +56,7 @@ func requireOrganizationMembership(
 		logger.Warn("authorization check failed",
 			slog.String("user_id", userID.String()),
 			slog.String("org_id", orgID.String()),
-			slog.String("error", err.Error()))
+			slog.String("err", err.Error()))
 		return nil, echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
 	}
 

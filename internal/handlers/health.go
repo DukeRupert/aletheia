@@ -88,7 +88,7 @@ func (h *HealthHandler) ReadinessCheck(c echo.Context) error {
 	if err := h.db.Ping(ctx); err != nil {
 		checks["database"] = "failed: " + err.Error()
 		healthy = false
-		h.logger.Error("database health check failed", slog.String("error", err.Error()))
+		h.logger.Error("database health check failed", slog.String("err", err.Error()))
 	} else {
 		checks["database"] = "ok"
 	}
@@ -189,7 +189,7 @@ func (h *HealthHandler) DetailedHealthCheck(c echo.Context) error {
 	// Check database connectivity
 	if err := h.db.Ping(ctx); err != nil {
 		databaseInfo["status"] = "failed: " + err.Error()
-		h.logger.Error("database ping failed in detailed health check", slog.String("error", err.Error()))
+		h.logger.Error("database ping failed in detailed health check", slog.String("err", err.Error()))
 	}
 
 	// Collect queue statistics
@@ -202,7 +202,7 @@ func (h *HealthHandler) DetailedHealthCheck(c echo.Context) error {
 		stats, err := h.queue.GetQueueStats(ctx, "photo_analysis")
 		if err != nil {
 			queueInfo["status"] = "failed: " + err.Error()
-			h.logger.Error("failed to get queue stats", slog.String("error", err.Error()))
+			h.logger.Error("failed to get queue stats", slog.String("err", err.Error()))
 		} else {
 			queueInfo["pending_jobs"] = stats.PendingJobs
 			queueInfo["processing_jobs"] = stats.ProcessingJobs
