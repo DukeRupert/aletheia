@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -10,6 +11,7 @@ import (
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -70,7 +72,7 @@ func (h *ViolationHandler) ListViolationsByInspection(c echo.Context) error {
 	// Authorization: verify user has access to this inspection's organization
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("endpoint", "ListViolationsByInspection"))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -104,8 +106,7 @@ func (h *ViolationHandler) ListViolationsByInspection(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to list violations",
 			slog.String("inspection_id", inspectionID.String()),
-			slog.String("error", err.Error()),
-		)
+			slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to retrieve violations")
 	}
 
@@ -169,17 +170,19 @@ func (h *ViolationHandler) GetViolation(c echo.Context) error {
 
 	violation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
 	if err != nil {
-		h.logger.Error("violation not found",
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "violation not found")
+		}
+		h.logger.Error("failed to get violation",
 			slog.String("violation_id", violationID.String()),
-			slog.String("error", err.Error()),
-		)
-		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get violation")
 	}
 
 	// Authorization: verify user has access to this violation's organization
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("violation_id", violationID.String()))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -252,17 +255,19 @@ func (h *ViolationHandler) UpdateViolation(c echo.Context) error {
 	// Get violation first to check authorization
 	violation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
 	if err != nil {
-		h.logger.Error("violation not found",
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "violation not found")
+		}
+		h.logger.Error("failed to get violation",
 			slog.String("violation_id", violationID.String()),
-			slog.String("error", err.Error()),
-		)
-		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get violation")
 	}
 
 	// Authorization: verify user has access to this violation's organization
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("violation_id", violationID.String()))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -306,8 +311,7 @@ func (h *ViolationHandler) UpdateViolation(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to update violation",
 			slog.String("violation_id", violationID.String()),
-			slog.String("error", err.Error()),
-		)
+			slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to update violation")
 	}
 
@@ -367,17 +371,19 @@ func (h *ViolationHandler) DeleteViolation(c echo.Context) error {
 	// Get violation first to check authorization
 	violation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
 	if err != nil {
-		h.logger.Error("violation not found",
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "violation not found")
+		}
+		h.logger.Error("failed to get violation",
 			slog.String("violation_id", violationID.String()),
-			slog.String("error", err.Error()),
-		)
-		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get violation")
 	}
 
 	// Authorization: verify user has access to this violation's organization
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("violation_id", violationID.String()))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -395,8 +401,7 @@ func (h *ViolationHandler) DeleteViolation(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to delete violation",
 			slog.String("violation_id", violationID.String()),
-			slog.String("error", err.Error()),
-		)
+			slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to delete violation")
 	}
 
@@ -422,17 +427,19 @@ func (h *ViolationHandler) ConfirmViolation(c echo.Context) error {
 	// Get violation first to check authorization
 	existingViolation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
 	if err != nil {
-		h.logger.Error("violation not found",
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "violation not found")
+		}
+		h.logger.Error("failed to get violation",
 			slog.String("violation_id", violationID.String()),
-			slog.String("error", err.Error()),
-		)
-		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get violation")
 	}
 
 	// Authorization: verify user has access to this violation's organization
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("violation_id", violationID.String()))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -509,17 +516,19 @@ func (h *ViolationHandler) DismissViolation(c echo.Context) error {
 	// Get violation first to check authorization
 	existingViolation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
 	if err != nil {
-		h.logger.Error("violation not found",
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "violation not found")
+		}
+		h.logger.Error("failed to get violation",
 			slog.String("violation_id", violationID.String()),
-			slog.String("error", err.Error()),
-		)
-		return echo.NewHTTPError(http.StatusNotFound, "Violation not found")
+			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get violation")
 	}
 
 	// Authorization: verify user has access to this violation's organization
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("violation_id", violationID.String()))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -802,7 +811,7 @@ func (h *ViolationHandler) CreateManualViolation(c echo.Context) error {
 	// Authorization: verify user has access to this photo's organization
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("endpoint", "CreateManualViolation"))
 		if c.Request().Header.Get("HX-Request") == "true" {
 			return c.HTML(http.StatusUnauthorized, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Unauthorized</div>`)
 		}
@@ -869,7 +878,7 @@ func (h *ViolationHandler) CreateManualViolation(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to create manual violation",
 			slog.String("photo_id", photoID.String()),
-			slog.String("error", err.Error()))
+			slog.String("err", err.Error()))
 		if c.Request().Header.Get("HX-Request") == "true" {
 			return c.HTML(http.StatusInternalServerError, `<div style="padding: var(--space-sm); background: #fef2f2; border-radius: 4px; color: #dc2626; font-size: 0.875rem;">Failed to create violation. Please try again.</div>`)
 		}

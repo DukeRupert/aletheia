@@ -48,7 +48,7 @@ func (h *InspectionHandler) CreateInspection(c echo.Context) error {
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("endpoint", "CreateInspection"))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -58,8 +58,8 @@ func (h *InspectionHandler) CreateInspection(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.ProjectID == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "project_id is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.pool)
@@ -138,7 +138,7 @@ func (h *InspectionHandler) GetInspection(c echo.Context) error {
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("endpoint", "GetInspection"))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -213,7 +213,7 @@ func (h *InspectionHandler) ListInspections(c echo.Context) error {
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("endpoint", "ListInspections"))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -290,7 +290,7 @@ func (h *InspectionHandler) UpdateInspectionStatus(c echo.Context) error {
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
-		h.logger.Error("failed to get user from session")
+		h.logger.Error("failed to get user from session", slog.String("endpoint", "UpdateInspectionStatus"))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 
@@ -305,8 +305,8 @@ func (h *InspectionHandler) UpdateInspectionStatus(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Status == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "status is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.pool)
