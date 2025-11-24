@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dukerupert/aletheia/internal/ai"
+	"github.com/dukerupert/aletheia/internal/audit"
 	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/email"
@@ -176,6 +177,31 @@ func main() {
 	sessionCache := session.NewSessionCache(pool)
 	logger.Info("session cache initialized", slog.Int("ttl_minutes", 5))
 
+	// Initialize audit logger for compliance and security tracking
+	logger.Debug("initializing audit logger")
+	auditLogger := audit.NewAuditLogger(pool, logger)
+	logger.Info("audit logger initialized")
+
+	// TODO: Uncomment to enable scheduled audit log cleanup (runs daily at 2 AM)
+	// Retention period: 2555 days (7 years - common compliance requirement)
+	// go func() {
+	// 	ticker := time.NewTicker(24 * time.Hour)
+	// 	defer ticker.Stop()
+	// 	for range ticker.C {
+	// 		// Run cleanup at 2 AM
+	// 		now := time.Now()
+	// 		if now.Hour() == 2 {
+	// 			ctx := context.Background()
+	// 			deleted, err := auditLogger.CleanupOldAuditLogs(ctx, 2555)
+	// 			if err != nil {
+	// 				logger.Error("audit log cleanup failed", slog.String("error", err.Error()))
+	// 			} else {
+	// 				logger.Info("audit log cleanup completed", slog.Int64("deleted", deleted))
+	// 			}
+	// 		}
+	// 	}
+	// }()
+
 	logger.Debug("initializing Echo web server")
 	e := echo.New()
 	e.Renderer = renderer
@@ -227,6 +253,24 @@ func main() {
 	queries := database.New(pool)
 	pageHandler := handlers.NewPageHandler(pool, logger)
 	uploadHandler := handlers.NewUploadHandler(fileStorage, pool, logger)
+
+	// TODO: Pass auditLogger to handlers that need audit logging
+	// These handlers perform state-changing operations and should log:
+	// - authHandler: user registration, login, logout, password changes
+	// - orgHandler: organization CRUD, member management
+	// - projectHandler: project CRUD
+	// - inspectionHandler: inspection CRUD, status changes
+	// - safetyCodeHandler: safety code CRUD
+	// - photoHandler: photo uploads, deletions
+	// - violationHandler: violation confirmations, dismissals, manual creation
+	//
+	// Example updated constructor:
+	//   authHandler := handlers.NewAuthHandler(pool, logger, emailService, auditLogger)
+	//
+	// Then in handler methods, log audit entries:
+	//   auditLogger.LogCreate(ctx, userID, orgID, "user", user.ID,
+	//       map[string]interface{}{"email": user.Email}, c)
+
 	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
 	orgHandler := handlers.NewOrganizationHandler(pool, logger)
 	projectHandler := handlers.NewProjectHandler(pool, logger)
@@ -235,6 +279,10 @@ func main() {
 	photoHandler := handlers.NewPhotoHandler(queries, queueService, logger)
 	violationHandler := handlers.NewViolationHandler(queries, logger)
 	healthHandler := handlers.NewHealthHandler(pool, fileStorage, queueService, logger)
+
+	// Suppress unused variable warning until audit logging is integrated
+	_ = auditLogger
+
 	logger.Info("all handlers initialized")
 
 	// Register queue job handlers

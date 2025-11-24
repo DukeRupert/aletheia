@@ -20,3 +20,188 @@ fileStorage := storage.NewS3Storage(
     "https://cdn.myapp.com", // CloudFront URL
 )
 ```
+
+## Audit Logging
+
+The audit logging system is implemented but not yet integrated into handlers. Here's how to enable it:
+
+### 1. Enable Scheduled Cleanup Job
+
+In `cmd/main.go` (lines 185-203), uncomment the cleanup job:
+
+```go
+// Uncomment this block to enable daily cleanup at 2 AM
+go func() {
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		now := time.Now()
+		if now.Hour() == 2 {
+			ctx := context.Background()
+			deleted, err := auditLogger.CleanupOldAuditLogs(ctx, 2555)
+			if err != nil {
+				logger.Error("audit log cleanup failed", slog.String("error", err.Error()))
+			} else {
+				logger.Info("audit log cleanup completed", slog.Int64("deleted", deleted))
+			}
+		}
+	}
+}()
+```
+
+**Retention period**: 2555 days (7 years) - common compliance requirement
+
+### 2. Update Handler Constructors
+
+Add `auditLogger` parameter to handlers that need audit logging:
+
+**Example for AuthHandler:**
+
+```go
+// Before
+authHandler := handlers.NewAuthHandler(pool, logger, emailService)
+
+// After
+authHandler := handlers.NewAuthHandler(pool, logger, emailService, auditLogger)
+```
+
+**Handlers that need audit logging:**
+- `authHandler` - user registration, login, logout, password changes
+- `orgHandler` - organization CRUD, member management
+- `projectHandler` - project CRUD
+- `inspectionHandler` - inspection CRUD, status changes
+- `safetyCodeHandler` - safety code CRUD
+- `photoHandler` - photo uploads, deletions
+- `violationHandler` - violation confirmations, dismissals, manual creation
+
+### 3. Update Handler Structs
+
+Add `auditLogger` field to handler structs:
+
+```go
+type AuthHandler struct {
+	db          *pgxpool.Pool
+	logger      *slog.Logger
+	emailService email.EmailService
+	auditLogger *audit.AuditLogger  // Add this field
+}
+
+func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger, emailService email.EmailService, auditLogger *audit.AuditLogger) *AuthHandler {
+	return &AuthHandler{
+		db:          db,
+		logger:      logger,
+		emailService: emailService,
+		auditLogger: auditLogger,  // Store the audit logger
+	}
+}
+```
+
+### 4. Add Audit Logging Calls in Handler Methods
+
+**After creating a resource:**
+
+```go
+// In Register handler after creating user
+auditLogger.LogCreate(ctx, user.ID, orgID, "user", user.ID,
+	map[string]interface{}{
+		"email": user.Email,
+		"username": user.Username,
+	}, c)
+```
+
+**Before and after updates:**
+
+```go
+// In UpdateInspection handler
+// Get old values before update
+oldInspection, _ := queries.GetInspection(ctx, inspectionID)
+
+// Perform update
+newInspection := updateInspection(...)
+
+// Log the update
+auditLogger.LogUpdate(ctx, userID, orgID, "inspection", inspectionID,
+	map[string]interface{}{
+		"status": oldInspection.Status,
+		"title": oldInspection.Title,
+	},
+	map[string]interface{}{
+		"status": newInspection.Status,
+		"title": newInspection.Title,
+	}, c)
+```
+
+**Before deletions:**
+
+```go
+// In DeleteProject handler
+// Get values before deletion
+project, _ := queries.GetProject(ctx, projectID)
+
+// Delete the project
+queries.DeleteProject(ctx, projectID)
+
+// Log the deletion
+auditLogger.LogDelete(ctx, userID, orgID, "project", projectID,
+	map[string]interface{}{
+		"name": project.Name,
+		"status": project.Status,
+	}, c)
+```
+
+**For sensitive data access:**
+
+```go
+// In GetReport handler (for compliance)
+auditLogger.LogView(ctx, userID, orgID, "report", reportID, c)
+```
+
+### 5. Viewing Audit Logs
+
+**Query user activity:**
+
+```go
+entries, err := auditLogger.GetUserAuditLog(ctx, userID, 50, 0)
+```
+
+**Query resource history:**
+
+```go
+entries, err := auditLogger.GetResourceAuditLog(ctx, "inspection", inspectionID, 50, 0)
+```
+
+**Search with filters:**
+
+```go
+filter := audit.AuditFilter{
+	OrganizationID: &orgID,
+	Action: ptr("create"),
+	StartTime: &startTime,
+	EndTime: &endTime,
+	Limit: 100,
+}
+entries, err := auditLogger.SearchAuditLog(ctx, filter)
+```
+
+**Export for compliance:**
+
+```go
+var buf bytes.Buffer
+err := auditLogger.ExportAuditLog(ctx, filter, &buf)
+// buf now contains CSV data for regulators
+```
+
+### 6. Remove Unused Variable Suppression
+
+In `cmd/main.go` (line 284), remove this line once audit logging is integrated:
+
+```go
+_ = auditLogger  // Delete this line
+```
+
+### Benefits
+
+- **Compliance**: Meets OSHA, insurance, and legal audit requirements
+- **Security**: Track all state changes and detect unauthorized access
+- **Forensics**: Complete history for investigations and rollback
+- **Accountability**: Know who did what, when, and from where
