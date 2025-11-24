@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -59,12 +61,8 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.OrganizationID == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "organization_id is required")
-	}
-
-	if req.Name == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "project name is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.pool)
@@ -76,19 +74,9 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 	}
 
 	// Verify user is owner or admin of the organization
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
-		h.logger.Warn("user not authorized to create project in organization",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", req.OrganizationID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
-	}
-
-	if membership.Role != database.OrganizationRoleOwner && membership.Role != database.OrganizationRoleAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can create projects")
+		return err
 	}
 
 	// Set default country if not provided
@@ -131,7 +119,7 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 		ID:             project.ID.String(),
 		OrganizationID: project.OrganizationID.String(),
 		Name:           project.Name,
-		CreatedAt:      project.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:      project.CreatedAt.Time.Format(RFC3339Format),
 	})
 }
 
@@ -169,28 +157,25 @@ func (h *ProjectHandler) GetProject(c echo.Context) error {
 	// Get project
 	project, err := queries.GetProject(c.Request().Context(), projectUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
 		h.logger.Error("failed to get project", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get project")
 	}
 
 	// Verify user is a member of the organization that owns this project
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to access project",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", projectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+		return err
 	}
 
 	return c.JSON(http.StatusOK, GetProjectResponse{
 		ID:             project.ID.String(),
 		OrganizationID: project.OrganizationID.String(),
 		Name:           project.Name,
-		CreatedAt:      project.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:      project.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:      project.CreatedAt.Time.Format(RFC3339Format),
+		UpdatedAt:      project.UpdatedAt.Time.Format(RFC3339Format),
 	})
 }
 
@@ -229,15 +214,9 @@ func (h *ProjectHandler) ListProjects(c echo.Context) error {
 	}
 
 	// Verify user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: orgUUID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID)
 	if err != nil {
-		h.logger.Warn("user not authorized to list projects in organization",
-			slog.String("user_id", userID.String()),
-			slog.String("org_id", orgID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this organization")
+		return err
 	}
 
 	// Get all projects for the organization
@@ -253,7 +232,7 @@ func (h *ProjectHandler) ListProjects(c echo.Context) error {
 			ID:             project.ID.String(),
 			OrganizationID: project.OrganizationID.String(),
 			Name:           project.Name,
-			CreatedAt:      project.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:      project.CreatedAt.Time.Format(RFC3339Format),
 		}
 	}
 
@@ -302,6 +281,10 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+
 	queries := database.New(h.pool)
 
 	// Parse project ID
@@ -313,23 +296,17 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 	// Get project to find its organization
 	project, err := queries.GetProject(c.Request().Context(), projectUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get project")
 	}
 
 	// Verify user is owner or admin of the organization
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, project.OrganizationID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
-		h.logger.Warn("user not authorized to update project",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", projectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
-	}
-
-	if membership.Role != database.OrganizationRoleOwner && membership.Role != database.OrganizationRoleAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can update projects")
+		return err
 	}
 
 	// Update project
@@ -376,7 +353,7 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 	return c.JSON(http.StatusOK, UpdateProjectResponse{
 		ID:        updatedProject.ID.String(),
 		Name:      updatedProject.Name,
-		UpdatedAt: updatedProject.UpdatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: updatedProject.UpdatedAt.Time.Format(RFC3339Format),
 	})
 }
 
@@ -405,23 +382,17 @@ func (h *ProjectHandler) DeleteProject(c echo.Context) error {
 	// Get project to find its organization
 	project, err := queries.GetProject(c.Request().Context(), projectUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
+		h.logger.Error("failed to get project", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get project")
 	}
 
 	// Verify user is owner or admin of the organization
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, project.OrganizationID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
-		h.logger.Warn("user not authorized to delete project",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", projectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
-	}
-
-	if membership.Role != database.OrganizationRoleOwner && membership.Role != database.OrganizationRoleAdmin {
-		return echo.NewHTTPError(http.StatusForbidden, "only owners and admins can delete projects")
+		return err
 	}
 
 	// Delete project

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/google/uuid"
@@ -15,6 +16,8 @@ import (
 const (
 	// RFC3339Format is the date/time format used for API responses
 	RFC3339Format = "2006-01-02T15:04:05Z07:00"
+	// DatabaseTimeout is the default timeout for database operations
+	DatabaseTimeout = 5 * time.Second
 )
 
 // parseUUID converts a string UUID to pgtype.UUID
@@ -67,10 +70,16 @@ func requireOrganizationMembership(
 			}
 		}
 		if !hasRole {
+			// Build string representation of allowed roles
+			allowedRolesStr := make([]string, len(allowedRoles))
+			for i, role := range allowedRoles {
+				allowedRolesStr[i] = string(role)
+			}
 			logger.Warn("user does not have required role",
 				slog.String("user_id", userID.String()),
 				slog.String("org_id", orgID.String()),
-				slog.String("user_role", string(membership.Role)))
+				slog.String("user_role", string(membership.Role)),
+				slog.Any("required_roles", allowedRolesStr))
 			return nil, echo.NewHTTPError(http.StatusForbidden, "insufficient permissions")
 		}
 	}
