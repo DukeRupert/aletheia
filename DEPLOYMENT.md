@@ -1,408 +1,256 @@
-# Deployment Guide
+# Deployment Guide - Simple MVP Setup
 
-This guide covers deploying Aletheia to a VPS using Docker, Docker Compose, and Watchtower for automatic updates.
+Minimal CI/CD pipeline for Aletheia MVP.
 
 ## Overview
 
-The deployment setup uses:
-- **Docker** - Containerization
-- **Docker Compose** - Multi-container orchestration
-- **GitHub Actions** - CI/CD pipeline for testing and building
-- **Docker Hub** - Container registry
-- **Watchtower** - Automatic container updates
-- **Caddy** - Reverse proxy with automatic HTTPS (running on VPS host)
-- **PostgreSQL** - Database (containerized)
+**GitHub Actions** → **Docker Hub** → **Manual Deploy on Server**
 
-## Prerequisites
+- GitHub Actions runs tests and builds Docker images automatically
+- Images pushed to Docker Hub
+- You manually deploy when ready (keeps it simple for MVP)
 
-### On Your VPS
+## One-Time Setup
 
-1. **Docker and Docker Compose installed**
-   ```bash
-   # Install Docker
-   curl -fsSL https://get.docker.com -o get-docker.sh
-   sudo sh get-docker.sh
+### 1. GitHub Secrets (Required)
 
-   # Add your user to docker group
-   sudo usermod -aG docker $USER
+Go to GitHub repo: **Settings → Secrets and variables → Actions**
 
-   # Install Docker Compose
-   sudo apt-get update
-   sudo apt-get install docker-compose-plugin
-   ```
-
-2. **Caddy installed and running**
-   ```bash
-   # Install Caddy
-   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-   sudo apt update
-   sudo apt install caddy
-   ```
-
-3. **Domain name** pointed to your VPS IP address
-
-### GitHub Secrets
-
-Configure these secrets in your GitHub repository (Settings → Secrets and variables → Actions):
-
+Add these secrets:
 - `DOCKER_USERNAME` - Your Docker Hub username
-- `DOCKER_PASSWORD` - Your Docker Hub password or access token
+- `DOCKER_PASSWORD` - Docker Hub access token (create at hub.docker.com/settings/security)
 
-## Initial Setup
+### 2. Server Prerequisites
 
-### 1. Clone Repository on VPS
-
+Install Docker on your server:
 ```bash
-mkdir -p ~/apps
-cd ~/apps
-git clone https://github.com/yourusername/aletheia.git
-cd aletheia
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+
+# Install Docker Compose plugin
+sudo apt-get update
+sudo apt-get install docker-compose-plugin
 ```
 
-### 2. Create Production Environment File
+## How It Works
 
-Create a `.env.prod` file with your production configuration:
+### Automatic Builds (GitHub Actions)
+
+The workflow at `.github/workflows/ci-cd.yml` automatically:
+
+**On every push/PR:**
+- Runs tests with PostgreSQL
+- Runs `go vet` and `go fmt` checks
+
+**On push to `master`:**
+- Builds Docker image
+- Pushes to Docker Hub as `yourusername/aletheia:master`
+
+**On version tags** (e.g., `v1.0.0`):
+- Builds Docker image
+- Pushes to Docker Hub with multiple tags:
+  - `yourusername/aletheia:1.0.0`
+  - `yourusername/aletheia:1.0`
+  - `yourusername/aletheia:1`
+
+### Deploy to Server
+
+**First time setup on server:**
+
+1. Create `docker-compose.prod.yml`:
+
+```yaml
+services:
+  app:
+    image: yourusername/aletheia:latest  # Replace with your Docker Hub username
+    container_name: aletheia-app
+    ports:
+      - "1323:1323"
+    env_file:
+      - .env
+    environment:
+      DB_HOSTNAME: postgres
+      STORAGE_LOCAL_PATH: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - app-network
+    restart: always
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: aletheia-db
+    environment:
+      POSTGRES_DB: aletheia
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: always
+
+volumes:
+  uploads:
+  postgres_data:
+
+networks:
+  app-network:
+```
+
+2. Create `.env` file with production config:
 
 ```bash
-# Copy the example and edit
-cat > .env.prod <<EOF
-# Docker configuration
-DOCKER_USERNAME=your-dockerhub-username
-IMAGE_TAG=latest
+# Server
+ENVIRONMENT=prod
+SERVER_PORT=1323
 
-# Database credentials
-DB_USER=aletheia_user
-DB_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
-DB_NAME=aletheia_prod
+# Database
+DB_USER=postgres
+DB_PASSWORD=your-secure-password-here
+DB_HOSTNAME=postgres
+DB_PORT=5432
+DB_NAME=aletheia
 
-# Security (REQUIRED - generate a strong secret)
-JWT_SECRET=CHANGE_THIS_TO_A_LONG_RANDOM_STRING
+# Security (REQUIRED)
+JWT_SECRET=your-secure-jwt-secret-here
 
-# Storage - S3 Configuration (recommended for production)
-STORAGE_PROVIDER=s3
-STORAGE_S3_BUCKET=your-s3-bucket-name
-STORAGE_S3_REGION=us-east-1
-STORAGE_S3_BASE_URL=https://your-cloudfront-domain.com
-AWS_ACCESS_KEY_ID=your-aws-access-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+# Storage (local for MVP, can switch to S3 later)
+STORAGE_PROVIDER=local
+STORAGE_LOCAL_PATH=/app/uploads
+STORAGE_LOCAL_URL=https://yourdomain.com/uploads
 
-# Email - Postmark Configuration
-EMAIL_PROVIDER=postmark
-EMAIL_FROM_ADDRESS=noreply@yourdomain.com
-EMAIL_FROM_NAME=Aletheia
-EMAIL_VERIFY_BASE_URL=https://yourdomain.com
-POSTMARK_SERVER_TOKEN=your-postmark-token
-
-# Queue Configuration
+# Queue
+QUEUE_PROVIDER=postgres
 QUEUE_WORKER_COUNT=3
-QUEUE_POLL_INTERVAL=1s
-QUEUE_JOB_TIMEOUT=60s
-QUEUE_ENABLE_RATE_LIMITING=true
 
-# AI Configuration
-ANTHROPIC_API_KEY=your-anthropic-api-key
-
-# Watchtower Configuration (check for updates every 5 minutes)
-WATCHTOWER_POLL_INTERVAL=300
-EOF
+# Add other vars as needed (email, AI, etc.)
 ```
 
-**Important:** Edit this file and replace all placeholder values with your actual credentials.
-
-### 3. Generate Strong Secrets
+3. Generate secrets:
 
 ```bash
-# Generate JWT secret
+# JWT secret
 openssl rand -base64 64
 
-# Generate database password
+# DB password
 openssl rand -base64 32
 ```
 
-### 4. Configure Caddy
+## Deploying Updates
 
-Add your domain configuration to Caddy. See `Caddyfile.example` for reference.
-
-```bash
-# Edit your Caddy configuration
-sudo nano /etc/caddy/Caddyfile
-```
-
-Add:
-```caddy
-yourdomain.com {
-    reverse_proxy localhost:1323
-    encode gzip
-
-    log {
-        output file /var/log/caddy/aletheia-access.log
-        format json
-    }
-
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Frame-Options "SAMEORIGIN"
-        X-XSS-Protection "1; mode=block"
-        X-Content-Type-Options "nosniff"
-        Referrer-Policy "strict-origin-when-cross-origin"
-        -Server
-    }
-}
-```
+### Step 1: Push code to GitHub
 
 ```bash
-# Reload Caddy
-sudo systemctl reload caddy
-```
-
-### 5. Start the Application
-
-```bash
-# Load environment variables and start services
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-
-# Check logs
-docker compose -f docker-compose.prod.yml logs -f
-```
-
-### 6. Run Database Migrations
-
-```bash
-# Run migrations inside the container
-docker exec -it aletheia-app ./aletheia -migrate-up
-
-# Or connect to the database directly
-docker exec -it aletheia-postgres psql -U aletheia_user -d aletheia_prod
-```
-
-### 7. Seed Initial Data (Optional)
-
-If you have seed scripts or need to create initial safety codes:
-
-```bash
-# Execute seed commands
-docker exec -it aletheia-app ./aletheia -seed
-```
-
-## CI/CD Pipeline
-
-The GitHub Actions workflow (`.github/workflows/ci-cd.yml`) automatically:
-
-1. **On Pull Requests**: Runs tests
-2. **On Push to Master**: Runs tests + builds and pushes Docker image to Docker Hub
-3. **On Version Tags** (`v*`): Builds and tags with semantic version
-
-### Workflow Stages
-
-1. **Test Job**
-   - Sets up Go environment
-   - Starts PostgreSQL test database
-   - Runs `go vet`, `go fmt`, and unit tests
-   - Uploads coverage to Codecov (optional)
-
-2. **Build Job** (only on master branch or tags)
-   - Builds Docker image
-   - Tags with branch name, git SHA, or semantic version
-   - Pushes to Docker Hub
-   - Uses layer caching for faster builds
-
-### Triggering a Deployment
-
-```bash
-# Option 1: Push to master (automatic deployment via Watchtower)
+# For latest changes
 git push origin master
 
-# Option 2: Create a version tag
+# OR create a version tag
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Watchtower will automatically:
-- Detect the new image on Docker Hub (checks every 5 minutes by default)
-- Pull the latest image
-- Recreate the container with zero downtime
-- Clean up old images
+GitHub Actions will automatically build and push to Docker Hub.
 
-## Monitoring and Maintenance
-
-### View Logs
+### Step 2: Deploy on server
 
 ```bash
-# All services
-docker compose -f docker-compose.prod.yml logs -f
+# Pull latest image
+docker compose -f docker-compose.prod.yml pull
 
-# Specific service
+# Restart with new image
+docker compose -f docker-compose.prod.yml up -d
+
+# View logs
 docker compose -f docker-compose.prod.yml logs -f app
-
-# Last 100 lines
-docker compose -f docker-compose.prod.yml logs --tail=100 app
 ```
 
-### Check Service Status
+**Simple deploy script** (`deploy.sh`):
 
+```bash
+#!/bin/bash
+set -e
+
+echo "Pulling latest image..."
+docker compose -f docker-compose.prod.yml pull
+
+echo "Restarting services..."
+docker compose -f docker-compose.prod.yml up -d
+
+echo "Deployment complete!"
+docker compose -f docker-compose.prod.yml ps
+```
+
+Then just run: `./deploy.sh`
+
+## Common Operations
+
+### View logs
+```bash
+docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml logs -f app  # Just app logs
+```
+
+### Check status
 ```bash
 docker compose -f docker-compose.prod.yml ps
 ```
 
-### Manual Container Updates
-
+### Restart services
 ```bash
-# Pull latest image
-docker compose -f docker-compose.prod.yml --env-file .env.prod pull
-
-# Recreate containers
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-
-# Remove old images
-docker image prune -f
+docker compose -f docker-compose.prod.yml restart app
 ```
 
-### Database Backup
-
+### Database backup
 ```bash
 # Create backup
-docker exec aletheia-postgres pg_dump -U aletheia_user aletheia_prod > backup_$(date +%Y%m%d).sql
+docker exec aletheia-db pg_dump -U postgres aletheia > backup_$(date +%Y%m%d).sql
 
-# Restore from backup
-docker exec -i aletheia-postgres psql -U aletheia_user -d aletheia_prod < backup_20250101.sql
+# Restore
+docker exec -i aletheia-db psql -U postgres aletheia < backup.sql
 ```
 
-### Access Database
-
+### Access database
 ```bash
-# PostgreSQL shell
-docker exec -it aletheia-postgres psql -U aletheia_user -d aletheia_prod
-
-# Run SQL file
-docker exec -i aletheia-postgres psql -U aletheia_user -d aletheia_prod < script.sql
+docker exec -it aletheia-db psql -U postgres -d aletheia
 ```
 
-## Updating Configuration
-
-1. Edit `.env.prod` file
-2. Recreate containers:
-   ```bash
-   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-   ```
-
-## Troubleshooting
-
-### Container Won't Start
-
+### Update config
 ```bash
-# Check logs
-docker compose -f docker-compose.prod.yml logs app
+# Edit .env file
+nano .env
 
-# Check if port is already in use
-sudo netstat -tlnp | grep 1323
-
-# Restart services
-docker compose -f docker-compose.prod.yml restart
+# Restart to apply
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Database Connection Issues
+## Rollback
 
+Use a specific version:
 ```bash
-# Check if PostgreSQL is running
-docker compose -f docker-compose.prod.yml ps postgres
+# Edit docker-compose.prod.yml
+# Change: image: yourusername/aletheia:latest
+# To:     image: yourusername/aletheia:1.0.0
 
-# Test database connection
-docker exec -it aletheia-postgres psql -U aletheia_user -d aletheia_prod -c "SELECT 1;"
-
-# Check database logs
-docker compose -f docker-compose.prod.yml logs postgres
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Watchtower Not Updating
+## Cost & Services
 
-```bash
-# Check Watchtower logs
-docker logs aletheia-watchtower
+**Free tier usage:**
+- GitHub Actions: Free for public repos (2000 min/month for private)
+- Docker Hub: Free (unlimited public images, 1 private repo)
+- Your VPS: Whatever you're paying for hosting
 
-# Manually trigger update
-docker exec aletheia-watchtower /watchtower --run-once
+**No additional services needed** - that's it!
 
-# Verify image labels
-docker inspect aletheia-app | grep watchtower
-```
+## Notes
 
-### Health Check Failing
-
-```bash
-# Check health status
-docker inspect aletheia-app | grep -A 10 Health
-
-# Test health endpoint manually
-curl http://localhost:1323/health
-```
-
-## Security Best Practices
-
-1. **Use strong, unique passwords** for all services
-2. **Keep secrets in `.env.prod`** and never commit to git
-3. **Regularly update containers** (Watchtower handles this)
-4. **Enable firewall** and only expose necessary ports:
-   ```bash
-   sudo ufw allow 22/tcp    # SSH
-   sudo ufw allow 80/tcp    # HTTP
-   sudo ufw allow 443/tcp   # HTTPS
-   sudo ufw enable
-   ```
-5. **Regular database backups** (automate with cron)
-6. **Monitor logs** for suspicious activity
-7. **Use S3 for production storage** instead of local filesystem
-8. **Enable rate limiting** in your application and Caddy
-
-## Performance Optimization
-
-1. **Adjust worker count** based on VPS resources:
-   ```bash
-   # In .env.prod
-   QUEUE_WORKER_COUNT=5  # Increase for more concurrent jobs
-   ```
-
-2. **Database connection pooling** is configured in the app (25 max connections)
-
-3. **Enable Caddy caching** for static assets (add to Caddyfile if needed)
-
-4. **Monitor resource usage**:
-   ```bash
-   docker stats
-   ```
-
-## Rolling Back
-
-If a deployment causes issues:
-
-```bash
-# Option 1: Use a specific image tag
-# Edit .env.prod and set IMAGE_TAG to a previous version
-IMAGE_TAG=v1.0.0
-
-# Recreate container
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-
-# Option 2: Pause Watchtower and manually pull previous image
-docker pause aletheia-watchtower
-docker pull your-dockerhub-username/aletheia:v1.0.0
-docker tag your-dockerhub-username/aletheia:v1.0.0 your-dockerhub-username/aletheia:latest
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-docker unpause aletheia-watchtower
-```
-
-## Additional Resources
-
-- [Docker Documentation](https://docs.docker.com/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Caddy Documentation](https://caddyserver.com/docs/)
-- [Watchtower Documentation](https://containrrr.dev/watchtower/)
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-
-## Support
-
-For issues or questions:
-- Check application logs: `docker compose -f docker-compose.prod.yml logs -f app`
-- Review this deployment guide
-- Check GitHub Issues for known problems
+- **Manual deployment**: You control when to deploy (no auto-updates)
+- **Simple rollback**: Just change image tag
+- **Local uploads**: Uses Docker volume for MVP (switch to S3 when ready)
+- **Database**: Also in Docker volume (backup regularly)
