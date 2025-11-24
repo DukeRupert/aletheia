@@ -1,11 +1,35 @@
 package email
 
 import (
+	"bytes"
+	"embed"
 	"fmt"
+	"html/template"
 	"log/slog"
 
 	"github.com/keighl/postmark"
 )
+
+//go:embed templates/*.html
+var templateFS embed.FS
+
+var (
+	verifyEmailTemplate *template.Template
+	resetPasswordTemplate *template.Template
+)
+
+func init() {
+	var err error
+	verifyEmailTemplate, err = template.ParseFS(templateFS, "templates/verify.html")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse verify email template: %v", err))
+	}
+
+	resetPasswordTemplate, err = template.ParseFS(templateFS, "templates/reset-password.html")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse reset password template: %v", err))
+	}
+}
 
 // EmailService defines the interface for sending emails
 type EmailService interface {
@@ -90,19 +114,22 @@ func newPostmarkEmailService(logger *slog.Logger, config EmailConfig) *postmarkE
 func (s *postmarkEmailService) SendVerificationEmail(to, token string) error {
 	verifyURL := fmt.Sprintf("%s/verify?token=%s", s.config.VerifyBaseURL, token)
 
+	// Render HTML body from template
+	var htmlBody bytes.Buffer
+	data := map[string]string{"VerifyURL": verifyURL}
+	if err := verifyEmailTemplate.Execute(&htmlBody, data); err != nil {
+		s.logger.Error("failed to render verification email template",
+			slog.String("error", err.Error()),
+		)
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
 	email := postmark.Email{
 		From:     fmt.Sprintf("%s <%s>", s.config.FromName, s.config.FromAddress),
 		To:       to,
 		Subject:  "Verify your email address",
 		TextBody: fmt.Sprintf("Please verify your email address by clicking this link: %s", verifyURL),
-		HtmlBody: fmt.Sprintf(`
-			<h2>Verify your email address</h2>
-			<p>Thank you for registering with Aletheia. Please verify your email address by clicking the link below:</p>
-			<p><a href="%s">Verify Email Address</a></p>
-			<p>Or copy and paste this URL into your browser:</p>
-			<p>%s</p>
-			<p>This link will expire in 24 hours.</p>
-		`, verifyURL, verifyURL),
+		HtmlBody: htmlBody.String(),
 		Tag:        "email-verification",
 		TrackOpens: true,
 	}
@@ -126,20 +153,22 @@ func (s *postmarkEmailService) SendVerificationEmail(to, token string) error {
 func (s *postmarkEmailService) SendPasswordResetEmail(to, token string) error {
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s", s.config.VerifyBaseURL, token)
 
+	// Render HTML body from template
+	var htmlBody bytes.Buffer
+	data := map[string]string{"ResetURL": resetURL}
+	if err := resetPasswordTemplate.Execute(&htmlBody, data); err != nil {
+		s.logger.Error("failed to render password reset email template",
+			slog.String("error", err.Error()),
+		)
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
 	email := postmark.Email{
 		From:     fmt.Sprintf("%s <%s>", s.config.FromName, s.config.FromAddress),
 		To:       to,
 		Subject:  "Reset your password",
 		TextBody: fmt.Sprintf("Reset your password by clicking this link: %s", resetURL),
-		HtmlBody: fmt.Sprintf(`
-			<h2>Reset your password</h2>
-			<p>We received a request to reset your password. Click the link below to reset it:</p>
-			<p><a href="%s">Reset Password</a></p>
-			<p>Or copy and paste this URL into your browser:</p>
-			<p>%s</p>
-			<p>If you didn't request this, you can safely ignore this email.</p>
-			<p>This link will expire in 1 hour.</p>
-		`, resetURL, resetURL),
+		HtmlBody: htmlBody.String(),
 		Tag:        "password-reset",
 		TrackOpens: true,
 	}
