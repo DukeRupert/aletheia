@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -38,6 +39,10 @@ type CreateInspectionResponse struct {
 
 // CreateInspection creates a new inspection for a project
 func (h *InspectionHandler) CreateInspection(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -64,25 +69,19 @@ func (h *InspectionHandler) CreateInspection(c echo.Context) error {
 	}
 
 	// Get project to find its organization
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "project not found")
 	}
 
 	// Verify user is a member of the organization that owns this project
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to create inspection in project",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", req.ProjectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+		return err
 	}
 
 	// Create inspection with default status 'draft'
-	inspection, err := queries.CreateInspection(c.Request().Context(), database.CreateInspectionParams{
+	inspection, err := queries.CreateInspection(ctx, database.CreateInspectionParams{
 		ProjectID:    projectUUID,
 		InspectorID:  uuidToPgUUID(userID),
 		Status:       database.InspectionStatusDraft,
@@ -126,6 +125,10 @@ type GetInspectionResponse struct {
 
 // GetInspection retrieves an inspection by ID
 func (h *InspectionHandler) GetInspection(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -147,29 +150,23 @@ func (h *InspectionHandler) GetInspection(c echo.Context) error {
 	}
 
 	// Get inspection
-	inspection, err := queries.GetInspection(c.Request().Context(), inspectionUUID)
+	inspection, err := queries.GetInspection(ctx, inspectionUUID)
 	if err != nil {
 		h.logger.Error("failed to get inspection", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
 	}
 
 	// Get project to find its organization
-	project, err := queries.GetProject(c.Request().Context(), inspection.ProjectID)
+	project, err := queries.GetProject(ctx, inspection.ProjectID)
 	if err != nil {
 		h.logger.Error("failed to get project for inspection", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get inspection details")
 	}
 
 	// Verify user is a member of the organization that owns this project
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to access inspection",
-			slog.String("user_id", userID.String()),
-			slog.String("inspection_id", inspectionID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this inspection's organization")
+		return err
 	}
 
 	return c.JSON(http.StatusOK, GetInspectionResponse{
@@ -197,6 +194,10 @@ type ListInspectionsResponse struct {
 
 // ListInspections lists all inspections for a project
 func (h *InspectionHandler) ListInspections(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -218,25 +219,19 @@ func (h *InspectionHandler) ListInspections(c echo.Context) error {
 	}
 
 	// Get project to find its organization
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "project not found")
 	}
 
 	// Verify user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to list inspections in project",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", projectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+		return err
 	}
 
 	// Get all inspections for the project
-	inspections, err := queries.ListInspections(c.Request().Context(), projectUUID)
+	inspections, err := queries.ListInspections(ctx, projectUUID)
 	if err != nil {
 		h.logger.Error("failed to list inspections", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to list inspections")
@@ -272,6 +267,10 @@ type UpdateInspectionStatusResponse struct {
 
 // UpdateInspectionStatus updates an inspection's status
 func (h *InspectionHandler) UpdateInspectionStatus(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -303,28 +302,22 @@ func (h *InspectionHandler) UpdateInspectionStatus(c echo.Context) error {
 	}
 
 	// Get inspection
-	inspection, err := queries.GetInspection(c.Request().Context(), inspectionUUID)
+	inspection, err := queries.GetInspection(ctx, inspectionUUID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
 	}
 
 	// Get project to find its organization
-	project, err := queries.GetProject(c.Request().Context(), inspection.ProjectID)
+	project, err := queries.GetProject(ctx, inspection.ProjectID)
 	if err != nil {
 		h.logger.Error("failed to get project for inspection", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get inspection details")
 	}
 
-	// Verify user is the inspector or an owner/admin of the organization
-	membership, err := queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	// Verify user is a member of the organization and get membership for role checking
+	membership, err := requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to update inspection",
-			slog.String("user_id", userID.String()),
-			slog.String("inspection_id", inspectionID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this inspection's organization")
+		return err
 	}
 
 	// Check if user is the inspector or an owner/admin
@@ -349,7 +342,7 @@ func (h *InspectionHandler) UpdateInspectionStatus(c echo.Context) error {
 	}
 
 	// Update inspection status
-	updatedInspection, err := queries.UpdateInspectionStatus(c.Request().Context(), database.UpdateInspectionStatusParams{
+	updatedInspection, err := queries.UpdateInspectionStatus(ctx, database.UpdateInspectionStatusParams{
 		ID:     inspectionUUID,
 		Status: newStatus,
 	})
