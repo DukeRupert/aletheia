@@ -60,6 +60,12 @@ func TestRegister(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -67,7 +73,7 @@ func TestRegister(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -127,6 +133,12 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -134,7 +146,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -173,7 +185,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	rec2 := httptest.NewRecorder()
 	c2 := e.NewContext(req2, rec2)
 
-	err := handler.Register(c2)
+	err = handler.Register(c2)
 	if err == nil {
 		t.Fatal("Expected conflict error for duplicate email")
 	}
@@ -195,6 +207,12 @@ func TestRegisterValidation(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -202,7 +220,7 @@ func TestRegisterValidation(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -275,6 +293,12 @@ func TestLogin(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -282,7 +306,7 @@ func TestLogin(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -369,6 +393,12 @@ func TestLoginInvalidPassword(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -376,7 +406,7 @@ func TestLoginInvalidPassword(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -413,7 +443,7 @@ func TestLoginInvalidPassword(t *testing.T) {
 	rec = httptest.NewRecorder()
 	c = e.NewContext(req, rec)
 
-	err := handler.Login(c)
+	err = handler.Login(c)
 	if err == nil {
 		t.Fatal("Expected login to fail with wrong password")
 	}
@@ -435,6 +465,12 @@ func TestLoginNonExistentUser(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -442,7 +478,7 @@ func TestLoginNonExistentUser(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -456,7 +492,7 @@ func TestLoginNonExistentUser(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := handler.Login(c)
+	err = handler.Login(c)
 	if err == nil {
 		t.Fatal("Expected login to fail for non-existent user")
 	}
@@ -475,6 +511,12 @@ func TestLogout(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -482,7 +524,7 @@ func TestLogout(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -568,8 +610,8 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Verify session is actually deleted from database
-	_, err := session.GetSession(context.Background(), pool, sessionCookie.Value)
-	if err == nil {
+	_, verifyErr := session.GetSession(context.Background(), pool, sessionCookie.Value)
+	if verifyErr == nil {
 		t.Error("Expected session to be deleted from database")
 	}
 
@@ -584,6 +626,12 @@ func TestLogoutWithoutSession(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -591,7 +639,7 @@ func TestLogoutWithoutSession(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -599,7 +647,7 @@ func TestLogoutWithoutSession(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := handler.Logout(c)
+	err = handler.Logout(c)
 	if err == nil {
 		t.Fatal("Expected logout to fail without session cookie")
 	}
@@ -618,6 +666,12 @@ func TestMeEndpoint(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -625,7 +679,7 @@ func TestMeEndpoint(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -737,6 +791,12 @@ func TestMeEndpointWithoutSession(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -744,7 +804,7 @@ func TestMeEndpointWithoutSession(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -752,7 +812,7 @@ func TestMeEndpointWithoutSession(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := handler.Me(c)
+	err = handler.Me(c)
 	if err == nil {
 		t.Fatal("Expected /me endpoint to fail without session")
 	}
@@ -771,6 +831,12 @@ func TestUpdateProfile(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -778,7 +844,7 @@ func TestUpdateProfile(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -909,6 +975,12 @@ func TestUpdateProfilePartial(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -916,7 +988,7 @@ func TestUpdateProfilePartial(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1013,6 +1085,12 @@ func TestUpdateProfileWithoutSession(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1020,7 +1098,7 @@ func TestUpdateProfileWithoutSession(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1036,7 +1114,7 @@ func TestUpdateProfileWithoutSession(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := handler.UpdateProfile(c)
+	err = handler.UpdateProfile(c)
 	if err == nil {
 		t.Fatal("Expected UpdateProfile to fail without session")
 	}
@@ -1055,6 +1133,12 @@ func TestVerifyEmail(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1062,7 +1146,7 @@ func TestVerifyEmail(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1147,6 +1231,12 @@ func TestVerifyEmailInvalidToken(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1154,7 +1244,7 @@ func TestVerifyEmailInvalidToken(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1168,7 +1258,7 @@ func TestVerifyEmailInvalidToken(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := handler.VerifyEmail(c)
+	err = handler.VerifyEmail(c)
 	if err == nil {
 		t.Fatal("Expected VerifyEmail to fail with invalid token")
 	}
@@ -1187,6 +1277,12 @@ func TestVerifyEmailAlreadyVerified(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1194,7 +1290,7 @@ func TestVerifyEmailAlreadyVerified(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1271,6 +1367,12 @@ func TestResendVerification(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1278,7 +1380,7 @@ func TestResendVerification(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1356,6 +1458,12 @@ func TestResendVerificationNonExistentEmail(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1363,7 +1471,7 @@ func TestResendVerificationNonExistentEmail(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1394,6 +1502,12 @@ func TestResendVerificationAlreadyVerified(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1401,7 +1515,7 @@ func TestResendVerificationAlreadyVerified(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1477,6 +1591,12 @@ func TestRequestPasswordReset(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1484,7 +1604,7 @@ func TestRequestPasswordReset(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1554,6 +1674,12 @@ func TestRequestPasswordResetNonExistentEmail(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1561,7 +1687,7 @@ func TestRequestPasswordResetNonExistentEmail(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1592,6 +1718,12 @@ func TestVerifyResetToken(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1599,7 +1731,7 @@ func TestVerifyResetToken(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1675,6 +1807,12 @@ func TestVerifyResetTokenInvalid(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1682,7 +1820,7 @@ func TestVerifyResetTokenInvalid(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1696,7 +1834,7 @@ func TestVerifyResetTokenInvalid(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := handler.VerifyResetToken(c)
+	err = handler.VerifyResetToken(c)
 	if err == nil {
 		t.Fatal("Expected VerifyResetToken to fail with invalid token")
 	}
@@ -1715,6 +1853,12 @@ func TestResetPassword(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1722,7 +1866,7 @@ func TestResetPassword(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1849,6 +1993,12 @@ func TestResetPasswordInvalidToken(t *testing.T) {
 	}
 	defer pool.Close()
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Skipf("Config not available: %v", err)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	emailService := email.NewEmailService(logger, email.EmailConfig{
 		Provider:      "mock",
@@ -1856,7 +2006,7 @@ func TestResetPasswordInvalidToken(t *testing.T) {
 		FromName:      "Test",
 		VerifyBaseURL: "http://localhost:1323",
 	})
-	handler := NewAuthHandler(pool, logger, emailService)
+	handler := NewAuthHandler(pool, logger, emailService, cfg)
 
 	e := echo.New()
 
@@ -1871,7 +2021,7 @@ func TestResetPasswordInvalidToken(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := handler.ResetPassword(c)
+	err = handler.ResetPassword(c)
 	if err == nil {
 		t.Fatal("Expected ResetPassword to fail with invalid token")
 	}
