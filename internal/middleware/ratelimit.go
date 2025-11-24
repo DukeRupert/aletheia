@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -29,9 +30,11 @@ import (
 // - Global: 100 requests/second per IP, burst of 200
 // - Stricter for auth endpoints: 5 requests/minute per IP
 type RateLimiter struct {
-	limiters sync.Map // IP address -> *limiterEntry
-	logger   *slog.Logger
-	config   RateLimitConfig
+	limiters  sync.Map // IP address -> *limiterEntry
+	logger    *slog.Logger
+	config    RateLimitConfig
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // limiterEntry wraps a rate limiter with metadata for cleanup.
@@ -49,11 +52,17 @@ type limiterEntry struct {
 // Usage in main.go:
 //   rateLimiter := middleware.NewRateLimiter(logger)
 //   e.Use(rateLimiter.Middleware())
+//   defer rateLimiter.Shutdown() // Important: call Shutdown() during graceful shutdown
 func NewRateLimiter(logger *slog.Logger) *RateLimiter {
+	// Create context for managing goroutine lifecycle
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Create RateLimiter instance with default config
 	rl := &RateLimiter{
 		logger: logger,
 		config: DefaultRateLimitConfig(),
+		ctx:    ctx,
+		cancel: cancel,
 	}
 
 	// Start cleanup goroutine to remove old limiters
@@ -157,6 +166,7 @@ func (rl *RateLimiter) GetLimiter(ip string) *rate.Limiter {
 // - Store last access time with each limiter
 // - Remove limiters unused for > 1 hour
 // - Run in background goroutine
+// - Respects context cancellation for graceful shutdown
 func (rl *RateLimiter) CleanupOldLimiters() {
 	// Parse cleanup interval from config
 	interval, err := time.ParseDuration(rl.config.CleanupInterval)
@@ -172,28 +182,50 @@ func (rl *RateLimiter) CleanupOldLimiters() {
 	// Threshold for removing old limiters (1 hour of inactivity)
 	inactivityThreshold := time.Hour
 
-	for range ticker.C {
-		var removed int
+	for {
+		select {
+		case <-ticker.C:
+			var removed int
 
-		// Range over all limiters in the map
-		rl.limiters.Range(func(key, value interface{}) bool {
-			entry := value.(*limiterEntry)
+			// Range over all limiters in the map
+			rl.limiters.Range(func(key, value interface{}) bool {
+				entry := value.(*limiterEntry)
 
-			// Check if limiter hasn't been accessed recently
-			if time.Since(entry.lastAccess) > inactivityThreshold {
-				// Delete old limiter
-				rl.limiters.Delete(key)
-				removed++
+				// Check if limiter hasn't been accessed recently
+				if time.Since(entry.lastAccess) > inactivityThreshold {
+					// Delete old limiter
+					rl.limiters.Delete(key)
+					removed++
+				}
+
+				return true // continue iteration
+			})
+
+			// Log cleanup stats
+			if removed > 0 {
+				rl.logger.Info("cleaned up old rate limiters",
+					slog.Int("removed", removed))
 			}
-
-			return true // continue iteration
-		})
-
-		// Log cleanup stats
-		if removed > 0 {
-			rl.logger.Info("cleaned up old rate limiters",
-				slog.Int("removed", removed))
+		case <-rl.ctx.Done():
+			// Context cancelled, stop cleanup goroutine
+			rl.logger.Debug("rate limiter cleanup goroutine stopping")
+			return
 		}
+	}
+}
+
+// Shutdown gracefully stops the rate limiter's background cleanup goroutine.
+//
+// Purpose:
+// - Stop the cleanup goroutine during application shutdown
+// - Prevent goroutine leaks in tests and production
+//
+// Usage in main.go:
+//   rateLimiter := middleware.NewRateLimiter(logger)
+//   defer rateLimiter.Shutdown()
+func (rl *RateLimiter) Shutdown() {
+	if rl.cancel != nil {
+		rl.cancel()
 	}
 }
 

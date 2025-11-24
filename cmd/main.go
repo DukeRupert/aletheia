@@ -455,6 +455,10 @@ func main() {
 		logger.Error("server forced to shutdown", slog.String("err", err.Error()))
 	}
 
+	// Shutdown rate limiter cleanup goroutine
+	rateLimiter.Shutdown()
+	logger.Info("rate limiter shutdown")
+
 	// Close database pool
 	pool.Close()
 	logger.Info("database pool closed")
