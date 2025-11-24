@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -12,10 +14,21 @@ import (
 	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
+
+const (
+	// dbTimeout is the maximum time to wait for database operations
+	dbTimeout = 5 * time.Second
+)
+
+// withDBTimeout creates a context with timeout for database operations
+func withDBTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, dbTimeout)
+}
 
 type AuthHandler struct {
 	db           *pgxpool.Pool
@@ -34,12 +47,12 @@ func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger, emailService email.Em
 }
 
 type RegisterRequest struct {
-	Email     string `json:"email" form:"email" validate:"required,email"`
+	Email     string `json:"email" form:"email" validate:"required,email,max=255"`
 	Username  string `json:"username" form:"username" validate:"required,min=3,max=50"`
-	Password  string `json:"password" form:"password" validate:"required,min=8"`
-	Name      string `json:"name" form:"name"` // Full name from form
-	FirstName string `json:"first_name" form:"first_name"`
-	LastName  string `json:"last_name" form:"last_name"`
+	Password  string `json:"password" form:"password" validate:"required,min=8,max=128"`
+	Name      string `json:"name" form:"name" validate:"omitempty,max=100"` // Full name from form
+	FirstName string `json:"first_name" form:"first_name" validate:"omitempty,max=50"`
+	LastName  string `json:"last_name" form:"last_name" validate:"omitempty,max=50"`
 }
 
 type RegisterResponse struct {
@@ -61,8 +74,9 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "email, username, and password are required")
 	}
 
-	if len(req.Password) < 8 {
-		return echo.NewHTTPError(http.StatusBadRequest, "password must be at least 8 characters")
+	// Validate password complexity
+	if err := auth.ValidatePassword(req.Password); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	// Hash password
@@ -78,23 +92,57 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	// Handle name field - split full name if provided, otherwise use first/last names
 	var firstName, lastName pgtype.Text
 	if req.Name != "" {
-		// Split full name into first and last name (simple split on first space)
-		parts := strings.SplitN(req.Name, " ", 2)
-		firstName = pgtype.Text{String: parts[0], Valid: true}
-		if len(parts) > 1 {
-			lastName = pgtype.Text{String: parts[1], Valid: true}
+		// Validate and sanitize name
+		name := strings.TrimSpace(req.Name)
+		if len(name) > 100 {
+			return echo.NewHTTPError(http.StatusBadRequest, "name too long (max 100 characters)")
+		}
+
+		// Split on spaces, handling multiple words better
+		parts := strings.Fields(name) // Handles multiple spaces, trims whitespace
+		if len(parts) > 0 {
+			if len(parts) == 1 {
+				// Single name - use as first name
+				if len(parts[0]) > 50 {
+					return echo.NewHTTPError(http.StatusBadRequest, "name too long")
+				}
+				firstName = pgtype.Text{String: parts[0], Valid: true}
+			} else {
+				// Multiple words - first word is first name, rest is last name
+				if len(parts[0]) > 50 {
+					return echo.NewHTTPError(http.StatusBadRequest, "first name too long (max 50 characters)")
+				}
+				lastNameStr := strings.Join(parts[1:], " ")
+				if len(lastNameStr) > 50 {
+					return echo.NewHTTPError(http.StatusBadRequest, "last name too long (max 50 characters)")
+				}
+				firstName = pgtype.Text{String: parts[0], Valid: true}
+				lastName = pgtype.Text{String: lastNameStr, Valid: true}
+			}
 		}
 	} else {
-		// Use explicit first/last name fields
+		// Use explicit first/last name fields with validation
 		if req.FirstName != "" {
-			firstName = pgtype.Text{String: req.FirstName, Valid: true}
+			name := strings.TrimSpace(req.FirstName)
+			if len(name) > 50 {
+				return echo.NewHTTPError(http.StatusBadRequest, "first name too long (max 50 characters)")
+			}
+			firstName = pgtype.Text{String: name, Valid: true}
 		}
 		if req.LastName != "" {
-			lastName = pgtype.Text{String: req.LastName, Valid: true}
+			name := strings.TrimSpace(req.LastName)
+			if len(name) > 50 {
+				return echo.NewHTTPError(http.StatusBadRequest, "last name too long (max 50 characters)")
+			}
+			lastName = pgtype.Text{String: name, Valid: true}
 		}
 	}
 
-	user, err := queries.CreateUser(c.Request().Context(), database.CreateUserParams{
+	// Create user with timeout
+	ctx, cancel := withDBTimeout(c.Request().Context())
+	defer cancel()
+
+	user, err := queries.CreateUser(ctx, database.CreateUserParams{
 		Email:        req.Email,
 		Username:     req.Username,
 		PasswordHash: passwordHash,
@@ -103,12 +151,14 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	})
 
 	if err != nil {
-		// Check for unique constraint violation
-		if err.Error() == "ERROR: duplicate key value violates unique constraint \"users_email_key\" (SQLSTATE 23505)" ||
-			err.Error() == "ERROR: duplicate key value violates unique constraint \"users_username_key\" (SQLSTATE 23505)" {
+		// Check for unique constraint violation using pgx error codes
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			// 23505 = unique_violation
 			h.logger.Warn("registration attempt with existing email/username",
 				slog.String("email", req.Email),
 				slog.String("username", req.Username),
+				slog.String("constraint", pgErr.ConstraintName),
 			)
 			return echo.NewHTTPError(http.StatusConflict, "email or username already exists")
 		}
@@ -164,8 +214,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" form:"email" validate:"required,email"`
-	Password string `json:"password" form:"password" validate:"required"`
+	Email    string `json:"email" form:"email" validate:"required,email,max=255"`
+	Password string `json:"password" form:"password" validate:"required,max=128"`
 }
 
 type LoginResponse struct {
@@ -187,9 +237,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "email and password are required")
 	}
 
-	// Get user by email
+	// Get user by email with timeout
+	ctx, cancel := withDBTimeout(c.Request().Context())
+	defer cancel()
+
 	queries := database.New(h.db)
-	user, err := queries.GetUserByEmail(c.Request().Context(), req.Email)
+	user, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			h.logger.Warn("login attempt with non-existent email", slog.String("email", req.Email))
@@ -208,8 +261,17 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid email or password")
 	}
 
+	// Check if email is verified
+	if !user.VerifiedAt.Valid {
+		h.logger.Warn("login attempt with unverified email",
+			slog.String("user_id", user.ID.String()),
+			slog.String("email", user.Email),
+		)
+		return echo.NewHTTPError(http.StatusForbidden, "please verify your email address before logging in")
+	}
+
 	// Check if user is active
-	if user.Status != "active" {
+	if user.Status != database.UserStatusActive {
 		h.logger.Warn("login attempt for non-active user",
 			slog.String("user_id", user.ID.String()),
 			slog.String("status", string(user.Status)),
@@ -218,14 +280,14 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Create session (convert pgtype.UUID to uuid.UUID)
-	sess, err := session.CreateSession(c.Request().Context(), h.db, user.ID.Bytes, session.SessionDuration)
+	sess, err := session.CreateSession(ctx, h.db, user.ID.Bytes, session.SessionDuration)
 	if err != nil {
 		h.logger.Error("failed to create session", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "login failed")
 	}
 
 	// Update last login time
-	if err := queries.UpdateUserLastLogin(c.Request().Context(), user.ID); err != nil {
+	if err := queries.UpdateUserLastLogin(ctx, user.ID); err != nil {
 		h.logger.Warn("failed to update last login time", slog.String("err", err.Error()))
 		// Don't fail the login for this
 	}
@@ -264,6 +326,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 
 // Logout handles user logout
 func (h *AuthHandler) Logout(c echo.Context) error {
+	// Try to get user ID from session context for logging
+	userID, hasUserID := session.GetUserID(c)
+
 	// Get session token from cookie
 	cookie, err := c.Cookie(session.SessionCookieName)
 	if err != nil {
@@ -291,7 +356,14 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	}
 	c.SetCookie(cookie)
 
-	h.logger.Info("user logged out successfully")
+	// Log logout with user ID if available
+	if hasUserID {
+		h.logger.Info("user logged out successfully",
+			slog.String("user_id", userID.String()),
+		)
+	} else {
+		h.logger.Info("user logged out successfully")
+	}
 
 	// Check if this is an HTMX request
 	if c.Request().Header.Get("HX-Request") == "true" {
@@ -337,8 +409,8 @@ func (h *AuthHandler) Me(c echo.Context) error {
 }
 
 type UpdateProfileRequest struct {
-	FirstName *string `json:"first_name" form:"first_name"`
-	LastName  *string `json:"last_name" form:"last_name"`
+	FirstName *string `json:"first_name" form:"first_name" validate:"omitempty,max=50"`
+	LastName  *string `json:"last_name" form:"last_name" validate:"omitempty,max=50"`
 }
 
 type UpdateProfileResponse struct {
@@ -409,7 +481,7 @@ func (h *AuthHandler) UpdateProfile(c echo.Context) error {
 }
 
 type VerifyEmailRequest struct {
-	Token string `json:"token" form:"token" validate:"required"`
+	Token string `json:"token" form:"token" validate:"required,max=255"`
 }
 
 // VerifyEmail verifies a user's email address using the verification token
@@ -475,7 +547,7 @@ func (h *AuthHandler) VerifyEmail(c echo.Context) error {
 }
 
 type ResendVerificationRequest struct {
-	Email string `json:"email" form:"email" validate:"required,email"`
+	Email string `json:"email" form:"email" validate:"required,email,max=255"`
 }
 
 // ResendVerification resends the verification email to a user
@@ -553,7 +625,7 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 }
 
 type RequestPasswordResetRequest struct {
-	Email string `json:"email" form:"email" validate:"required,email"`
+	Email string `json:"email" form:"email" validate:"required,email,max=255"`
 }
 
 // RequestPasswordReset initiates the password reset flow
@@ -570,8 +642,11 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 
 	queries := database.New(h.db)
 
-	// Get user by email
-	user, err := queries.GetUserByEmail(c.Request().Context(), req.Email)
+	// Get user by email with timeout
+	ctx, cancel := withDBTimeout(c.Request().Context())
+	defer cancel()
+
+	user, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			// Don't reveal if email exists or not for security
@@ -615,7 +690,7 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 	}
 
 	// Save reset token to database
-	if err := queries.SetPasswordResetToken(c.Request().Context(), database.SetPasswordResetTokenParams{
+	if err := queries.SetPasswordResetToken(ctx, database.SetPasswordResetTokenParams{
 		ID:                    user.ID,
 		ResetToken:            pgtype.Text{String: resetToken, Valid: true},
 		ResetTokenExpiresAt:   expiresAt,
@@ -661,7 +736,7 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 }
 
 type VerifyResetTokenRequest struct {
-	Token string `json:"token" form:"token" validate:"required"`
+	Token string `json:"token" form:"token" validate:"required,max=255"`
 }
 
 // VerifyResetToken verifies that a password reset token is valid
@@ -713,9 +788,9 @@ func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
 }
 
 type ResetPasswordRequest struct {
-	Token       string `json:"token" form:"token" validate:"required"`
-	NewPassword string `json:"new_password" form:"password" validate:"required,min=8"`
-	Password    string `json:"password" form:"confirm_password"` // For form compatibility
+	Token       string `json:"token" form:"token" validate:"required,max=255"`
+	NewPassword string `json:"new_password" form:"password" validate:"required,min=8,max=128"`
+	Password    string `json:"password" form:"confirm_password" validate:"omitempty,max=128"` // For form compatibility
 }
 
 // ResetPassword resets a user's password using a valid reset token
@@ -730,8 +805,9 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "reset token is required")
 	}
 
-	if len(req.NewPassword) < 8 {
-		return echo.NewHTTPError(http.StatusBadRequest, "password must be at least 8 characters")
+	// Validate password complexity
+	if err := auth.ValidatePassword(req.NewPassword); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	queries := database.New(h.db)
@@ -775,6 +851,15 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 	if err != nil {
 		h.logger.Error("failed to reset password", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "password reset failed")
+	}
+
+	// Invalidate all existing sessions for security
+	if err := queries.DeleteUserSessions(c.Request().Context(), user.ID); err != nil {
+		// Log but don't fail - password was already reset
+		h.logger.Warn("failed to invalidate sessions after password reset",
+			slog.String("user_id", user.ID.String()),
+			slog.String("error", err.Error()),
+		)
 	}
 
 	h.logger.Info("password reset successfully",
