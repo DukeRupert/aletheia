@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dukerupert/aletheia/internal/session"
@@ -38,9 +39,10 @@ type RateLimiter struct {
 }
 
 // limiterEntry wraps a rate limiter with metadata for cleanup.
+// lastAccess is stored as Unix timestamp (int64) for thread-safe atomic access.
 type limiterEntry struct {
 	limiter    *rate.Limiter
-	lastAccess time.Time
+	lastAccess atomic.Int64 // Unix timestamp in seconds
 }
 
 // NewRateLimiter creates a new rate limiter.
@@ -129,6 +131,7 @@ func (rl *RateLimiter) Middleware() echo.MiddlewareFunc {
 // - Get existing limiter from map, or create new one
 // - Use sync.Map for thread-safe access
 // - Configure appropriate rate (100 req/sec, burst 200)
+// - Thread-safe lastAccess tracking using atomic operations
 //
 // Parameters:
 //   ip - Client IP address
@@ -138,8 +141,8 @@ func (rl *RateLimiter) GetLimiter(ip string) *rate.Limiter {
 	// Check if limiter exists in map
 	if entry, exists := rl.limiters.Load(ip); exists {
 		limEntry := entry.(*limiterEntry)
-		// Update last access time
-		limEntry.lastAccess = time.Now()
+		// Update last access time atomically (thread-safe)
+		limEntry.lastAccess.Store(time.Now().Unix())
 		return limEntry.limiter
 	}
 
@@ -148,9 +151,9 @@ func (rl *RateLimiter) GetLimiter(ip string) *rate.Limiter {
 
 	// Store in map (use LoadOrStore for race-free creation)
 	entry := &limiterEntry{
-		limiter:    limiter,
-		lastAccess: time.Now(),
+		limiter: limiter,
 	}
+	entry.lastAccess.Store(time.Now().Unix())
 	actual, _ := rl.limiters.LoadOrStore(ip, entry)
 	return actual.(*limiterEntry).limiter
 }
@@ -186,13 +189,15 @@ func (rl *RateLimiter) CleanupOldLimiters() {
 		select {
 		case <-ticker.C:
 			var removed int
+			currentTime := time.Now().Unix()
 
 			// Range over all limiters in the map
 			rl.limiters.Range(func(key, value interface{}) bool {
 				entry := value.(*limiterEntry)
 
-				// Check if limiter hasn't been accessed recently
-				if time.Since(entry.lastAccess) > inactivityThreshold {
+				// Check if limiter hasn't been accessed recently (atomically read lastAccess)
+				lastAccess := entry.lastAccess.Load()
+				if currentTime-lastAccess > int64(inactivityThreshold.Seconds()) {
 					// Delete old limiter
 					rl.limiters.Delete(key)
 					removed++
