@@ -95,7 +95,7 @@ func TestAnalyzePhoto(t *testing.T) {
 
 	// Create handler with mock queue
 	mockQueue := queue.NewMockQueue()
-	handler := NewPhotoHandler(queries, mockQueue, logger)
+	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
 	reqBody := fmt.Sprintf(`{"photo_id":"%s"}`, uuid.UUID(photo.ID.Bytes).String())
@@ -143,7 +143,7 @@ func TestAnalyzePhoto_InvalidPhotoID(t *testing.T) {
 
 	queries := database.New(pool)
 	mockQueue := queue.NewMockQueue()
-	handler := NewPhotoHandler(queries, mockQueue, logger)
+	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
 	reqBody := `{"photo_id":"invalid-uuid"}`
@@ -174,7 +174,7 @@ func TestAnalyzePhoto_PhotoNotFound(t *testing.T) {
 
 	queries := database.New(pool)
 	mockQueue := queue.NewMockQueue()
-	handler := NewPhotoHandler(queries, mockQueue, logger)
+	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
 	nonExistentID := uuid.New()
@@ -235,7 +235,7 @@ func TestGetPhotoAnalysisStatus(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	handler := NewPhotoHandler(queries, mockQueue, logger)
+	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/photos/analyze/"+job.ID.String(), nil)
@@ -270,7 +270,7 @@ func TestGetPhotoAnalysisStatus_InvalidJobID(t *testing.T) {
 
 	queries := database.New(pool)
 	mockQueue := queue.NewMockQueue()
-	handler := NewPhotoHandler(queries, mockQueue, logger)
+	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/photos/analyze/invalid-uuid", nil)
@@ -301,7 +301,7 @@ func TestGetPhotoAnalysisStatus_JobNotFound(t *testing.T) {
 
 	queries := database.New(pool)
 	mockQueue := queue.NewMockQueue()
-	handler := NewPhotoHandler(queries, mockQueue, logger)
+	handler := NewPhotoHandler(pool, queries, mockQueue, logger)
 
 	e := echo.New()
 	nonExistentJobID := uuid.New()

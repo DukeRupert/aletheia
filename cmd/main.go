@@ -276,7 +276,7 @@ func main() {
 	projectHandler := handlers.NewProjectHandler(pool, logger)
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
-	photoHandler := handlers.NewPhotoHandler(queries, queueService, logger)
+	photoHandler := handlers.NewPhotoHandler(pool, queries, queueService, logger)
 	violationHandler := handlers.NewViolationHandler(queries, logger)
 	healthHandler := handlers.NewHealthHandler(pool, fileStorage, queueService, logger)
 

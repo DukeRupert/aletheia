@@ -1,28 +1,33 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/queue"
+	"github.com/dukerupert/aletheia/internal/session"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
 
 // PhotoHandler handles photo-related HTTP requests
 type PhotoHandler struct {
 	db     *database.Queries
+	pool   *pgxpool.Pool
 	queue  queue.Queue
 	logger *slog.Logger
 }
 
 // NewPhotoHandler creates a new photo handler
-func NewPhotoHandler(db *database.Queries, q queue.Queue, logger *slog.Logger) *PhotoHandler {
+func NewPhotoHandler(pool *pgxpool.Pool, db *database.Queries, q queue.Queue, logger *slog.Logger) *PhotoHandler {
 	return &PhotoHandler{
 		db:     db,
+		pool:   pool,
 		queue:  q,
 		logger: logger,
 	}
@@ -55,7 +60,9 @@ type AnalyzePhotoResponse struct {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/photos/analyze [post]
 func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	// Parse request - try form params first (from HTMX), then JSON
 	var req AnalyzePhotoRequest
@@ -92,10 +99,6 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "Photo not found")
 	}
 
-	// Get the current user's organization ID from session
-	// TODO: Add authorization check to ensure user has access to this photo's organization
-	// userOrgID := c.Get("organization_id").(uuid.UUID)
-
 	// Fetch inspection to get organization ID
 	inspection, err := h.db.GetInspection(ctx, photo.InspectionID)
 	if err != nil {
@@ -114,6 +117,18 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 			slog.String("error", err.Error()),
 		)
 		return echo.NewHTTPError(http.StatusNotFound, "Project not found")
+	}
+
+	// Authorization: verify user has access to this photo's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
+	if err != nil {
+		return err
 	}
 
 	// Enqueue photo analysis job
@@ -203,7 +218,9 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 // @Failure 404 {object} ErrorResponse
 // @Router /api/photos/analyze/{job_id} [get]
 func (h *PhotoHandler) GetPhotoAnalysisStatus(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	jobIDStr := c.Param("job_id")
 	jobID, err := uuid.Parse(jobIDStr)
@@ -221,23 +238,56 @@ func (h *PhotoHandler) GetPhotoAnalysisStatus(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "Job not found")
 	}
 
+	// Get photo_id from job payload for authorization
+	photoIDStr, ok := job.Payload["photo_id"].(string)
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Invalid job payload")
+	}
+	photoID, err := uuid.Parse(photoIDStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Invalid photo_id in job payload")
+	}
+
+	// Get photo to verify access
+	photo, err := h.db.GetPhoto(ctx, pgtype.UUID{Bytes: photoID, Valid: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "Photo not found")
+	}
+
+	// Fetch inspection to get organization ID
+	inspection, err := h.db.GetInspection(ctx, photo.InspectionID)
+	if err != nil {
+		h.logger.Error("inspection not found",
+			slog.String("inspection_id", photo.InspectionID.String()),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusNotFound, "Inspection not found")
+	}
+
+	// Fetch project to get organization ID
+	project, err := h.db.GetProject(ctx, inspection.ProjectID)
+	if err != nil {
+		h.logger.Error("project not found",
+			slog.String("project_id", inspection.ProjectID.String()),
+			slog.String("error", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusNotFound, "Project not found")
+	}
+
+	// Authorization: verify user has access to this photo's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session")
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
+	if err != nil {
+		return err
+	}
+
 	// Check if this is an HTMX request
 	if c.Request().Header.Get("HX-Request") == "true" {
-		// Get photo_id from job payload
-		photoIDStr, ok := job.Payload["photo_id"].(string)
-		if !ok {
-			return echo.NewHTTPError(http.StatusInternalServerError, "Invalid job payload")
-		}
-		photoID, err := uuid.Parse(photoIDStr)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "Invalid photo_id in job payload")
-		}
-
-		// Get photo
-		photo, err := h.db.GetPhoto(ctx, pgtype.UUID{Bytes: photoID, Valid: true})
-		if err != nil {
-			return echo.NewHTTPError(http.StatusNotFound, "Photo not found")
-		}
 
 		displayURL := photo.StorageUrl
 		if photo.ThumbnailUrl.Valid {
