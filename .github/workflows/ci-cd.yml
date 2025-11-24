@@ -64,6 +64,16 @@ jobs:
             exit 1
           fi
 
+      - name: Install goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
+      - name: Run database migrations
+        env:
+          GOOSE_DRIVER: postgres
+          GOOSE_DBSTRING: "host=localhost port=5432 user=postgres password=postgres dbname=aletheia_test sslmode=disable"
+          GOOSE_MIGRATION_DIR: ./internal/migrations
+        run: goose up
+
       - name: Run tests
         env:
           DB_USER: postgres
