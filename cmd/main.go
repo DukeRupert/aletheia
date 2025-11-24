@@ -271,7 +271,7 @@ func main() {
 	//   auditLogger.LogCreate(ctx, userID, orgID, "user", user.ID,
 	//       map[string]interface{}{"email": user.Email}, c)
 
-	authHandler := handlers.NewAuthHandler(pool, logger, emailService)
+	authHandler := handlers.NewAuthHandler(pool, logger, emailService, cfg)
 	orgHandler := handlers.NewOrganizationHandler(pool, logger)
 	projectHandler := handlers.NewProjectHandler(pool, logger)
 	inspectionHandler := handlers.NewInspectionHandler(pool, logger)

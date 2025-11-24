@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dukerupert/aletheia/internal/auth"
+	"github.com/dukerupert/aletheia/internal/config"
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/email"
 	"github.com/dukerupert/aletheia/internal/session"
@@ -20,13 +21,15 @@ type AuthHandler struct {
 	db           *pgxpool.Pool
 	logger       *slog.Logger
 	emailService email.EmailService
+	cfg          *config.Config
 }
 
-func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger, emailService email.EmailService) *AuthHandler {
+func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger, emailService email.EmailService, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
 		db:           db,
 		logger:       logger,
 		emailService: emailService,
+		cfg:          cfg,
 	}
 }
 
@@ -233,7 +236,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		Value:    sess.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   c.Request().URL.Scheme == "https", // Only send over HTTPS in production
+		Secure:   h.cfg.Session.Secure, // Use config-based Secure flag (set by ENVIRONMENT variable)
 		SameSite: http.SameSiteLaxMode,
 		Expires:  sess.ExpiresAt.Time, // Convert pgtype.Timestamptz to time.Time
 	}
@@ -689,6 +692,16 @@ func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "token verification failed")
 	}
 
+	// Validate token hasn't expired
+	if !user.ResetTokenExpiresAt.Valid || time.Now().After(user.ResetTokenExpiresAt.Time) {
+		h.logger.Warn("reset token expired",
+			slog.String("user_id", user.ID.String()),
+			slog.String("email", user.Email),
+			slog.String("token", req.Token),
+		)
+		return echo.NewHTTPError(http.StatusBadRequest, "reset token has expired, please request a new one")
+	}
+
 	h.logger.Info("reset token verified",
 		slog.String("user_id", user.ID.String()),
 		slog.String("email", user.Email),
@@ -735,6 +748,16 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 		}
 		h.logger.Error("failed to get user by reset token", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "password reset failed")
+	}
+
+	// Validate token hasn't expired
+	if !user.ResetTokenExpiresAt.Valid || time.Now().After(user.ResetTokenExpiresAt.Time) {
+		h.logger.Warn("password reset attempt with expired token",
+			slog.String("user_id", user.ID.String()),
+			slog.String("email", user.Email),
+			slog.String("token", req.Token),
+		)
+		return echo.NewHTTPError(http.StatusBadRequest, "reset token has expired, please request a new one")
 	}
 
 	// Hash new password
