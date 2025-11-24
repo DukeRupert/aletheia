@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
@@ -65,6 +67,17 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 		return err
 	}
 
+	// Sanitize input
+	req.OrganizationID = strings.TrimSpace(req.OrganizationID)
+	req.Name = strings.TrimSpace(req.Name)
+	req.Description = strings.TrimSpace(req.Description)
+	req.ProjectType = strings.TrimSpace(req.ProjectType)
+	req.Address = strings.TrimSpace(req.Address)
+	req.City = strings.TrimSpace(req.City)
+	req.State = strings.TrimSpace(req.State)
+	req.ZipCode = strings.TrimSpace(req.ZipCode)
+	req.Country = strings.TrimSpace(req.Country)
+
 	queries := database.New(h.pool)
 
 	// Parse organization ID
@@ -73,8 +86,12 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid organization_id")
 	}
 
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Verify user is owner or admin of the organization
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
@@ -86,7 +103,7 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 	}
 
 	// Create project
-	project, err := queries.CreateProject(c.Request().Context(), database.CreateProjectParams{
+	project, err := queries.CreateProject(ctx, database.CreateProjectParams{
 		OrganizationID: orgUUID,
 		Name:           req.Name,
 		Description:    pgtype.Text{String: req.Description, Valid: req.Description != ""},
@@ -154,8 +171,12 @@ func (h *ProjectHandler) GetProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid project id")
 	}
 
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get project
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "project not found")
@@ -165,7 +186,7 @@ func (h *ProjectHandler) GetProject(c echo.Context) error {
 	}
 
 	// Verify user is a member of the organization that owns this project
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, project.OrganizationID)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
 		return err
 	}
@@ -213,14 +234,18 @@ func (h *ProjectHandler) ListProjects(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid organization id")
 	}
 
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Verify user is a member of the organization
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, orgUUID)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgUUID)
 	if err != nil {
 		return err
 	}
 
 	// Get all projects for the organization
-	projects, err := queries.ListProjects(c.Request().Context(), orgUUID)
+	projects, err := queries.ListProjects(ctx, orgUUID)
 	if err != nil {
 		h.logger.Error("failed to list projects", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to list projects")
@@ -285,6 +310,44 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 		return err
 	}
 
+	// Sanitize input
+	if req.Name != nil {
+		trimmed := strings.TrimSpace(*req.Name)
+		req.Name = &trimmed
+	}
+	if req.Description != nil {
+		trimmed := strings.TrimSpace(*req.Description)
+		req.Description = &trimmed
+	}
+	if req.ProjectType != nil {
+		trimmed := strings.TrimSpace(*req.ProjectType)
+		req.ProjectType = &trimmed
+	}
+	if req.Status != nil {
+		trimmed := strings.TrimSpace(*req.Status)
+		req.Status = &trimmed
+	}
+	if req.Address != nil {
+		trimmed := strings.TrimSpace(*req.Address)
+		req.Address = &trimmed
+	}
+	if req.City != nil {
+		trimmed := strings.TrimSpace(*req.City)
+		req.City = &trimmed
+	}
+	if req.State != nil {
+		trimmed := strings.TrimSpace(*req.State)
+		req.State = &trimmed
+	}
+	if req.ZipCode != nil {
+		trimmed := strings.TrimSpace(*req.ZipCode)
+		req.ZipCode = &trimmed
+	}
+	if req.Country != nil {
+		trimmed := strings.TrimSpace(*req.Country)
+		req.Country = &trimmed
+	}
+
 	queries := database.New(h.pool)
 
 	// Parse project ID
@@ -293,8 +356,12 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid project id")
 	}
 
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get project to find its organization
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "project not found")
@@ -304,7 +371,7 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 	}
 
 	// Verify user is owner or admin of the organization
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, project.OrganizationID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
@@ -342,7 +409,7 @@ func (h *ProjectHandler) UpdateProject(c echo.Context) error {
 		params.Country = pgtype.Text{String: *req.Country, Valid: true}
 	}
 
-	updatedProject, err := queries.UpdateProject(c.Request().Context(), params)
+	updatedProject, err := queries.UpdateProject(ctx, params)
 	if err != nil {
 		h.logger.Error("failed to update project", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update project")
@@ -379,8 +446,12 @@ func (h *ProjectHandler) DeleteProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid project id")
 	}
 
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get project to find its organization
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "project not found")
@@ -390,13 +461,13 @@ func (h *ProjectHandler) DeleteProject(c echo.Context) error {
 	}
 
 	// Verify user is owner or admin of the organization
-	_, err = requireOrganizationMembership(c.Request().Context(), h.pool, h.logger, userID, project.OrganizationID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID, database.OrganizationRoleOwner, database.OrganizationRoleAdmin)
 	if err != nil {
 		return err
 	}
 
 	// Delete project
-	err = queries.DeleteProject(c.Request().Context(), projectUUID)
+	err = queries.DeleteProject(ctx, projectUUID)
 	if err != nil {
 		h.logger.Error("failed to delete project", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete project")
