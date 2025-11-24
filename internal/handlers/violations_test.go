@@ -103,7 +103,7 @@ func TestListViolationsByInspection(t *testing.T) {
 	_ = createTestViolation(t, pool, photo.ID, database.ViolationSeverityHigh, database.ViolationStatusConfirmed)
 	_ = createTestViolation(t, pool, photo.ID, database.ViolationSeverityMedium, database.ViolationStatusPending)
 
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/inspections/"+uuid.UUID(inspection.ID.Bytes).String()+"/violations", nil)
@@ -166,7 +166,7 @@ func TestListViolationsByInspection_WithStatusFilter(t *testing.T) {
 	_ = createTestViolation(t, pool, photo.ID, database.ViolationSeverityCritical, database.ViolationStatusPending)
 	confirmedViolation := createTestViolation(t, pool, photo.ID, database.ViolationSeverityHigh, database.ViolationStatusConfirmed)
 
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/inspections/"+uuid.UUID(inspection.ID.Bytes).String()+"/violations?status=confirmed", nil)
@@ -217,7 +217,7 @@ func TestGetViolation(t *testing.T) {
 	photo := createTestPhoto(t, pool, inspection.ID)
 	violation := createTestViolation(t, pool, photo.ID, database.ViolationSeverityHigh, database.ViolationStatusPending)
 
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/violations/"+uuid.UUID(violation.ID.Bytes).String(), nil)
@@ -252,7 +252,7 @@ func TestGetViolation_NotFound(t *testing.T) {
 	_ = createTestOrganization(t, pool, userID, "Test Org")
 
 	queries := database.New(pool)
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	nonExistentID := uuid.New()
@@ -300,7 +300,7 @@ func TestUpdateViolation(t *testing.T) {
 	photo := createTestPhoto(t, pool, inspection.ID)
 	violation := createTestViolation(t, pool, photo.ID, database.ViolationSeverityHigh, database.ViolationStatusPending)
 
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	newStatus := "confirmed"
@@ -355,7 +355,7 @@ func TestUpdateViolation_StatusOnly(t *testing.T) {
 	violation := createTestViolation(t, pool, photo.ID, database.ViolationSeverityHigh, database.ViolationStatusPending)
 	originalDescription := violation.Description
 
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	reqBody := `{"status":"dismissed"}`
@@ -407,7 +407,7 @@ func TestDeleteViolation(t *testing.T) {
 	photo := createTestPhoto(t, pool, inspection.ID)
 	violation := createTestViolation(t, pool, photo.ID, database.ViolationSeverityLow, database.ViolationStatusPending)
 
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodDelete, "/api/violations/"+uuid.UUID(violation.ID.Bytes).String(), nil)
@@ -438,7 +438,7 @@ func TestDeleteViolation_NotFound(t *testing.T) {
 	_ = createTestOrganization(t, pool, userID, "Test Org")
 
 	queries := database.New(pool)
-	handler := NewViolationHandler(queries, logger)
+	handler := NewViolationHandler(pool, queries, logger)
 
 	e := echo.New()
 	nonExistentID := uuid.New()
