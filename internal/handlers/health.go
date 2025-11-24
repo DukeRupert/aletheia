@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -80,7 +81,10 @@ func (h *HealthHandler) HealthCheck(c echo.Context) error {
 //
 // Route: GET /health/ready
 func (h *HealthHandler) ReadinessCheck(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	checks := make(map[string]string)
 	healthy := true
 
@@ -171,7 +175,9 @@ func (h *HealthHandler) LivenessCheck(c echo.Context) error {
 //
 // Route: GET /health/detailed
 func (h *HealthHandler) DetailedHealthCheck(c echo.Context) error {
-	ctx := c.Request().Context()
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
 
 	// Calculate uptime
 	uptime := time.Since(h.startTime)

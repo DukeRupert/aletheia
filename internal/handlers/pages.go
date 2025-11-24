@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -299,20 +301,17 @@ func (h *PageHandler) ProjectDetailPage(c echo.Context) error {
 	// Get project
 	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
 		h.logger.Error("failed to get project", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load project")
 	}
 
 	// Verify user is a member of the organization that owns this project
-	_, err = queries.GetOrganizationMemberByUserAndOrg(ctx, database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to access project",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", projectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+		return err
 	}
 
 	data := map[string]interface{}{
@@ -340,8 +339,11 @@ func (h *PageHandler) ProfilePage(c echo.Context) error {
 	// Get user details
 	user, err := queries.GetUser(ctx, uuidToPgUUID(userID))
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
 		h.logger.Error("failed to get user", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load user")
 	}
 
 	// Build display name
@@ -364,6 +366,10 @@ func (h *PageHandler) ProfilePage(c echo.Context) error {
 
 // InspectionsPage renders the inspections list page for a project
 func (h *PageHandler) InspectionsPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -384,26 +390,23 @@ func (h *PageHandler) InspectionsPage(c echo.Context) error {
 	}
 
 	// Get project
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
 		h.logger.Error("failed to get project", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load project")
 	}
 
 	// Verify user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to access project inspections",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", projectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+		return err
 	}
 
 	// Get all inspections for the project
-	inspections, err := queries.ListInspections(c.Request().Context(), projectUUID)
+	inspections, err := queries.ListInspections(ctx, projectUUID)
 	if err != nil {
 		h.logger.Error("failed to list inspections", slog.String("err", err.Error()))
 		inspections = []database.Inspection{}
@@ -420,6 +423,10 @@ func (h *PageHandler) InspectionsPage(c echo.Context) error {
 
 // NewInspectionPage renders the new inspection form page
 func (h *PageHandler) NewInspectionPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -440,22 +447,19 @@ func (h *PageHandler) NewInspectionPage(c echo.Context) error {
 	}
 
 	// Get project
-	project, err := queries.GetProject(c.Request().Context(), projectUUID)
+	project, err := queries.GetProject(ctx, projectUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		}
 		h.logger.Error("failed to get project", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load project")
 	}
 
 	// Verify user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to create inspection",
-			slog.String("user_id", userID.String()),
-			slog.String("project_id", projectID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this project's organization")
+		return err
 	}
 
 	data := map[string]interface{}{
@@ -468,6 +472,10 @@ func (h *PageHandler) NewInspectionPage(c echo.Context) error {
 
 // AllInspectionsPage renders a global view of all inspections across all projects
 func (h *PageHandler) AllInspectionsPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -477,7 +485,7 @@ func (h *PageHandler) AllInspectionsPage(c echo.Context) error {
 	queries := database.New(h.pool)
 
 	// Get user's organizations
-	memberships, err := queries.ListUserOrganizations(c.Request().Context(), uuidToPgUUID(userID))
+	memberships, err := queries.ListUserOrganizations(ctx, uuidToPgUUID(userID))
 	if err != nil {
 		h.logger.Error("failed to get user organizations", slog.String("err", err.Error()))
 		memberships = []database.OrganizationMember{}
@@ -495,7 +503,7 @@ func (h *PageHandler) AllInspectionsPage(c echo.Context) error {
 
 	for _, membership := range memberships {
 		// Get all projects in this organization
-		projects, err := queries.ListProjects(c.Request().Context(), membership.OrganizationID)
+		projects, err := queries.ListProjects(ctx, membership.OrganizationID)
 		if err != nil {
 			h.logger.Warn("failed to list projects", slog.String("err", err.Error()))
 			continue
@@ -503,7 +511,7 @@ func (h *PageHandler) AllInspectionsPage(c echo.Context) error {
 
 		// Get inspections for each project
 		for _, project := range projects {
-			inspections, err := queries.ListInspections(c.Request().Context(), project.ID)
+			inspections, err := queries.ListInspections(ctx, project.ID)
 			if err != nil {
 				h.logger.Warn("failed to list inspections", slog.String("err", err.Error()))
 				continue
@@ -540,6 +548,10 @@ func (h *PageHandler) AllInspectionsPage(c echo.Context) error {
 
 // InspectionDetailPage displays a single inspection with its photos
 func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -560,40 +572,37 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 	}
 
 	// Get inspection
-	inspection, err := queries.GetInspection(c.Request().Context(), inspectionUUID)
+	inspection, err := queries.GetInspection(ctx, inspectionUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+		}
 		h.logger.Error("failed to get inspection", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load inspection")
 	}
 
 	// Get project for inspection
-	project, err := queries.GetProject(c.Request().Context(), inspection.ProjectID)
+	project, err := queries.GetProject(ctx, inspection.ProjectID)
 	if err != nil {
 		h.logger.Error("failed to get project", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load inspection details")
 	}
 
 	// Verify user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to view inspection",
-			slog.String("user_id", userID.String()),
-			slog.String("inspection_id", inspectionID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this inspection's organization")
+		return err
 	}
 
 	// Get photos for inspection
-	photos, err := queries.ListPhotos(c.Request().Context(), inspectionUUID)
+	photos, err := queries.ListPhotos(ctx, inspectionUUID)
 	if err != nil {
 		h.logger.Error("failed to list photos", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photos")
 	}
 
 	// Get violations for the inspection
-	violations, err := queries.ListDetectedViolationsByInspection(c.Request().Context(), inspectionUUID)
+	violations, err := queries.ListDetectedViolationsByInspection(ctx, inspectionUUID)
 	if err != nil {
 		h.logger.Error("failed to list violations", slog.String("err", err.Error()))
 		// Don't fail the page load if violations can't be fetched, just log it
@@ -618,7 +627,7 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 		if violation.SafetyCodeID.Valid {
 			// Only fetch if we haven't already
 			if _, exists := safetyCodeMap[violation.SafetyCodeID.String()]; !exists {
-				safetyCode, err := queries.GetSafetyCode(c.Request().Context(), violation.SafetyCodeID)
+				safetyCode, err := queries.GetSafetyCode(ctx, violation.SafetyCodeID)
 				if err == nil {
 					safetyCodeMap[violation.SafetyCodeID.String()] = safetyCode.Code + " - " + safetyCode.Description
 				}
@@ -653,6 +662,10 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 
 // PhotoDetailPage renders the photo detail page with violation review
 func (h *PageHandler) PhotoDetailPage(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	// Get authenticated user from session
 	userID, ok := session.GetUserID(c)
 	if !ok {
@@ -673,40 +686,40 @@ func (h *PageHandler) PhotoDetailPage(c echo.Context) error {
 	}
 
 	// Get photo
-	photo, err := queries.GetPhoto(c.Request().Context(), photoUUID)
+	photo, err := queries.GetPhoto(ctx, photoUUID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "photo not found")
+		}
 		h.logger.Error("failed to get photo", slog.String("err", err.Error()))
-		return echo.NewHTTPError(http.StatusNotFound, "photo not found")
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photo")
 	}
 
 	// Get inspection
-	inspection, err := queries.GetInspection(c.Request().Context(), photo.InspectionID)
+	inspection, err := queries.GetInspection(ctx, photo.InspectionID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "inspection not found")
+		}
 		h.logger.Error("failed to get inspection", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photo details")
 	}
 
 	// Get project
-	project, err := queries.GetProject(c.Request().Context(), inspection.ProjectID)
+	project, err := queries.GetProject(ctx, inspection.ProjectID)
 	if err != nil {
 		h.logger.Error("failed to get project", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load photo details")
 	}
 
 	// Verify user is a member of the organization
-	_, err = queries.GetOrganizationMemberByUserAndOrg(c.Request().Context(), database.GetOrganizationMemberByUserAndOrgParams{
-		OrganizationID: project.OrganizationID,
-		UserID:         uuidToPgUUID(userID),
-	})
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, project.OrganizationID)
 	if err != nil {
-		h.logger.Warn("user not authorized to view photo",
-			slog.String("user_id", userID.String()),
-			slog.String("photo_id", photoID))
-		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this photo's organization")
+		return err
 	}
 
 	// Get violations for this photo
-	allViolations, err := queries.ListDetectedViolations(c.Request().Context(), photo.ID)
+	allViolations, err := queries.ListDetectedViolations(ctx, photo.ID)
 	if err != nil {
 		h.logger.Error("failed to list violations", slog.String("err", err.Error()))
 		allViolations = []database.DetectedViolation{}
@@ -724,7 +737,7 @@ func (h *PageHandler) PhotoDetailPage(c echo.Context) error {
 	safetyCodeMap := make(map[string]string)
 	for _, violation := range violations {
 		if violation.SafetyCodeID.Valid {
-			safetyCode, err := queries.GetSafetyCode(c.Request().Context(), violation.SafetyCodeID)
+			safetyCode, err := queries.GetSafetyCode(ctx, violation.SafetyCodeID)
 			if err == nil {
 				safetyCodeMap[violation.SafetyCodeID.String()] = safetyCode.Code + " - " + safetyCode.Description
 			}

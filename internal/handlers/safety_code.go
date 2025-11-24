@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -61,12 +63,8 @@ func (h *SafetyCodeHandler) CreateSafetyCode(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	// Validate required fields
-	if req.Code == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "code is required")
-	}
-	if req.Description == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "description is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.pool)
@@ -128,7 +126,11 @@ func (h *SafetyCodeHandler) GetSafetyCode(c echo.Context) error {
 	// Get safety code
 	safetyCode, err := queries.GetSafetyCode(ctx, safetyCodeUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
+		}
+		h.logger.Error("failed to get safety code", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get safety code")
 	}
 
 	return c.JSON(http.StatusOK, safetyCodeToResponse(safetyCode))
@@ -229,7 +231,11 @@ func (h *SafetyCodeHandler) UpdateSafetyCode(c echo.Context) error {
 	// Get existing safety code to use as base values
 	existingSafetyCode, err := queries.GetSafetyCode(ctx, safetyCodeUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
+		}
+		h.logger.Error("failed to get safety code", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get safety code")
 	}
 
 	// Use existing values if not provided in request
@@ -301,7 +307,11 @@ func (h *SafetyCodeHandler) DeleteSafetyCode(c echo.Context) error {
 	// Check if safety code exists
 	_, err = queries.GetSafetyCode(ctx, safetyCodeUUID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "safety code not found")
+		}
+		h.logger.Error("failed to get safety code", slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get safety code")
 	}
 
 	// Delete safety code

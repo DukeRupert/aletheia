@@ -60,9 +60,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	// Validate request
-	if req.Email == "" || req.Username == "" || req.Password == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "email, username, and password are required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	// Validate password complexity
@@ -223,9 +222,8 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	// Validate request
-	if req.Email == "" || req.Password == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "email and password are required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	// Get user by email with timeout
@@ -235,7 +233,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	queries := database.New(h.db)
 	user, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			h.logger.Warn("login attempt with non-existent email", slog.String("email", req.Email))
 			return echo.NewHTTPError(http.StatusUnauthorized, "invalid email or password")
 		}
@@ -392,6 +390,9 @@ func (h *AuthHandler) Me(c echo.Context) error {
 		Valid: true,
 	})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
 		h.logger.Error("failed to get user", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user")
 	}
@@ -436,6 +437,10 @@ func (h *AuthHandler) UpdateProfile(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	// Build update parameters
@@ -499,8 +504,8 @@ func (h *AuthHandler) VerifyEmail(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Token == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "verification token is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.db)
@@ -511,7 +516,7 @@ func (h *AuthHandler) VerifyEmail(c echo.Context) error {
 		Valid:  true,
 	})
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			h.logger.Warn("verification attempt with invalid token", slog.String("token", req.Token))
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired verification token")
 		}
@@ -569,8 +574,8 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Email == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "email is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.db)
@@ -578,7 +583,7 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 	// Get user by email
 	user, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			// Don't reveal if email exists or not for security
 			h.logger.Warn("resend verification attempt for non-existent email", slog.String("email", req.Email))
 			return c.JSON(http.StatusOK, map[string]string{
@@ -647,8 +652,8 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Email == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "email is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.db)
@@ -659,7 +664,7 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 
 	user, err := queries.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			// Don't reveal if email exists or not for security
 			h.logger.Warn("password reset attempt for non-existent email", slog.String("email", req.Email))
 
@@ -762,8 +767,8 @@ func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Token == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "reset token is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	queries := database.New(h.db)
@@ -774,7 +779,7 @@ func (h *AuthHandler) VerifyResetToken(c echo.Context) error {
 		Valid:  true,
 	})
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			h.logger.Warn("reset token verification failed", slog.String("token", req.Token))
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired reset token")
 		}
@@ -820,8 +825,8 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Token == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "reset token is required")
+	if err := c.Validate(&req); err != nil {
+		return err
 	}
 
 	// Validate password complexity
@@ -837,7 +842,7 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 		Valid:  true,
 	})
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			h.logger.Warn("password reset attempt with invalid token", slog.String("token", req.Token))
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired reset token")
 		}
