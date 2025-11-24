@@ -234,7 +234,17 @@ func (rl *RateLimiter) Shutdown() {
 	}
 }
 
-// StrictRateLimitMiddleware provides stricter rate limiting for sensitive endpoints.
+// StrictRateLimiter provides stricter rate limiting for sensitive endpoints.
+// Similar to RateLimiter but with stricter limits and cleanup support.
+type StrictRateLimiter struct {
+	limiters sync.Map
+	logger   *slog.Logger
+	config   RateLimitConfig
+	ctx      context.Context
+	cancel   context.CancelFunc
+}
+
+// NewStrictRateLimiter creates a new strict rate limiter for auth endpoints.
 //
 // Purpose:
 // - Apply tighter limits to authentication endpoints (login, register, password reset)
@@ -242,38 +252,43 @@ func (rl *RateLimiter) Shutdown() {
 // - Use much lower rate: 5 requests/minute per IP
 //
 // Usage in main.go (apply to specific routes):
+//   strictLimiter := middleware.NewStrictRateLimiter(logger)
+//   defer strictLimiter.Shutdown()
 //   auth := e.Group("/auth")
-//   auth.Use(middleware.StrictRateLimitMiddleware(logger))
+//   auth.Use(strictLimiter.Middleware())
 //   auth.POST("/login", authHandler.Login)
-//   auth.POST("/register", authHandler.Register)
-func StrictRateLimitMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
-	// Create a separate limiter map for strict rate limiting
-	limiters := &sync.Map{}
-	config := DefaultRateLimitConfig()
+func NewStrictRateLimiter(logger *slog.Logger) *StrictRateLimiter {
+	ctx, cancel := context.WithCancel(context.Background())
 
+	rl := &StrictRateLimiter{
+		logger: logger,
+		config: DefaultRateLimitConfig(),
+		ctx:    ctx,
+		cancel: cancel,
+	}
+
+	// Start cleanup goroutine
+	go rl.cleanupOldLimiters()
+
+	return rl
+}
+
+// Middleware returns the strict rate limiting middleware.
+func (rl *StrictRateLimiter) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Get client IP
 			ip := c.RealIP()
 
-			// Get or create strict rate limiter for this IP
-			var limiter *rate.Limiter
-			if entry, exists := limiters.Load(ip); exists {
-				limiter = entry.(*rate.Limiter)
-			} else {
-				// Create new strict limiter: 5 requests per minute
-				limiter = rate.NewLimiter(rate.Limit(config.StrictRate), config.StrictBurst)
-				limiters.Store(ip, limiter)
-			}
+			// Get or create limiter for this IP
+			limiter := rl.getLimiter(ip)
 
 			// Check if request is allowed
 			if !limiter.Allow() {
-				logger.Warn("strict rate limit exceeded",
+				rl.logger.Warn("strict rate limit exceeded",
 					slog.String("ip", ip),
 					slog.String("path", c.Path()),
 					slog.String("method", c.Request().Method))
 
-				// Set Retry-After header (60 seconds for stricter limit)
 				c.Response().Header().Set("Retry-After", "60")
 				c.Response().Header().Set("X-RateLimit-Limit", "5")
 				c.Response().Header().Set("X-RateLimit-Remaining", "0")
@@ -281,65 +296,135 @@ func StrictRateLimitMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 				return echo.NewHTTPError(http.StatusTooManyRequests, "too many authentication attempts, please try again later")
 			}
 
-			// Add rate limit headers
 			c.Response().Header().Set("X-RateLimit-Limit", "5")
-
 			return next(c)
 		}
 	}
 }
 
-// PerUserRateLimitMiddleware provides rate limiting per authenticated user.
+// getLimiter gets or creates a rate limiter for the given key.
+func (rl *StrictRateLimiter) getLimiter(key string) *rate.Limiter {
+	if entry, exists := rl.limiters.Load(key); exists {
+		limEntry := entry.(*limiterEntry)
+		limEntry.lastAccess.Store(time.Now().Unix())
+		return limEntry.limiter
+	}
+
+	limiter := rate.NewLimiter(rate.Limit(rl.config.StrictRate), rl.config.StrictBurst)
+	entry := &limiterEntry{
+		limiter: limiter,
+	}
+	entry.lastAccess.Store(time.Now().Unix())
+	actual, _ := rl.limiters.LoadOrStore(key, entry)
+	return actual.(*limiterEntry).limiter
+}
+
+// cleanupOldLimiters removes inactive limiters periodically.
+func (rl *StrictRateLimiter) cleanupOldLimiters() {
+	interval, err := time.ParseDuration(rl.config.CleanupInterval)
+	if err != nil {
+		interval = time.Hour
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	inactivityThreshold := time.Hour
+
+	for {
+		select {
+		case <-ticker.C:
+			var removed int
+			currentTime := time.Now().Unix()
+
+			rl.limiters.Range(func(key, value interface{}) bool {
+				entry := value.(*limiterEntry)
+				lastAccess := entry.lastAccess.Load()
+				if currentTime-lastAccess > int64(inactivityThreshold.Seconds()) {
+					rl.limiters.Delete(key)
+					removed++
+				}
+				return true
+			})
+
+			if removed > 0 {
+				rl.logger.Info("cleaned up old strict rate limiters",
+					slog.Int("removed", removed))
+			}
+		case <-rl.ctx.Done():
+			rl.logger.Debug("strict rate limiter cleanup goroutine stopping")
+			return
+		}
+	}
+}
+
+// Shutdown stops the cleanup goroutine.
+func (rl *StrictRateLimiter) Shutdown() {
+	if rl.cancel != nil {
+		rl.cancel()
+	}
+}
+
+// PerUserRateLimiter provides rate limiting per authenticated user.
+// Similar to RateLimiter but tracks by user ID instead of IP.
+type PerUserRateLimiter struct {
+	limiters sync.Map
+	logger   *slog.Logger
+	config   RateLimitConfig
+	ctx      context.Context
+	cancel   context.CancelFunc
+}
+
+// NewPerUserRateLimiter creates a new per-user rate limiter.
 //
 // Purpose:
 // - Limit requests per user account (in addition to IP-based limiting)
 // - Prevent single user from overwhelming system
 // - Useful for API endpoints after authentication
 //
-// Implementation:
-// - Extract user ID from session/context
-// - Maintain separate limiters per user ID
-// - Apply in addition to (not instead of) IP-based limiting
-//
 // Usage:
+//   userLimiter := middleware.NewPerUserRateLimiter(logger)
+//   defer userLimiter.Shutdown()
 //   api := e.Group("/api")
 //   api.Use(session.SessionMiddleware(pool))
-//   api.Use(middleware.PerUserRateLimitMiddleware(logger))
-func PerUserRateLimitMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
-	// Create a separate limiter map for per-user rate limiting
-	limiters := &sync.Map{}
-	config := DefaultRateLimitConfig()
+//   api.Use(userLimiter.Middleware())
+func NewPerUserRateLimiter(logger *slog.Logger) *PerUserRateLimiter {
+	ctx, cancel := context.WithCancel(context.Background())
 
+	rl := &PerUserRateLimiter{
+		logger: logger,
+		config: DefaultRateLimitConfig(),
+		ctx:    ctx,
+		cancel: cancel,
+	}
+
+	// Start cleanup goroutine
+	go rl.cleanupOldLimiters()
+
+	return rl
+}
+
+// Middleware returns the per-user rate limiting middleware.
+func (rl *PerUserRateLimiter) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// Extract user ID from context (set by session middleware)
 			userID, ok := session.GetUserID(c)
 			if !ok {
-				// Not authenticated, skip user-based limiting (rely on IP-based limiting)
+				// Not authenticated, skip user-based limiting
 				return next(c)
 			}
 
-			// Convert user ID to string for use as map key
 			userKey := userID.String()
-
-			// Get or create rate limiter for this user
-			var limiter *rate.Limiter
-			if entry, exists := limiters.Load(userKey); exists {
-				limiter = entry.(*rate.Limiter)
-			} else {
-				// Create new user limiter: 100 requests per minute
-				limiter = rate.NewLimiter(rate.Limit(config.UserRate), config.UserBurst)
-				limiters.Store(userKey, limiter)
-			}
+			limiter := rl.getLimiter(userKey)
 
 			// Check if request is allowed
 			if !limiter.Allow() {
-				logger.Warn("per-user rate limit exceeded",
+				rl.logger.Warn("per-user rate limit exceeded",
 					slog.String("user_id", userKey),
 					slog.String("path", c.Path()),
 					slog.String("method", c.Request().Method))
 
-				// Set Retry-After header (60 seconds)
 				c.Response().Header().Set("Retry-After", "60")
 				c.Response().Header().Set("X-RateLimit-Limit-User", "100")
 				c.Response().Header().Set("X-RateLimit-Remaining-User", "0")
@@ -347,11 +432,72 @@ func PerUserRateLimitMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 				return echo.NewHTTPError(http.StatusTooManyRequests, "user rate limit exceeded")
 			}
 
-			// Add user-specific rate limit headers
 			c.Response().Header().Set("X-RateLimit-Limit-User", "100")
-
 			return next(c)
 		}
+	}
+}
+
+// getLimiter gets or creates a rate limiter for the given user.
+func (rl *PerUserRateLimiter) getLimiter(userKey string) *rate.Limiter {
+	if entry, exists := rl.limiters.Load(userKey); exists {
+		limEntry := entry.(*limiterEntry)
+		limEntry.lastAccess.Store(time.Now().Unix())
+		return limEntry.limiter
+	}
+
+	limiter := rate.NewLimiter(rate.Limit(rl.config.UserRate), rl.config.UserBurst)
+	entry := &limiterEntry{
+		limiter: limiter,
+	}
+	entry.lastAccess.Store(time.Now().Unix())
+	actual, _ := rl.limiters.LoadOrStore(userKey, entry)
+	return actual.(*limiterEntry).limiter
+}
+
+// cleanupOldLimiters removes inactive limiters periodically.
+func (rl *PerUserRateLimiter) cleanupOldLimiters() {
+	interval, err := time.ParseDuration(rl.config.CleanupInterval)
+	if err != nil {
+		interval = time.Hour
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	inactivityThreshold := time.Hour
+
+	for {
+		select {
+		case <-ticker.C:
+			var removed int
+			currentTime := time.Now().Unix()
+
+			rl.limiters.Range(func(key, value interface{}) bool {
+				entry := value.(*limiterEntry)
+				lastAccess := entry.lastAccess.Load()
+				if currentTime-lastAccess > int64(inactivityThreshold.Seconds()) {
+					rl.limiters.Delete(key)
+					removed++
+				}
+				return true
+			})
+
+			if removed > 0 {
+				rl.logger.Info("cleaned up old per-user rate limiters",
+					slog.Int("removed", removed))
+			}
+		case <-rl.ctx.Done():
+			rl.logger.Debug("per-user rate limiter cleanup goroutine stopping")
+			return
+		}
+	}
+}
+
+// Shutdown stops the cleanup goroutine.
+func (rl *PerUserRateLimiter) Shutdown() {
+	if rl.cancel != nil {
+		rl.cancel()
 	}
 }
 

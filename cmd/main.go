@@ -317,8 +317,9 @@ func main() {
 
 	// Public API routes - Auth endpoints with strict rate limiting
 	logger.Debug("configuring auth endpoints with strict rate limiting")
+	strictLimiter := intmiddleware.NewStrictRateLimiter(logger)
 	authGroup := e.Group("/api/auth")
-	authGroup.Use(intmiddleware.StrictRateLimitMiddleware(logger))
+	authGroup.Use(strictLimiter.Middleware())
 	authGroup.POST("/register", authHandler.Register)
 	authGroup.POST("/login", authHandler.Login)
 	authGroup.POST("/verify-email", authHandler.VerifyEmail)
@@ -348,9 +349,10 @@ func main() {
 
 	// Protected API routes (require session)
 	logger.Debug("configuring protected API routes with per-user rate limiting")
+	userLimiter := intmiddleware.NewPerUserRateLimiter(logger)
 	protected := e.Group("/api")
 	protected.Use(session.CachedSessionMiddleware(sessionCache))
-	protected.Use(intmiddleware.PerUserRateLimitMiddleware(logger))
+	protected.Use(userLimiter.Middleware())
 	logger.Info("protected API routes configured with per-user rate limiting",
 		slog.Float64("rate_per_min", 100.0),
 		slog.Int("burst", 150))
@@ -455,9 +457,11 @@ func main() {
 		logger.Error("server forced to shutdown", slog.String("err", err.Error()))
 	}
 
-	// Shutdown rate limiter cleanup goroutine
+	// Shutdown rate limiter cleanup goroutines
 	rateLimiter.Shutdown()
-	logger.Info("rate limiter shutdown")
+	strictLimiter.Shutdown()
+	userLimiter.Shutdown()
+	logger.Info("rate limiters shutdown")
 
 	// Close database pool
 	pool.Close()
