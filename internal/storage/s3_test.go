@@ -111,7 +111,7 @@ func TestS3Storage_Save(t *testing.T) {
 				baseURL: "https://test-bucket.s3.amazonaws.com",
 			}
 
-				// Load test file
+			// Load test file
 			imageData, err := loadTestImage("small", "jpeg")
 			assert.NoError(t, err)
 
@@ -254,14 +254,14 @@ func TestS3Storage_GetURL(t *testing.T) {
 
 func TestS3Storage_GenerateThumbnail(t *testing.T) {
 	tests := []struct {
-		name           string
-		bucket         string
-		originalFile   string
-		imageSize      string
-		imageFormat    string
-		setupMock      func(*MockS3Client, []byte)
-		wantErr        bool
-		errMessage     string
+		name            string
+		bucket          string
+		originalFile    string
+		imageSize       string
+		imageFormat     string
+		setupMock       func(*MockS3Client, []byte)
+		wantErr         bool
+		errMessage      string
 		verifyThumbnail bool
 	}{
 		{

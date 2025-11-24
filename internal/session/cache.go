@@ -47,7 +47,8 @@ type SessionCache struct {
 // - Cleanup interval: 10 minutes (purge expired entries from memory)
 //
 // Usage in main.go:
-//   sessionCache := session.NewSessionCache(pool)
+//
+//	sessionCache := session.NewSessionCache(pool)
 func NewSessionCache(db *pgxpool.Pool) *SessionCache {
 	// Initialize cache with 5-minute default expiration and 10-minute cleanup interval
 	c := cache.New(5*time.Minute, 10*time.Minute)
@@ -77,7 +78,8 @@ func NewSessionCache(db *pgxpool.Pool) *SessionCache {
 // - Return other errors from database queries
 //
 // Usage in middleware:
-//   session, err := sessionCache.GetSession(ctx, token)
+//
+//	session, err := sessionCache.GetSession(ctx, token)
 func (sc *SessionCache) GetSession(ctx context.Context, token string) (database.Session, error) {
 	// Check cache first (fast path)
 	if cached, found := sc.cache.Get(token); found {
@@ -112,7 +114,8 @@ func (sc *SessionCache) GetSession(ctx context.Context, token string) (database.
 // 5. Return SessionWithUser struct
 //
 // Usage in middleware:
-//   sessionUser, err := sessionCache.GetSessionWithUser(ctx, token)
+//
+//	sessionUser, err := sessionCache.GetSessionWithUser(ctx, token)
 func (sc *SessionCache) GetSessionWithUser(ctx context.Context, token string) (SessionWithUser, error) {
 	// Define cache key for combined session+user data
 	cacheKey := fmt.Sprintf("session_user:%s", token)
@@ -165,8 +168,9 @@ type SessionWithUser struct {
 // - Ensures cache doesn't serve stale session data
 //
 // Usage in handlers/auth.go:
-//   sessionCache.InvalidateSession(token)
-//   queries.DeleteSession(ctx, sessionID)
+//
+//	sessionCache.InvalidateSession(token)
+//	queries.DeleteSession(ctx, sessionID)
 func (sc *SessionCache) InvalidateSession(token string) {
 	// Delete session from cache
 	sc.cache.Delete(token)
@@ -191,7 +195,8 @@ func (sc *SessionCache) InvalidateSession(token string) {
 // Start with Option 3 for simplicity, implement Option 1 if needed.
 //
 // Usage in handlers/auth.go:
-//   sessionCache.InvalidateUserSessions(userID)
+//
+//	sessionCache.InvalidateUserSessions(userID)
 func (sc *SessionCache) InvalidateUserSessions(userID uuid.UUID) {
 	// No-op for now - sessions will expire naturally from cache (5 min)
 	// Future enhancement: maintain user_id -> []tokens mapping for immediate invalidation
@@ -209,7 +214,8 @@ func (sc *SessionCache) InvalidateUserSessions(userID uuid.UUID) {
 // - Emergency cache flush if corruption suspected
 //
 // Usage in tests:
-//   sessionCache.Clear()
+//
+//	sessionCache.Clear()
 func (sc *SessionCache) Clear() {
 	sc.cache.Flush()
 }
@@ -222,12 +228,13 @@ func (sc *SessionCache) Clear() {
 // - Expose via health check or metrics endpoint
 //
 // Returns:
-//   {
-//     "hits": 1000,
-//     "misses": 50,
-//     "items": 200,
-//     "evictions": 10
-//   }
+//
+//	{
+//	  "hits": 1000,
+//	  "misses": 50,
+//	  "items": 200,
+//	  "evictions": 10
+//	}
 func (sc *SessionCache) Stats() CacheStats {
 	// Note: go-cache doesn't track hits/misses/evictions natively
 	// We can only report item count

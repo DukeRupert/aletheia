@@ -49,9 +49,9 @@ func ValidatePassword(password string) error {
 
 	// Check for required character types
 	var (
-		hasUpper   bool
-		hasLower   bool
-		hasDigit   bool
+		hasUpper bool
+		hasLower bool
+		hasDigit bool
 	)
 
 	for _, c := range password {

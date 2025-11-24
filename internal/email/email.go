@@ -14,7 +14,7 @@ import (
 var templateFS embed.FS
 
 var (
-	verifyEmailTemplate *template.Template
+	verifyEmailTemplate   *template.Template
 	resetPasswordTemplate *template.Template
 )
 
@@ -125,11 +125,11 @@ func (s *postmarkEmailService) SendVerificationEmail(to, token string) error {
 	}
 
 	email := postmark.Email{
-		From:     fmt.Sprintf("%s <%s>", s.config.FromName, s.config.FromAddress),
-		To:       to,
-		Subject:  "Verify your email address",
-		TextBody: fmt.Sprintf("Please verify your email address by clicking this link: %s", verifyURL),
-		HtmlBody: htmlBody.String(),
+		From:       fmt.Sprintf("%s <%s>", s.config.FromName, s.config.FromAddress),
+		To:         to,
+		Subject:    "Verify your email address",
+		TextBody:   fmt.Sprintf("Please verify your email address by clicking this link: %s", verifyURL),
+		HtmlBody:   htmlBody.String(),
 		Tag:        "email-verification",
 		TrackOpens: true,
 	}
@@ -164,11 +164,11 @@ func (s *postmarkEmailService) SendPasswordResetEmail(to, token string) error {
 	}
 
 	email := postmark.Email{
-		From:     fmt.Sprintf("%s <%s>", s.config.FromName, s.config.FromAddress),
-		To:       to,
-		Subject:  "Reset your password",
-		TextBody: fmt.Sprintf("Reset your password by clicking this link: %s", resetURL),
-		HtmlBody: htmlBody.String(),
+		From:       fmt.Sprintf("%s <%s>", s.config.FromName, s.config.FromAddress),
+		To:         to,
+		Subject:    "Reset your password",
+		TextBody:   fmt.Sprintf("Reset your password by clicking this link: %s", resetURL),
+		HtmlBody:   htmlBody.String(),
 		Tag:        "password-reset",
 		TrackOpens: true,
 	}

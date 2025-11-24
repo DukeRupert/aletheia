@@ -22,10 +22,11 @@ import (
 // - Support proper error wrapping and unwrapping
 //
 // Usage in handlers:
-//   if err != nil {
-//       return errors.NewInternalError("USER_CREATION_FAILED", "failed to create user", err).
-//           WithField("email", req.Email)
-//   }
+//
+//	if err != nil {
+//	    return errors.NewInternalError("USER_CREATION_FAILED", "failed to create user", err).
+//	        WithField("email", req.Email)
+//	}
 type AppError struct {
 	// Code is a unique identifier for this error type (e.g., "USER_NOT_FOUND")
 	// Used for error tracking, metrics, and client-side error handling
@@ -80,7 +81,8 @@ func (e *AppError) Unwrap() error {
 // - Chain multiple fields: err.WithField("a", 1).WithField("b", 2)
 //
 // Usage:
-//   return err.WithField("user_id", userID).WithField("email", email)
+//
+//	return err.WithField("user_id", userID).WithField("email", email)
 func (e *AppError) WithField(key string, value interface{}) *AppError {
 	// Initialize Fields map if nil
 	if e.Fields == nil {
@@ -118,8 +120,9 @@ func (e *AppError) WithFields(fields map[string]interface{}) *AppError {
 // - Use appropriate log level based on error severity
 //
 // Usage in handlers:
-//   appErr.LogError(logger)
-//   return echo.NewHTTPError(appErr.StatusCode, appErr.Message)
+//
+//	appErr.LogError(logger)
+//	return echo.NewHTTPError(appErr.StatusCode, appErr.Message)
 func (e *AppError) LogError(logger *slog.Logger) {
 	// Create log attributes from Fields
 	attrs := make([]slog.Attr, 0, len(e.Fields)+3)
@@ -178,7 +181,8 @@ func (e *AppError) ToEchoError() error {
 // - Client should modify request and retry
 //
 // Usage:
-//   return errors.NewBadRequestError("INVALID_EMAIL", "email format is invalid", nil)
+//
+//	return errors.NewBadRequestError("INVALID_EMAIL", "email format is invalid", nil)
 func NewBadRequestError(code, message string, err error) *AppError {
 	return &AppError{
 		Code:       code,
@@ -196,7 +200,8 @@ func NewBadRequestError(code, message string, err error) *AppError {
 // - Missing or invalid credentials
 //
 // Usage:
-//   return errors.NewUnauthorizedError("INVALID_CREDENTIALS", "email or password is incorrect", nil)
+//
+//	return errors.NewUnauthorizedError("INVALID_CREDENTIALS", "email or password is incorrect", nil)
 func NewUnauthorizedError(code, message string, err error) *AppError {
 	return &AppError{
 		Code:       code,
@@ -214,7 +219,8 @@ func NewUnauthorizedError(code, message string, err error) *AppError {
 // - Authenticated but lacks permission
 //
 // Usage:
-//   return errors.NewForbiddenError("INSUFFICIENT_PERMISSIONS", "you don't have access to this organization", nil)
+//
+//	return errors.NewForbiddenError("INSUFFICIENT_PERMISSIONS", "you don't have access to this organization", nil)
 func NewForbiddenError(code, message string, err error) *AppError {
 	return &AppError{
 		Code:       code,
@@ -232,7 +238,8 @@ func NewForbiddenError(code, message string, err error) *AppError {
 // - Should not reveal whether resource ever existed (security)
 //
 // Usage:
-//   return errors.NewNotFoundError("INSPECTION_NOT_FOUND", "inspection not found", nil)
+//
+//	return errors.NewNotFoundError("INSPECTION_NOT_FOUND", "inspection not found", nil)
 func NewNotFoundError(code, message string, err error) *AppError {
 	return &AppError{
 		Code:       code,
@@ -250,7 +257,8 @@ func NewNotFoundError(code, message string, err error) *AppError {
 // - Concurrent modification conflicts
 //
 // Usage:
-//   return errors.NewConflictError("EMAIL_EXISTS", "an account with this email already exists", err)
+//
+//	return errors.NewConflictError("EMAIL_EXISTS", "an account with this email already exists", err)
 func NewConflictError(code, message string, err error) *AppError {
 	return &AppError{
 		Code:       code,
@@ -269,7 +277,8 @@ func NewConflictError(code, message string, err error) *AppError {
 // - Should be logged and monitored
 //
 // Usage:
-//   return errors.NewInternalError("DATABASE_ERROR", "failed to save inspection", err)
+//
+//	return errors.NewInternalError("DATABASE_ERROR", "failed to save inspection", err)
 func NewInternalError(code, message string, err error) *AppError {
 	return &AppError{
 		Code:       code,
@@ -288,7 +297,8 @@ func NewInternalError(code, message string, err error) *AppError {
 // - External service down
 //
 // Usage:
-//   return errors.NewServiceUnavailableError("AI_SERVICE_DOWN", "AI service temporarily unavailable", err)
+//
+//	return errors.NewServiceUnavailableError("AI_SERVICE_DOWN", "AI service temporarily unavailable", err)
 func NewServiceUnavailableError(code, message string, err error) *AppError {
 	return &AppError{
 		Code:       code,
@@ -327,7 +337,8 @@ var (
 // - Handle unexpected panics
 //
 // Usage in main.go:
-//   e.Use(errors.ErrorHandlerMiddleware(logger))
+//
+//	e.Use(errors.ErrorHandlerMiddleware(logger))
 func ErrorHandlerMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -393,10 +404,11 @@ func ErrorHandlerMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 // - Other errors -> InternalError
 //
 // Usage in handlers:
-//   user, err := queries.GetUserByID(ctx, userID)
-//   if err != nil {
-//       return errors.WrapDatabaseError(err, "USER_FETCH_FAILED", "failed to fetch user")
-//   }
+//
+//	user, err := queries.GetUserByID(ctx, userID)
+//	if err != nil {
+//	    return errors.WrapDatabaseError(err, "USER_FETCH_FAILED", "failed to fetch user")
+//	}
 func WrapDatabaseError(err error, code, message string) *AppError {
 	// Check if err is pgx.ErrNoRows -> return NotFoundError
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -430,9 +442,10 @@ func WrapDatabaseError(err error, code, message string) *AppError {
 // - Enable conditional logic based on error codes
 //
 // Usage:
-//   if errors.IsErrorCode(err, "USER_NOT_FOUND") {
-//       // handle specific error
-//   }
+//
+//	if errors.IsErrorCode(err, "USER_NOT_FOUND") {
+//	    // handle specific error
+//	}
 func IsErrorCode(err error, code string) bool {
 	// Use errors.As to extract AppError
 	var appErr *AppError

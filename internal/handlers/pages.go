@@ -648,14 +648,14 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"IsAuthenticated":    true,
-		"User":               h.getUserDisplayInfo(c, userID),
-		"Inspection":         inspection,
-		"ProjectName":        project.Name,
-		"ProjectLocation":    projectLocation,
-		"Photos":             photos,
-		"ViolationsByPhoto":  violationsByPhoto,
-		"SafetyCodeMap":      safetyCodeMap,
+		"IsAuthenticated":   true,
+		"User":              h.getUserDisplayInfo(c, userID),
+		"Inspection":        inspection,
+		"ProjectName":       project.Name,
+		"ProjectLocation":   projectLocation,
+		"Photos":            photos,
+		"ViolationsByPhoto": violationsByPhoto,
+		"SafetyCodeMap":     safetyCodeMap,
 	}
 	return c.Render(http.StatusOK, "inspection-detail.html", data)
 }

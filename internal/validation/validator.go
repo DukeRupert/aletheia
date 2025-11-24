@@ -38,7 +38,8 @@ type Validator struct {
 // - Configure error message formatting
 //
 // Usage in main.go:
-//   e.Validator = validation.NewValidator()
+//
+//	e.Validator = validation.NewValidator()
 func NewValidator() *Validator {
 	// Create new validator instance
 	v := validator.New()
@@ -66,13 +67,14 @@ func NewValidator() *Validator {
 // 4. Return error
 //
 // Usage in handlers:
-//   var req RegisterRequest
-//   if err := c.Bind(&req); err != nil {
-//       return err
-//   }
-//   if err := c.Validate(&req); err != nil {
-//       return err
-//   }
+//
+//	var req RegisterRequest
+//	if err := c.Bind(&req); err != nil {
+//	    return err
+//	}
+//	if err := c.Validate(&req); err != nil {
+//	    return err
+//	}
 func (v *Validator) Validate(i interface{}) error {
 	// Validate the struct using validator tags
 	if err := v.validate.Struct(i); err != nil {
@@ -141,7 +143,8 @@ type CreateInspectionRequest struct {
 // - validimage: checks file type and size for uploads
 //
 // Usage in NewValidator():
-//   v.RegisterValidation("safecode", validateSafetyCode)
+//
+//	v.RegisterValidation("safecode", validateSafetyCode)
 func RegisterCustomValidators(v interface{}) {
 	// TODO: Get validator instance
 	// TODO: Register "safecode" validator
@@ -211,14 +214,16 @@ func validateOrganizationAccess(fl interface{}) bool {
 // - Provide specific error messages for each validation rule
 //
 // Example output:
-//   {
-//     "email": "must be a valid email address",
-//     "password": "must be at least 12 characters",
-//     "username": "must be between 3 and 50 characters"
-//   }
+//
+//	{
+//	  "email": "must be a valid email address",
+//	  "password": "must be at least 12 characters",
+//	  "username": "must be between 3 and 50 characters"
+//	}
 //
 // Parameters:
-//   err - validation error from validator.Struct()
+//
+//	err - validation error from validator.Struct()
 //
 // Returns map of field -> error message.
 func FormatValidationErrors(err error) map[string]string {
@@ -294,9 +299,10 @@ func FormatValidationErrors(err error) map[string]string {
 // - Contains special character
 //
 // Usage in handlers:
-//   if err := validation.PasswordComplexity(req.Password); err != nil {
-//       return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-//   }
+//
+//	if err := validation.PasswordComplexity(req.Password); err != nil {
+//	    return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+//	}
 func PasswordComplexity(password string) error {
 	// Check minimum length (12 characters)
 	if len(password) < 12 {
@@ -351,7 +357,8 @@ func PasswordComplexity(password string) error {
 // Note: This is defense in depth - output encoding is primary XSS defense.
 //
 // Usage:
-//   req.Username = validation.SanitizeInput(req.Username)
+//
+//	req.Username = validation.SanitizeInput(req.Username)
 func SanitizeInput(input string) string {
 	// Trim leading/trailing whitespace
 	input = strings.TrimSpace(input)
@@ -377,14 +384,16 @@ func SanitizeInput(input string) string {
 // - Prevent malicious uploads
 //
 // Parameters:
-//   fileHeader - multipart.FileHeader from form upload
-//   maxSize - maximum file size in bytes
-//   allowedTypes - slice of allowed MIME types
+//
+//	fileHeader - multipart.FileHeader from form upload
+//	maxSize - maximum file size in bytes
+//	allowedTypes - slice of allowed MIME types
 //
 // Returns error if validation fails.
 //
 // Usage in upload handler:
-//   err := validation.ValidateFileUpload(fileHeader, 10*1024*1024, []string{"image/jpeg", "image/png", "image/webp"})
+//
+//	err := validation.ValidateFileUpload(fileHeader, 10*1024*1024, []string{"image/jpeg", "image/png", "image/webp"})
 func ValidateFileUpload(fileHeader interface{}, maxSize int64, allowedTypes []string) error {
 	// Type assert to multipart.FileHeader
 	header, ok := fileHeader.(*multipart.FileHeader)
@@ -438,13 +447,14 @@ func ValidateFileUpload(fileHeader interface{}, maxSize int64, allowedTypes []st
 // - Easy for clients to parse and display
 //
 // Response format:
-//   {
-//     "error": "validation failed",
-//     "fields": {
-//       "email": "must be a valid email address",
-//       "password": "must be at least 12 characters"
-//     }
-//   }
+//
+//	{
+//	  "error": "validation failed",
+//	  "fields": {
+//	    "email": "must be a valid email address",
+//	    "password": "must be at least 12 characters"
+//	  }
+//	}
 func ValidationErrorResponse(err error) map[string]interface{} {
 	// Format the validation errors
 	fieldErrors := FormatValidationErrors(err)

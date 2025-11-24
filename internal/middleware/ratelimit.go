@@ -39,14 +39,16 @@ import (
 // headers), you MUST properly configure Echo's IPExtractor in production:
 //
 // Production configuration (main.go):
-//   e.IPExtractor = echo.ExtractIPFromXFFHeader(
-//       echo.TrustLoopback(true),   // Trust localhost
-//       echo.TrustLinkLocal(false), // Don't trust link-local
-//       echo.TrustPrivateNet(true), // Trust private networks (adjust based on your setup)
-//   )
+//
+//	e.IPExtractor = echo.ExtractIPFromXFFHeader(
+//	    echo.TrustLoopback(true),   // Trust localhost
+//	    echo.TrustLinkLocal(false), // Don't trust link-local
+//	    echo.TrustPrivateNet(true), // Trust private networks (adjust based on your setup)
+//	)
 //
 // Alternative for environments behind a known proxy:
-//   e.IPExtractor = echo.ExtractIPDirect() // Only if not behind proxy
+//
+//	e.IPExtractor = echo.ExtractIPDirect() // Only if not behind proxy
 //
 // If misconfigured, attackers can:
 // - Bypass rate limits by spoofing X-Forwarded-For headers
@@ -55,11 +57,11 @@ import (
 //
 // See: https://echo.labstack.com/docs/ip-address
 type RateLimiter struct {
-	limiters  sync.Map // IP address -> *limiterEntry
-	logger    *slog.Logger
-	config    RateLimitConfig
-	ctx       context.Context
-	cancel    context.CancelFunc
+	limiters sync.Map // IP address -> *limiterEntry
+	logger   *slog.Logger
+	config   RateLimitConfig
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 // limiterEntry wraps a rate limiter with metadata for cleanup.
@@ -76,9 +78,10 @@ type limiterEntry struct {
 // - Start background cleanup goroutine
 //
 // Usage in main.go:
-//   rateLimiter := middleware.NewRateLimiter(logger)
-//   e.Use(rateLimiter.Middleware())
-//   defer rateLimiter.Shutdown() // Important: call Shutdown() during graceful shutdown
+//
+//	rateLimiter := middleware.NewRateLimiter(logger)
+//	e.Use(rateLimiter.Middleware())
+//	defer rateLimiter.Shutdown() // Important: call Shutdown() during graceful shutdown
 func NewRateLimiter(logger *slog.Logger) *RateLimiter {
 	// Create context for managing goroutine lifecycle
 	ctx, cancel := context.WithCancel(context.Background())
@@ -115,7 +118,8 @@ func NewRateLimiter(logger *slog.Logger) *RateLimiter {
 // 5. If allowed, add rate limit headers and continue
 //
 // Usage:
-//   e.Use(rateLimiter.Middleware())
+//
+//	e.Use(rateLimiter.Middleware())
 func (rl *RateLimiter) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -158,7 +162,8 @@ func (rl *RateLimiter) Middleware() echo.MiddlewareFunc {
 // - Thread-safe lastAccess tracking using atomic operations
 //
 // Parameters:
-//   ip - Client IP address
+//
+//	ip - Client IP address
 //
 // Returns rate limiter instance for this IP.
 func (rl *RateLimiter) GetLimiter(ip string) *rate.Limiter {
@@ -250,8 +255,9 @@ func (rl *RateLimiter) CleanupOldLimiters() {
 // - Prevent goroutine leaks in tests and production
 //
 // Usage in main.go:
-//   rateLimiter := middleware.NewRateLimiter(logger)
-//   defer rateLimiter.Shutdown()
+//
+//	rateLimiter := middleware.NewRateLimiter(logger)
+//	defer rateLimiter.Shutdown()
 func (rl *RateLimiter) Shutdown() {
 	if rl.cancel != nil {
 		rl.cancel()
@@ -276,11 +282,12 @@ type StrictRateLimiter struct {
 // - Use much lower rate: 5 requests/minute per IP
 //
 // Usage in main.go (apply to specific routes):
-//   strictLimiter := middleware.NewStrictRateLimiter(logger)
-//   defer strictLimiter.Shutdown()
-//   auth := e.Group("/auth")
-//   auth.Use(strictLimiter.Middleware())
-//   auth.POST("/login", authHandler.Login)
+//
+//	strictLimiter := middleware.NewStrictRateLimiter(logger)
+//	defer strictLimiter.Shutdown()
+//	auth := e.Group("/auth")
+//	auth.Use(strictLimiter.Middleware())
+//	auth.POST("/login", authHandler.Login)
 func NewStrictRateLimiter(logger *slog.Logger) *StrictRateLimiter {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -407,11 +414,12 @@ type PerUserRateLimiter struct {
 // - Useful for API endpoints after authentication
 //
 // Usage:
-//   userLimiter := middleware.NewPerUserRateLimiter(logger)
-//   defer userLimiter.Shutdown()
-//   api := e.Group("/api")
-//   api.Use(session.SessionMiddleware(pool))
-//   api.Use(userLimiter.Middleware())
+//
+//	userLimiter := middleware.NewPerUserRateLimiter(logger)
+//	defer userLimiter.Shutdown()
+//	api := e.Group("/api")
+//	api.Use(session.SessionMiddleware(pool))
+//	api.Use(userLimiter.Middleware())
 func NewPerUserRateLimiter(logger *slog.Logger) *PerUserRateLimiter {
 	ctx, cancel := context.WithCancel(context.Background())
 

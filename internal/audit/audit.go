@@ -50,8 +50,8 @@ type AuditEntry struct {
 	ID             uuid.UUID              `json:"id"`
 	UserID         uuid.UUID              `json:"user_id"`
 	OrganizationID uuid.UUID              `json:"organization_id"`
-	Action         string                 `json:"action"`          // "create", "update", "delete", "view"
-	ResourceType   string                 `json:"resource_type"`   // "inspection", "violation", "photo", etc.
+	Action         string                 `json:"action"`        // "create", "update", "delete", "view"
+	ResourceType   string                 `json:"resource_type"` // "inspection", "violation", "photo", etc.
 	ResourceID     uuid.UUID              `json:"resource_id"`
 	OldValues      map[string]interface{} `json:"old_values,omitempty"` // JSON - state before change
 	NewValues      map[string]interface{} `json:"new_values,omitempty"` // JSON - state after change
@@ -69,20 +69,22 @@ type AuditEntry struct {
 // - Run asynchronously to avoid adding latency to requests
 //
 // Parameters:
-//   ctx - context with timeout
-//   entry - audit entry to record
+//
+//	ctx - context with timeout
+//	entry - audit entry to record
 //
 // Usage in handlers (after successful operation):
-//   audit.LogAction(ctx, audit.AuditEntry{
-//       UserID:         userID,
-//       OrganizationID: orgID,
-//       Action:         "create",
-//       ResourceType:   "inspection",
-//       ResourceID:     inspection.ID,
-//       NewValues:      map[string]interface{}{"title": inspection.Title},
-//       IPAddress:      c.RealIP(),
-//       UserAgent:      c.Request().UserAgent(),
-//   })
+//
+//	audit.LogAction(ctx, audit.AuditEntry{
+//	    UserID:         userID,
+//	    OrganizationID: orgID,
+//	    Action:         "create",
+//	    ResourceType:   "inspection",
+//	    ResourceID:     inspection.ID,
+//	    NewValues:      map[string]interface{}{"title": inspection.Title},
+//	    IPAddress:      c.RealIP(),
+//	    UserAgent:      c.Request().UserAgent(),
+//	})
 func (al *AuditLogger) LogAction(ctx context.Context, entry AuditEntry) {
 	// Run asynchronously to avoid blocking
 	go func() {
@@ -142,7 +144,8 @@ func (al *AuditLogger) LogAction(ctx context.Context, entry AuditEntry) {
 // - Only needs new values (no old values)
 //
 // Usage:
-//   audit.LogCreate(ctx, userID, orgID, "inspection", inspectionID, newValues, c)
+//
+//	audit.LogCreate(ctx, userID, orgID, "inspection", inspectionID, newValues, c)
 func (al *AuditLogger) LogCreate(ctx context.Context, userID, orgID uuid.UUID, resourceType string, resourceID uuid.UUID, newValues map[string]interface{}, c echo.Context) {
 	// Extract request ID from context if available
 	requestID := ""
@@ -180,7 +183,8 @@ func (al *AuditLogger) LogCreate(ctx context.Context, userID, orgID uuid.UUID, r
 // - Essential for audit trail and potential rollback
 //
 // Usage:
-//   audit.LogUpdate(ctx, userID, orgID, "inspection", inspectionID, oldValues, newValues, c)
+//
+//	audit.LogUpdate(ctx, userID, orgID, "inspection", inspectionID, oldValues, newValues, c)
 func (al *AuditLogger) LogUpdate(ctx context.Context, userID, orgID uuid.UUID, resourceType string, resourceID uuid.UUID, oldValues, newValues map[string]interface{}, c echo.Context) {
 	// Extract request ID from context if available
 	requestID := ""
@@ -219,7 +223,8 @@ func (al *AuditLogger) LogUpdate(ctx context.Context, userID, orgID uuid.UUID, r
 // - Record who deleted what and when
 //
 // Usage:
-//   audit.LogDelete(ctx, userID, orgID, "inspection", inspectionID, oldValues, c)
+//
+//	audit.LogDelete(ctx, userID, orgID, "inspection", inspectionID, oldValues, c)
 func (al *AuditLogger) LogDelete(ctx context.Context, userID, orgID uuid.UUID, resourceType string, resourceID uuid.UUID, oldValues map[string]interface{}, c echo.Context) {
 	// Extract request ID from context if available
 	requestID := ""
@@ -260,7 +265,8 @@ func (al *AuditLogger) LogDelete(ctx context.Context, userID, orgID uuid.UUID, r
 // Note: Only log views for sensitive resources (not every GET request)
 //
 // Usage:
-//   audit.LogView(ctx, userID, orgID, "report", reportID, c)
+//
+//	audit.LogView(ctx, userID, orgID, "report", reportID, c)
 func (al *AuditLogger) LogView(ctx context.Context, userID, orgID uuid.UUID, resourceType string, resourceID uuid.UUID, c echo.Context) {
 	// Extract request ID from context if available
 	requestID := ""
@@ -300,10 +306,11 @@ func (al *AuditLogger) LogView(ctx context.Context, userID, orgID uuid.UUID, res
 // - Investigate suspicious behavior
 //
 // Parameters:
-//   ctx - context
-//   userID - user to query
-//   limit - max entries to return
-//   offset - pagination offset
+//
+//	ctx - context
+//	userID - user to query
+//	limit - max entries to return
+//	offset - pagination offset
 //
 // Returns slice of audit entries, ordered by created_at DESC.
 func (al *AuditLogger) GetUserAuditLog(ctx context.Context, userID uuid.UUID, limit, offset int) ([]AuditEntry, error) {
@@ -367,11 +374,12 @@ func (al *AuditLogger) GetUserAuditLog(ctx context.Context, userID uuid.UUID, li
 // - Track evolution of an inspection or report
 //
 // Parameters:
-//   ctx - context
-//   resourceType - type of resource ("inspection", "violation", etc.)
-//   resourceID - resource UUID
-//   limit - max entries
-//   offset - pagination
+//
+//	ctx - context
+//	resourceType - type of resource ("inspection", "violation", etc.)
+//	resourceID - resource UUID
+//	limit - max entries
+//	offset - pagination
 //
 // Returns audit entries for this resource, ordered by created_at DESC.
 func (al *AuditLogger) GetResourceAuditLog(ctx context.Context, resourceType string, resourceID uuid.UUID, limit, offset int) ([]AuditEntry, error) {
@@ -435,11 +443,12 @@ func (al *AuditLogger) GetResourceAuditLog(ctx context.Context, resourceType str
 // - Activity monitoring
 //
 // Parameters:
-//   ctx - context
-//   orgID - organization UUID
-//   startTime - filter by created_at >= startTime
-//   endTime - filter by created_at <= endTime
-//   limit, offset - pagination
+//
+//	ctx - context
+//	orgID - organization UUID
+//	startTime - filter by created_at >= startTime
+//	endTime - filter by created_at <= endTime
+//	limit, offset - pagination
 //
 // Returns audit entries for organization in time range.
 func (al *AuditLogger) GetOrganizationAuditLog(ctx context.Context, orgID uuid.UUID, startTime, endTime time.Time, limit, offset int) ([]AuditEntry, error) {
@@ -630,7 +639,7 @@ func (al *AuditLogger) SearchAuditLog(ctx context.Context, filter AuditFilter) (
 type AuditFilter struct {
 	UserID         *uuid.UUID `json:"user_id,omitempty"`
 	OrganizationID *uuid.UUID `json:"organization_id,omitempty"`
-	Action         *string    `json:"action,omitempty"`          // "create", "update", "delete", "view"
+	Action         *string    `json:"action,omitempty"` // "create", "update", "delete", "view"
 	ResourceType   *string    `json:"resource_type,omitempty"`
 	ResourceID     *uuid.UUID `json:"resource_id,omitempty"`
 	IPAddress      *string    `json:"ip_address,omitempty"`
@@ -708,9 +717,10 @@ func AuditMiddleware(al *AuditLogger) echo.MiddlewareFunc {
 // - Archive audit logs for long-term retention
 //
 // Parameters:
-//   ctx - context
-//   filter - what to export
-//   writer - io.Writer for CSV output
+//
+//	ctx - context
+//	filter - what to export
+//	writer - io.Writer for CSV output
 //
 // Format: CSV with columns: timestamp, user, organization, action, resource_type, resource_id, details
 func (al *AuditLogger) ExportAuditLog(ctx context.Context, filter AuditFilter, writer interface{}) error {
@@ -800,8 +810,9 @@ func (al *AuditLogger) ExportAuditLog(ctx context.Context, filter AuditFilter, w
 // - Run as scheduled job (not on every request)
 //
 // Parameters:
-//   ctx - context
-//   retentionDays - keep logs newer than this many days
+//
+//	ctx - context
+//	retentionDays - keep logs newer than this many days
 //
 // Returns number of entries deleted.
 func (al *AuditLogger) CleanupOldAuditLogs(ctx context.Context, retentionDays int) (int64, error) {

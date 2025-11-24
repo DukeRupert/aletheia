@@ -40,7 +40,8 @@ func NewHealthHandler(db *pgxpool.Pool, storage storage.FileStorage, queue queue
 // - Does not check dependencies (fast response)
 //
 // Response:
-//   {"status": "ok"}
+//
+//	{"status": "ok"}
 //
 // Route: GET /health
 func (h *HealthHandler) HealthCheck(c echo.Context) error {
@@ -60,24 +61,26 @@ func (h *HealthHandler) HealthCheck(c echo.Context) error {
 // - Used by Kubernetes/orchestrators to determine if pod should receive traffic
 //
 // Response (healthy):
-//   {
-//     "status": "healthy",
-//     "checks": {
-//       "database": "ok",
-//       "storage": "ok",
-//       "queue": "ok"
-//     }
-//   }
+//
+//	{
+//	  "status": "healthy",
+//	  "checks": {
+//	    "database": "ok",
+//	    "storage": "ok",
+//	    "queue": "ok"
+//	  }
+//	}
 //
 // Response (unhealthy):
-//   {
-//     "status": "unhealthy",
-//     "checks": {
-//       "database": "ok",
-//       "storage": "failed: connection timeout",
-//       "queue": "ok"
-//     }
-//   }
+//
+//	{
+//	  "status": "unhealthy",
+//	  "checks": {
+//	    "database": "ok",
+//	    "storage": "failed: connection timeout",
+//	    "queue": "ok"
+//	  }
+//	}
 //
 // Route: GET /health/ready
 func (h *HealthHandler) ReadinessCheck(c echo.Context) error {
@@ -152,26 +155,27 @@ func (h *HealthHandler) LivenessCheck(c echo.Context) error {
 // - Should be protected (only accessible to admins)
 //
 // Response:
-//   {
-//     "status": "healthy",
-//     "version": "1.0.0",
-//     "uptime_seconds": 3600,
-//     "database": {
-//       "status": "ok",
-//       "total_connections": 25,
-//       "idle_connections": 20,
-//       "acquired_connections": 5
-//     },
-//     "queue": {
-//       "status": "ok",
-//       "pending_jobs": 42,
-//       "active_workers": 3
-//     },
-//     "storage": {
-//       "status": "ok",
-//       "provider": "s3"
-//     }
-//   }
+//
+//	{
+//	  "status": "healthy",
+//	  "version": "1.0.0",
+//	  "uptime_seconds": 3600,
+//	  "database": {
+//	    "status": "ok",
+//	    "total_connections": 25,
+//	    "idle_connections": 20,
+//	    "acquired_connections": 5
+//	  },
+//	  "queue": {
+//	    "status": "ok",
+//	    "pending_jobs": 42,
+//	    "active_workers": 3
+//	  },
+//	  "storage": {
+//	    "status": "ok",
+//	    "provider": "s3"
+//	  }
+//	}
 //
 // Route: GET /health/detailed
 func (h *HealthHandler) DetailedHealthCheck(c echo.Context) error {

@@ -17,8 +17,8 @@ type MockQueue struct {
 }
 
 type usageTracker struct {
-	jobsInWindow  int
-	windowStart   time.Time
+	jobsInWindow   int
+	windowStart    time.Time
 	processingJobs int
 }
 

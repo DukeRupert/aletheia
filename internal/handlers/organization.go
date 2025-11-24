@@ -26,7 +26,6 @@ func NewOrganizationHandler(pool *pgxpool.Pool, logger *slog.Logger) *Organizati
 	}
 }
 
-
 // CreateOrganizationRequest is the request payload for creating an organization
 type CreateOrganizationRequest struct {
 	Name string `json:"name" form:"name" validate:"required,min=1,max=255"`

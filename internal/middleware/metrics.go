@@ -13,10 +13,10 @@ import (
 
 var (
 	// HTTP metrics
-	httpRequestsTotal *prometheus.CounterVec
-	httpRequestDuration *prometheus.HistogramVec
-	httpRequestsInFlight prometheus.Gauge
-	httpRequestSizeBytes *prometheus.HistogramVec
+	httpRequestsTotal     *prometheus.CounterVec
+	httpRequestDuration   *prometheus.HistogramVec
+	httpRequestsInFlight  prometheus.Gauge
+	httpRequestSizeBytes  *prometheus.HistogramVec
 	httpResponseSizeBytes *prometheus.HistogramVec
 
 	// metricsInitOnce ensures metrics are initialized exactly once
@@ -39,8 +39,9 @@ var (
 // - http_response_size_bytes (histogram) - response body size
 //
 // Usage in main.go:
-//   e.Use(middleware.MetricsMiddleware())
-//   e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+//
+//	e.Use(middleware.MetricsMiddleware())
+//	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 func MetricsMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -128,7 +129,8 @@ func MetricsMiddleware() echo.MiddlewareFunc {
 // - Histogram: http_response_size_bytes
 //
 // Usage in main.go:
-//   middleware.InitMetrics()
+//
+//	middleware.InitMetrics()
 func InitMetrics() {
 	// Ensure metrics are initialized exactly once, even if called multiple times
 	metricsInitOnce.Do(func() {

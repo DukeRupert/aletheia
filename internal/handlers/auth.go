@@ -20,7 +20,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-
 type AuthHandler struct {
 	db           *pgxpool.Pool
 	logger       *slog.Logger
@@ -334,7 +333,7 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 	}
 
 	// Delete session from database
-	if err := session.DestroySession(ctx, h.db, cookie.Value); err != nil{
+	if err := session.DestroySession(ctx, h.db, cookie.Value); err != nil {
 		h.logger.Error("failed to destroy session", slog.String("err", err.Error()))
 		// Continue to clear cookie even if database delete fails
 	}
@@ -707,9 +706,9 @@ func (h *AuthHandler) RequestPasswordReset(c echo.Context) error {
 
 	// Save reset token to database
 	if err := queries.SetPasswordResetToken(ctx, database.SetPasswordResetTokenParams{
-		ID:                    user.ID,
-		ResetToken:            pgtype.Text{String: resetToken, Valid: true},
-		ResetTokenExpiresAt:   expiresAt,
+		ID:                  user.ID,
+		ResetToken:          pgtype.Text{String: resetToken, Valid: true},
+		ResetTokenExpiresAt: expiresAt,
 	}); err != nil {
 		h.logger.Error("failed to set reset token", slog.String("err", err.Error()))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to request password reset")
@@ -878,7 +877,7 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 	}
 
 	// Invalidate all existing sessions for security
-	if err := queries.DeleteUserSessions(ctx, user.ID); err != nil{
+	if err := queries.DeleteUserSessions(ctx, user.ID); err != nil {
 		// Log but don't fail - password was already reset
 		h.logger.Warn("failed to invalidate sessions after password reset",
 			slog.String("user_id", user.ID.String()),

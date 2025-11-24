@@ -604,7 +604,7 @@ func (h *ViolationHandler) renderViolationCard(c echo.Context, violation databas
 	}
 
 	// Determine background and border colors based on status and severity
-	bgColor := "#fef2f2" // default pending
+	bgColor := "#fef2f2"     // default pending
 	borderColor := "#dc2626" // default critical
 	if violation.Status == database.ViolationStatusConfirmed {
 		bgColor = "#d1fae5"
@@ -752,11 +752,11 @@ func (h *ViolationHandler) renderViolationCard(c echo.Context, violation databas
 
 // CreateManualViolationRequest represents the request body for creating a manual violation
 type CreateManualViolationRequest struct {
-	PhotoID    string `form:"photo_id" json:"photo_id" validate:"required,uuid"`
-	SafetyCode string `form:"safety_code" json:"safety_code" validate:"required"`
+	PhotoID     string `form:"photo_id" json:"photo_id" validate:"required,uuid"`
+	SafetyCode  string `form:"safety_code" json:"safety_code" validate:"required"`
 	Description string `form:"description" json:"description" validate:"required"`
-	Severity   string `form:"severity" json:"severity" validate:"required,oneof=critical high medium low"`
-	Location   string `form:"location" json:"location"`
+	Severity    string `form:"severity" json:"severity" validate:"required,oneof=critical high medium low"`
+	Location    string `form:"location" json:"location"`
 }
 
 // CreateManualViolation godoc

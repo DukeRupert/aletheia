@@ -145,15 +145,15 @@ func main() {
 	// Initialize queue (using Postgres with existing pool)
 	logger.Debug("initializing queue service")
 	queueConfig := queue.Config{
-		Provider:             "postgres",
-		WorkerCount:          3,
-		PollInterval:         time.Second,
-		JobTimeout:           60 * time.Second,
-		EnableRateLimiting:   true,
-		ShutdownTimeout:      10 * time.Second,
-		CleanupInterval:      time.Hour,
-		CleanupRetention:     7 * 24 * time.Hour,
-		DefaultMaxJobsPerHour: 100,
+		Provider:                 "postgres",
+		WorkerCount:              3,
+		PollInterval:             time.Second,
+		JobTimeout:               60 * time.Second,
+		EnableRateLimiting:       true,
+		ShutdownTimeout:          10 * time.Second,
+		CleanupInterval:          time.Hour,
+		CleanupRetention:         7 * 24 * time.Hour,
+		DefaultMaxJobsPerHour:    100,
 		DefaultMaxConcurrentJobs: 10,
 	}
 	queueService := queue.NewPostgresQueue(pool, logger, queueConfig)
@@ -299,9 +299,9 @@ func main() {
 
 	// Health check endpoints
 	logger.Debug("configuring health check endpoints")
-	e.GET("/health", healthHandler.HealthCheck)           // Basic uptime check
-	e.GET("/health/live", healthHandler.LivenessCheck)    // Kubernetes liveness probe
-	e.GET("/health/ready", healthHandler.ReadinessCheck)  // Kubernetes readiness probe
+	e.GET("/health", healthHandler.HealthCheck)                  // Basic uptime check
+	e.GET("/health/live", healthHandler.LivenessCheck)           // Kubernetes liveness probe
+	e.GET("/health/ready", healthHandler.ReadinessCheck)         // Kubernetes readiness probe
 	e.GET("/health/detailed", healthHandler.DetailedHealthCheck) // Detailed system info
 
 	// Prometheus metrics endpoint

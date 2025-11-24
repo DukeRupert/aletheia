@@ -88,9 +88,9 @@ func (h *InspectionHandler) CreateInspection(c echo.Context) error {
 
 	// Create inspection with default status 'draft'
 	inspection, err := queries.CreateInspection(ctx, database.CreateInspectionParams{
-		ProjectID:    projectUUID,
-		InspectorID:  uuidToPgUUID(userID),
-		Status:       database.InspectionStatusDraft,
+		ProjectID:   projectUUID,
+		InspectorID: uuidToPgUUID(userID),
+		Status:      database.InspectionStatusDraft,
 	})
 	if err != nil {
 		h.logger.Error("failed to create inspection", slog.String("err", err.Error()))

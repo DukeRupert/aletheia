@@ -101,11 +101,11 @@ type JobFilter struct {
 
 // QueueStats provides statistics about a queue
 type QueueStats struct {
-	QueueName        string
-	PendingJobs      int
-	ProcessingJobs   int
-	CompletedJobs    int
-	FailedJobs       int
+	QueueName         string
+	PendingJobs       int
+	ProcessingJobs    int
+	CompletedJobs     int
+	FailedJobs        int
 	AvgProcessingTime time.Duration
 }
 
@@ -129,9 +129,9 @@ type Config struct {
 	CleanupRetention time.Duration // How long to keep completed jobs
 
 	// Rate limiting defaults
-	DefaultMaxJobsPerHour      int
-	DefaultMaxConcurrentJobs   int
-	EnableRateLimiting         bool
+	DefaultMaxJobsPerHour    int
+	DefaultMaxConcurrentJobs int
+	EnableRateLimiting       bool
 }
 
 // DefaultEnqueueOptions returns sensible defaults for enqueuing jobs
@@ -153,15 +153,15 @@ func DefaultDequeueOptions() *DequeueOptions {
 // DefaultConfig returns default queue configuration
 func DefaultConfig() Config {
 	return Config{
-		Provider:                   "postgres",
-		WorkerCount:                3,
-		PollInterval:               1 * time.Second,
-		JobTimeout:                 60 * time.Second,
-		ShutdownTimeout:            30 * time.Second,
-		CleanupInterval:            1 * time.Hour,
-		CleanupRetention:           24 * time.Hour,
-		DefaultMaxJobsPerHour:      100,
-		DefaultMaxConcurrentJobs:   5,
-		EnableRateLimiting:         true,
+		Provider:                 "postgres",
+		WorkerCount:              3,
+		PollInterval:             1 * time.Second,
+		JobTimeout:               60 * time.Second,
+		ShutdownTimeout:          30 * time.Second,
+		CleanupInterval:          1 * time.Hour,
+		CleanupRetention:         24 * time.Hour,
+		DefaultMaxJobsPerHour:    100,
+		DefaultMaxConcurrentJobs: 5,
+		EnableRateLimiting:       true,
 	}
 }

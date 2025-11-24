@@ -58,12 +58,12 @@ type EmailConfig struct {
 }
 
 type StorageConfig struct {
-	Provider   string // "local" or "s3"
-	LocalPath  string // Path for local storage
-	LocalURL   string // Base URL for local storage
-	S3Bucket   string // S3 bucket name
-	S3Region   string // S3 region
-	S3BaseURL  string // CloudFront or S3 base URL
+	Provider  string // "local" or "s3"
+	LocalPath string // Path for local storage
+	LocalURL  string // Base URL for local storage
+	S3Bucket  string // S3 bucket name
+	S3Region  string // S3 region
+	S3BaseURL string // CloudFront or S3 base URL
 }
 
 type AIConfig struct {

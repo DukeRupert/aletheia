@@ -31,7 +31,8 @@ const (
 // - Debugging production issues by following a single request ID
 //
 // Usage in main.go:
-//   e.Use(middleware.RequestIDMiddleware(logger))
+//
+//	e.Use(middleware.RequestIDMiddleware(logger))
 func RequestIDMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -63,8 +64,9 @@ func RequestIDMiddleware(logger *slog.Logger) echo.MiddlewareFunc {
 // - Use when enqueuing jobs to maintain correlation across async operations
 //
 // Usage in handlers:
-//   requestID := middleware.GetRequestID(c)
-//   job.CorrelationID = requestID
+//
+//	requestID := middleware.GetRequestID(c)
+//	job.CorrelationID = requestID
 func GetRequestID(c echo.Context) string {
 	// Retrieve request_id from context
 	requestID, ok := c.Get(string(requestIDKey)).(string)
@@ -82,8 +84,9 @@ func GetRequestID(c echo.Context) string {
 // - Ensures consistent logging across the request lifecycle
 //
 // Usage in handlers:
-//   logger := middleware.GetRequestLogger(c)
-//   logger.Info("processing request", slog.String("user_id", userID))
+//
+//	logger := middleware.GetRequestLogger(c)
+//	logger.Info("processing request", slog.String("user_id", userID))
 func GetRequestLogger(c echo.Context) *slog.Logger {
 	// Retrieve logger from context
 	logger, ok := c.Get(string(loggerKey)).(*slog.Logger)

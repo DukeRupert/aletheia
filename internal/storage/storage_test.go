@@ -501,11 +501,11 @@ func TestLocalStorage_GenerateThumbnail_Errors(t *testing.T) {
 
 func TestResizeImage(t *testing.T) {
 	tests := []struct {
-		name      string
-		origWidth int
+		name       string
+		origWidth  int
 		origHeight int
-		maxWidth  int
-		maxHeight int
+		maxWidth   int
+		maxHeight  int
 		wantLarger bool // Should result be larger than max?
 	}{
 		{

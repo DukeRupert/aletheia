@@ -148,8 +148,8 @@ func (h *PhotoHandler) AnalyzePhoto(c echo.Context) error {
 
 	job, err := h.queue.Enqueue(
 		ctx,
-		"photo_analysis",                           // queue name
-		"analyze_photo",                            // job type
+		"photo_analysis",                        // queue name
+		"analyze_photo",                         // job type
 		uuid.UUID(project.OrganizationID.Bytes), // organization ID for rate limiting
 		payload,
 		&queue.EnqueueOptions{
