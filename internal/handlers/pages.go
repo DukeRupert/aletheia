@@ -99,10 +99,16 @@ func (h *PageHandler) DashboardPage(c echo.Context) error {
 
 	// Get user's organizations
 	orgMemberships, err := queries.ListUserOrganizations(ctx, uuidToPgUUID(userID))
-	if err != nil || len(orgMemberships) == 0 {
+	if err != nil {
 		h.logger.Error("failed to get user organizations",
 			slog.String("user_id", userID.String()),
 			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to load dashboard")
+	}
+
+	if len(orgMemberships) == 0 {
+		h.logger.Info("user has no organizations, showing empty state",
+			slog.String("user_id", userID.String()))
 
 		// Show empty state for users with no organizations
 		data := map[string]interface{}{
