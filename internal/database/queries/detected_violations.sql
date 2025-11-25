@@ -74,3 +74,25 @@ WHERE photo_id = $1 AND status = 'pending';
 -- name: DeletePendingAndDismissedViolationsByPhoto :exec
 DELETE FROM detected_violations
 WHERE photo_id = $1 AND status IN ('pending', 'dismissed');
+
+-- name: GetViolationCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM detected_violations dv
+JOIN photos ph ON ph.id = dv.photo_id
+JOIN inspections i ON i.id = ph.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND dv.created_at >= $2
+  AND dv.created_at < $3;
+
+-- name: GetViolationCountBySeverityAndOrganization :many
+SELECT dv.severity, COUNT(*) as count
+FROM detected_violations dv
+JOIN photos ph ON ph.id = dv.photo_id
+JOIN inspections i ON i.id = ph.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND dv.created_at >= $2
+  AND dv.created_at < $3
+  AND dv.status = 'confirmed'
+GROUP BY dv.severity;

@@ -69,6 +69,29 @@ func (q *Queries) GetPhoto(ctx context.Context, id pgtype.UUID) (Photo, error) {
 	return i, err
 }
 
+const getPhotoCountByOrganizationAndDateRange = `-- name: GetPhotoCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM photos ph
+JOIN inspections i ON i.id = ph.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND ph.created_at >= $2
+  AND ph.created_at < $3
+`
+
+type GetPhotoCountByOrganizationAndDateRangeParams struct {
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CreatedAt_2    pgtype.Timestamptz `json:"created_at_2"`
+}
+
+func (q *Queries) GetPhotoCountByOrganizationAndDateRange(ctx context.Context, arg GetPhotoCountByOrganizationAndDateRangeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getPhotoCountByOrganizationAndDateRange, arg.OrganizationID, arg.CreatedAt, arg.CreatedAt_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const listPhotos = `-- name: ListPhotos :many
 SELECT id, inspection_id, storage_url, created_at, thumbnail_url FROM photos
 WHERE inspection_id = $1

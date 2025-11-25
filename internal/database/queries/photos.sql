@@ -20,3 +20,12 @@ RETURNING *;
 -- name: DeletePhoto :exec
 DELETE FROM photos
 WHERE id = $1;
+
+-- name: GetPhotoCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM photos ph
+JOIN inspections i ON i.id = ph.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND ph.created_at >= $2
+  AND ph.created_at < $3;

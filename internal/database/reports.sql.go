@@ -65,6 +65,29 @@ func (q *Queries) GetReport(ctx context.Context, id pgtype.UUID) (Report, error)
 	return i, err
 }
 
+const getReportCountByOrganizationAndDateRange = `-- name: GetReportCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM reports r
+JOIN inspections i ON i.id = r.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND r.created_at >= $2
+  AND r.created_at < $3
+`
+
+type GetReportCountByOrganizationAndDateRangeParams struct {
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CreatedAt_2    pgtype.Timestamptz `json:"created_at_2"`
+}
+
+func (q *Queries) GetReportCountByOrganizationAndDateRange(ctx context.Context, arg GetReportCountByOrganizationAndDateRangeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getReportCountByOrganizationAndDateRange, arg.OrganizationID, arg.CreatedAt, arg.CreatedAt_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const listReports = `-- name: ListReports :many
 SELECT id, inspection_id, storage_url, created_at FROM reports
 WHERE inspection_id = $1

@@ -71,6 +71,82 @@ func (q *Queries) GetInspection(ctx context.Context, id pgtype.UUID) (Inspection
 	return i, err
 }
 
+const getInspectionCountByOrganizationAndDateRange = `-- name: GetInspectionCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM inspections i
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND i.created_at >= $2
+  AND i.created_at < $3
+`
+
+type GetInspectionCountByOrganizationAndDateRangeParams struct {
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CreatedAt_2    pgtype.Timestamptz `json:"created_at_2"`
+}
+
+func (q *Queries) GetInspectionCountByOrganizationAndDateRange(ctx context.Context, arg GetInspectionCountByOrganizationAndDateRangeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getInspectionCountByOrganizationAndDateRange, arg.OrganizationID, arg.CreatedAt, arg.CreatedAt_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getRecentInspectionsByOrganization = `-- name: GetRecentInspectionsByOrganization :many
+SELECT i.id, i.project_id, i.inspector_id, i.status, i.created_at, i.updated_at, p.name as project_name, p.organization_id
+FROM inspections i
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+ORDER BY i.created_at DESC
+LIMIT $2
+`
+
+type GetRecentInspectionsByOrganizationParams struct {
+	OrganizationID pgtype.UUID `json:"organization_id"`
+	Limit          int32       `json:"limit"`
+}
+
+type GetRecentInspectionsByOrganizationRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	ProjectID      pgtype.UUID        `json:"project_id"`
+	InspectorID    pgtype.UUID        `json:"inspector_id"`
+	Status         InspectionStatus   `json:"status"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ProjectName    string             `json:"project_name"`
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+}
+
+func (q *Queries) GetRecentInspectionsByOrganization(ctx context.Context, arg GetRecentInspectionsByOrganizationParams) ([]GetRecentInspectionsByOrganizationRow, error) {
+	rows, err := q.db.Query(ctx, getRecentInspectionsByOrganization, arg.OrganizationID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRecentInspectionsByOrganizationRow{}
+	for rows.Next() {
+		var i GetRecentInspectionsByOrganizationRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.InspectorID,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ProjectName,
+			&i.OrganizationID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInspections = `-- name: ListInspections :many
 SELECT id, project_id, inspector_id, status, created_at, updated_at FROM inspections
 WHERE project_id = $1

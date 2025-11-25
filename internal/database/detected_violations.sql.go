@@ -126,6 +126,74 @@ func (q *Queries) GetDetectedViolation(ctx context.Context, id pgtype.UUID) (Det
 	return i, err
 }
 
+const getViolationCountByOrganizationAndDateRange = `-- name: GetViolationCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM detected_violations dv
+JOIN photos ph ON ph.id = dv.photo_id
+JOIN inspections i ON i.id = ph.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND dv.created_at >= $2
+  AND dv.created_at < $3
+`
+
+type GetViolationCountByOrganizationAndDateRangeParams struct {
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CreatedAt_2    pgtype.Timestamptz `json:"created_at_2"`
+}
+
+func (q *Queries) GetViolationCountByOrganizationAndDateRange(ctx context.Context, arg GetViolationCountByOrganizationAndDateRangeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getViolationCountByOrganizationAndDateRange, arg.OrganizationID, arg.CreatedAt, arg.CreatedAt_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getViolationCountBySeverityAndOrganization = `-- name: GetViolationCountBySeverityAndOrganization :many
+SELECT dv.severity, COUNT(*) as count
+FROM detected_violations dv
+JOIN photos ph ON ph.id = dv.photo_id
+JOIN inspections i ON i.id = ph.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND dv.created_at >= $2
+  AND dv.created_at < $3
+  AND dv.status = 'confirmed'
+GROUP BY dv.severity
+`
+
+type GetViolationCountBySeverityAndOrganizationParams struct {
+	OrganizationID pgtype.UUID        `json:"organization_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CreatedAt_2    pgtype.Timestamptz `json:"created_at_2"`
+}
+
+type GetViolationCountBySeverityAndOrganizationRow struct {
+	Severity ViolationSeverity `json:"severity"`
+	Count    int64             `json:"count"`
+}
+
+func (q *Queries) GetViolationCountBySeverityAndOrganization(ctx context.Context, arg GetViolationCountBySeverityAndOrganizationParams) ([]GetViolationCountBySeverityAndOrganizationRow, error) {
+	rows, err := q.db.Query(ctx, getViolationCountBySeverityAndOrganization, arg.OrganizationID, arg.CreatedAt, arg.CreatedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetViolationCountBySeverityAndOrganizationRow{}
+	for rows.Next() {
+		var i GetViolationCountBySeverityAndOrganizationRow
+		if err := rows.Scan(&i.Severity, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDetectedViolations = `-- name: ListDetectedViolations :many
 SELECT id, photo_id, description, confidence_score, status, created_at, safety_code_id, severity, location FROM detected_violations
 WHERE photo_id = $1

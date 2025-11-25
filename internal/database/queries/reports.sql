@@ -19,3 +19,12 @@ RETURNING *;
 -- name: DeleteReport :exec
 DELETE FROM reports
 WHERE id = $1;
+
+-- name: GetReportCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM reports r
+JOIN inspections i ON i.id = r.inspection_id
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND r.created_at >= $2
+  AND r.created_at < $3;

@@ -38,3 +38,19 @@ RETURNING *;
 -- name: DeleteInspection :exec
 DELETE FROM inspections
 WHERE id = $1;
+
+-- name: GetInspectionCountByOrganizationAndDateRange :one
+SELECT COUNT(*) as count
+FROM inspections i
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+  AND i.created_at >= $2
+  AND i.created_at < $3;
+
+-- name: GetRecentInspectionsByOrganization :many
+SELECT i.*, p.name as project_name, p.organization_id
+FROM inspections i
+JOIN projects p ON p.id = i.project_id
+WHERE p.organization_id = $1
+ORDER BY i.created_at DESC
+LIMIT $2;
