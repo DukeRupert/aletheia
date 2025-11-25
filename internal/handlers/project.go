@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -126,8 +127,9 @@ func (h *ProjectHandler) CreateProject(c echo.Context) error {
 
 	// Check if this is an HTMX request
 	if c.Request().Header.Get("HX-Request") == "true" {
-		// HTMX request - redirect to projects list
-		c.Response().Header().Set("HX-Redirect", "/projects")
+		// HTMX request - redirect to project detail page to create first inspection
+		redirectURL := fmt.Sprintf("/projects/%s", project.ID.String())
+		c.Response().Header().Set("HX-Redirect", redirectURL)
 		return c.NoContent(http.StatusOK)
 	}
 

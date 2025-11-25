@@ -104,8 +104,8 @@ func (h *OrganizationHandler) CreateOrganization(c echo.Context) error {
 
 	// Check if this is an HTMX request
 	if c.Request().Header.Get("HX-Request") == "true" {
-		// HTMX request - redirect to organizations list
-		c.Response().Header().Set("HX-Redirect", "/organizations")
+		// HTMX request - redirect to projects page to create first project
+		c.Response().Header().Set("HX-Redirect", "/projects")
 		return c.NoContent(http.StatusOK)
 	}
 
