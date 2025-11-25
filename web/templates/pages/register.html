@@ -32,7 +32,19 @@
           <label for="name" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
             Full Name
           </label>
-          {{template "input" (dict "Type" "text" "Name" "name" "ID" "name" "Required" true "Autofocus" true "Placeholder" "John Doe")}}
+          {{template "input" (dict
+            "Type" "text"
+            "Name" "name"
+            "ID" "name"
+            "Required" true
+            "Autofocus" true
+            "Placeholder" "John Doe"
+            "Value" (index .Values "name")
+            "Error" (index .Errors "name")
+          )}}
+          {{if index .Errors "name"}}
+            {{template "field-error" (dict "ID" "name-error" "Message" (index .Errors "name"))}}
+          {{end}}
         </div>
 
         <!-- Username field -->
@@ -40,10 +52,22 @@
           <label for="username" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
             Username
           </label>
-          {{template "input" (dict "Type" "text" "Name" "username" "ID" "username" "Required" true "Placeholder" "johndoe")}}
-          <p class="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-            Choose a unique username
-          </p>
+          {{template "input" (dict
+            "Type" "text"
+            "Name" "username"
+            "ID" "username"
+            "Required" true
+            "Placeholder" "johndoe"
+            "Value" (index .Values "username")
+            "Error" (index .Errors "username")
+          )}}
+          {{if index .Errors "username"}}
+            {{template "field-error" (dict "ID" "username-error" "Message" (index .Errors "username"))}}
+          {{else}}
+            <p class="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+              Choose a unique username
+            </p>
+          {{end}}
         </div>
 
         <!-- Email field -->
@@ -51,7 +75,18 @@
           <label for="email" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
             Email
           </label>
-          {{template "input" (dict "Type" "email" "Name" "email" "ID" "email" "Required" true "Placeholder" "you@example.com")}}
+          {{template "input" (dict
+            "Type" "email"
+            "Name" "email"
+            "ID" "email"
+            "Required" true
+            "Placeholder" "you@example.com"
+            "Value" (index .Values "email")
+            "Error" (index .Errors "email")
+          )}}
+          {{if index .Errors "email"}}
+            {{template "field-error" (dict "ID" "email-error" "Message" (index .Errors "email"))}}
+          {{end}}
         </div>
 
         <!-- Password field -->
@@ -59,11 +94,32 @@
           <label for="password" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
             Password
           </label>
-          {{template "input" (dict "Type" "password" "Name" "password" "ID" "password" "Required" true "Minlength" 8 "Placeholder" "At least 8 characters")}}
-          <p class="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-            Must be at least 8 characters
-          </p>
+          {{template "input" (dict
+            "Type" "password"
+            "Name" "password"
+            "ID" "password"
+            "Required" true
+            "Minlength" 8
+            "Pattern" "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$"
+            "Title" "Password must be at least 8 characters and contain: uppercase letter, lowercase letter, and number"
+            "Placeholder" "Create a strong password"
+            "Error" (index .Errors "password")
+          )}}
+          {{if index .Errors "password"}}
+            {{template "field-error" (dict "ID" "password-error" "Message" (index .Errors "password"))}}
+          {{else}}
+            <p class="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+              Must be at least 8 characters with uppercase, lowercase, and number
+            </p>
+          {{end}}
         </div>
+
+        <!-- General error message -->
+        {{if index .Errors "general"}}
+          <div class="rounded-lg bg-red-50 border border-red-200 p-4 dark:bg-red-950/20 dark:border-red-900/50">
+            {{template "field-error" (dict "ID" "general-error" "Message" (index .Errors "general"))}}
+          </div>
+        {{end}}
 
         <!-- Submit button -->
         {{template "button" (dict "Type" "submit" "Content" "Create Account" "Variant" "solid" "Color" "blue" "Class" "w-full")}}

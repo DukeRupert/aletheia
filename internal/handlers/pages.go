@@ -81,6 +81,8 @@ func (h *PageHandler) ErrorPage(c echo.Context) error {
 func (h *PageHandler) LoginPage(c echo.Context) error {
 	data := map[string]interface{}{
 		"IsAuthenticated": false,
+		"Values":          make(map[string]string),
+		"Errors":          make(map[string]string),
 	}
 	return c.Render(http.StatusOK, "login.html", data)
 }
@@ -256,6 +258,8 @@ func (h *PageHandler) DashboardPage(c echo.Context) error {
 func (h *PageHandler) RegisterPage(c echo.Context) error {
 	data := map[string]interface{}{
 		"IsAuthenticated": false,
+		"Values":          make(map[string]string),
+		"Errors":          make(map[string]string),
 	}
 	return c.Render(http.StatusOK, "register.html", data)
 }

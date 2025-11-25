@@ -56,15 +56,34 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	var req RegisterRequest
 	if err := c.Bind(&req); err != nil {
 		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderRegisterFormWithErrors(c, &req, map[string]string{
+				"general": "Invalid form data. Please check your inputs.",
+			})
+		}
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
 	if err := c.Validate(&req); err != nil {
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderRegisterFormWithErrors(c, &req, map[string]string{
+				"general": "Please fill in all required fields correctly.",
+			})
+		}
 		return err
 	}
 
 	// Validate password complexity
 	if err := auth.ValidatePassword(req.Password); err != nil {
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderRegisterFormWithErrors(c, &req, map[string]string{
+				"password": err.Error(),
+			})
+		}
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
@@ -149,10 +168,30 @@ func (h *AuthHandler) Register(c echo.Context) error {
 				slog.String("username", req.Username),
 				slog.String("constraint", pgErr.ConstraintName),
 			)
+
+			// Check if this is an HTMX request
+			if c.Request().Header.Get("HX-Request") == "true" {
+				fieldErrors := make(map[string]string)
+				if pgErr.ConstraintName == "users_email_key" {
+					fieldErrors["email"] = "This email is already registered"
+				} else if pgErr.ConstraintName == "users_username_key" {
+					fieldErrors["username"] = "This username is already taken"
+				} else {
+					fieldErrors["general"] = "Email or username already exists"
+				}
+				return h.renderRegisterFormWithErrors(c, &req, fieldErrors)
+			}
 			return echo.NewHTTPError(http.StatusConflict, "email or username already exists")
 		}
 
 		h.logger.Error("failed to create user", slog.String("err", err.Error()))
+
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderRegisterFormWithErrors(c, &req, map[string]string{
+				"general": "Failed to create account. Please try again.",
+			})
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create user")
 	}
 
@@ -202,6 +241,34 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	})
 }
 
+// renderRegisterFormWithErrors renders the registration form with validation errors
+func (h *AuthHandler) renderRegisterFormWithErrors(c echo.Context, req *RegisterRequest, fieldErrors map[string]string) error {
+	data := map[string]interface{}{
+		"IsAuthenticated": false,
+		"Values": map[string]string{
+			"name":     req.Name,
+			"username": req.Username,
+			"email":    req.Email,
+			// Don't send password back for security
+		},
+		"Errors": fieldErrors,
+	}
+	return c.Render(http.StatusUnprocessableEntity, "register.html", data)
+}
+
+// renderLoginFormWithErrors renders the login form with validation errors
+func (h *AuthHandler) renderLoginFormWithErrors(c echo.Context, req *LoginRequest, fieldErrors map[string]string) error {
+	data := map[string]interface{}{
+		"IsAuthenticated": false,
+		"Values": map[string]string{
+			"email": req.Email,
+			// Don't send password back for security
+		},
+		"Errors": fieldErrors,
+	}
+	return c.Render(http.StatusUnprocessableEntity, "login.html", data)
+}
+
 type LoginRequest struct {
 	Email    string `json:"email" form:"email" validate:"required,email,max=255"`
 	Password string `json:"password" form:"password" validate:"required,max=128"`
@@ -218,10 +285,23 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	var req LoginRequest
 	if err := c.Bind(&req); err != nil {
 		h.logger.Error("failed to bind request", slog.String("err", err.Error()))
+
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderLoginFormWithErrors(c, &req, map[string]string{
+				"general": "Invalid form data. Please check your inputs.",
+			})
+		}
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
 	if err := c.Validate(&req); err != nil {
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderLoginFormWithErrors(c, &req, map[string]string{
+				"general": "Please fill in all required fields correctly.",
+			})
+		}
 		return err
 	}
 
@@ -234,9 +314,23 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			h.logger.Warn("login attempt with non-existent email", slog.String("email", req.Email))
+
+			// Check if this is an HTMX request
+			if c.Request().Header.Get("HX-Request") == "true" {
+				return h.renderLoginFormWithErrors(c, &req, map[string]string{
+					"general": "Invalid email or password",
+				})
+			}
 			return echo.NewHTTPError(http.StatusUnauthorized, "invalid email or password")
 		}
 		h.logger.Error("failed to get user", slog.String("err", err.Error()))
+
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderLoginFormWithErrors(c, &req, map[string]string{
+				"general": "Login failed. Please try again.",
+			})
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "login failed")
 	}
 
@@ -246,6 +340,13 @@ func (h *AuthHandler) Login(c echo.Context) error {
 			slog.String("user_id", user.ID.String()),
 			slog.String("email", user.Email),
 		)
+
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderLoginFormWithErrors(c, &req, map[string]string{
+				"general": "Invalid email or password",
+			})
+		}
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid email or password")
 	}
 
@@ -255,6 +356,13 @@ func (h *AuthHandler) Login(c echo.Context) error {
 			slog.String("user_id", user.ID.String()),
 			slog.String("email", user.Email),
 		)
+
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderLoginFormWithErrors(c, &req, map[string]string{
+				"general": "Please verify your email address before logging in",
+			})
+		}
 		return echo.NewHTTPError(http.StatusForbidden, "please verify your email address before logging in")
 	}
 
@@ -264,6 +372,13 @@ func (h *AuthHandler) Login(c echo.Context) error {
 			slog.String("user_id", user.ID.String()),
 			slog.String("status", string(user.Status)),
 		)
+
+		// Check if this is an HTMX request
+		if c.Request().Header.Get("HX-Request") == "true" {
+			return h.renderLoginFormWithErrors(c, &req, map[string]string{
+				"general": "Account is not active",
+			})
+		}
 		return echo.NewHTTPError(http.StatusForbidden, "account is not active")
 	}
 

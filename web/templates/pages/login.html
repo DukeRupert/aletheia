@@ -32,7 +32,20 @@
           <label for="email" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
             Email
           </label>
-          {{template "input" (dict "Type" "email" "Name" "email" "ID" "email" "Required" true "Autofocus" true "Placeholder" "you@example.com")}}
+          {{template "input" (dict
+            "Type" "email"
+            "Name" "email"
+            "ID" "email"
+            "Required" true
+            "Autofocus" true
+            "Placeholder" "you@example.com"
+            "Title" "Please enter a valid email address"
+            "Value" (index .Values "email")
+            "Error" (index .Errors "email")
+          )}}
+          {{if index .Errors "email"}}
+            {{template "field-error" (dict "ID" "email-error" "Message" (index .Errors "email"))}}
+          {{end}}
         </div>
 
         <!-- Password field -->
@@ -40,8 +53,27 @@
           <label for="password" class="text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white font-medium">
             Password
           </label>
-          {{template "input" (dict "Type" "password" "Name" "password" "ID" "password" "Required" true "Placeholder" "Enter your password")}}
+          {{template "input" (dict
+            "Type" "password"
+            "Name" "password"
+            "ID" "password"
+            "Required" true
+            "Minlength" 8
+            "Placeholder" "Enter your password"
+            "Title" "Password must be at least 8 characters"
+            "Error" (index .Errors "password")
+          )}}
+          {{if index .Errors "password"}}
+            {{template "field-error" (dict "ID" "password-error" "Message" (index .Errors "password"))}}
+          {{end}}
         </div>
+
+        <!-- General error message -->
+        {{if index .Errors "general"}}
+          <div class="rounded-lg bg-red-50 border border-red-200 p-4 dark:bg-red-950/20 dark:border-red-900/50">
+            {{template "field-error" (dict "ID" "general-error" "Message" (index .Errors "general"))}}
+          </div>
+        {{end}}
 
         <!-- Submit button -->
         {{template "button" (dict "Type" "submit" "Content" "Sign In" "Variant" "solid" "Color" "blue" "Class" "w-full")}}
