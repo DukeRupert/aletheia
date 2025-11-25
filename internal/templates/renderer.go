@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -40,6 +41,17 @@ func NewTemplateRenderer(templatesDir string) (*TemplateRenderer, error) {
 		// list creates a slice for passing arrays to templates
 		"list": func(values ...interface{}) []interface{} {
 			return values
+		},
+		// slice is an alias for list (for convenience)
+		"slice": func(values ...interface{}) []interface{} {
+			return values
+		},
+		// cond returns the first value if condition is true, otherwise the second value
+		"cond": func(condition bool, trueVal, falseVal interface{}) interface{} {
+			if condition {
+				return trueVal
+			}
+			return falseVal
 		},
 		"mul": func(a, b interface{}) float64 {
 			var aFloat, bFloat float64
@@ -95,6 +107,25 @@ func NewTemplateRenderer(templatesDir string) (*TemplateRenderer, error) {
 		// sub subtracts two integers
 		"sub": func(a, b int) int {
 			return a - b
+		},
+		// add adds two integers
+		"add": func(a, b int) int {
+			return a + b
+		},
+		// div divides two integers
+		"div": func(a, b int) int {
+			if b == 0 {
+				return 0
+			}
+			return a / b
+		},
+		// toJSON converts a value to JSON for use in Alpine.js or JavaScript
+		"toJSON": func(v interface{}) template.JS {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return template.JS("[]")
+			}
+			return template.JS(b)
 		},
 	}
 

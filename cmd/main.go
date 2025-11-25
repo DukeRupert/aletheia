@@ -278,6 +278,7 @@ func main() {
 	safetyCodeHandler := handlers.NewSafetyCodeHandler(pool, logger)
 	photoHandler := handlers.NewPhotoHandler(pool, queries, queueService, logger)
 	violationHandler := handlers.NewViolationHandler(pool, queries, logger)
+	jobHandler := handlers.NewJobHandler(pool, queries, queueService, logger)
 	healthHandler := handlers.NewHealthHandler(pool, fileStorage, queueService, logger)
 
 	// Suppress unused variable warning until audit logging is integrated
@@ -390,7 +391,8 @@ func main() {
 	// Photo routes
 	protected.GET("/inspections/:inspectionId/photos", uploadHandler.ListPhotos)
 	protected.GET("/photos/:id", uploadHandler.GetPhoto)
-	protected.DELETE("/photos/:id", uploadHandler.DeletePhoto)
+	protected.GET("/photos/:photo_id/status", photoHandler.GetPhotoStatus)
+	protected.DELETE("/photos/:photo_id", photoHandler.DeletePhoto)
 	protected.POST("/photos/analyze", photoHandler.AnalyzePhoto)
 	protected.GET("/photos/analyze/:job_id", photoHandler.GetPhotoAnalysisStatus)
 
@@ -404,7 +406,14 @@ func main() {
 	// Violation review routes
 	protected.POST("/violations/:id/confirm", violationHandler.ConfirmViolation)
 	protected.POST("/violations/:id/dismiss", violationHandler.DismissViolation)
+	protected.POST("/violations/:id/pending", violationHandler.SetViolationPending)
+	protected.PATCH("/violations/:violation_id", violationHandler.UpdateViolation)
 	protected.POST("/violations/manual", violationHandler.CreateManualViolation)
+	protected.GET("/inspections/:inspection_id/violations", violationHandler.ListViolationsByInspection)
+
+	// Job status routes
+	protected.GET("/jobs/status", jobHandler.GetJobStatus)
+	protected.POST("/jobs/:job_id/cancel", jobHandler.CancelJob)
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,

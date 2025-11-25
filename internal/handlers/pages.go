@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/dukerupert/aletheia/internal/database"
 	"github.com/dukerupert/aletheia/internal/session"
@@ -85,14 +87,161 @@ func (h *PageHandler) LoginPage(c echo.Context) error {
 
 // DashboardPage renders the dashboard page
 func (h *PageHandler) DashboardPage(c echo.Context) error {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
 	userID, ok := session.GetUserID(c)
 	if !ok {
 		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
 	}
 
+	queries := database.New(h.pool)
+
+	// Get user's organizations
+	orgMemberships, err := queries.ListUserOrganizations(ctx, uuidToPgUUID(userID))
+	if err != nil || len(orgMemberships) == 0 {
+		h.logger.Error("failed to get user organizations",
+			slog.String("user_id", userID.String()),
+			slog.String("err", err.Error()))
+
+		// Show empty state for users with no organizations
+		data := map[string]interface{}{
+			"IsAuthenticated": true,
+			"User":            h.getUserDisplayInfo(c, userID),
+			"HasOrganization": false,
+		}
+		return c.Render(http.StatusOK, "dashboard.html", data)
+	}
+
+	// Use first organization (TODO: add organization switcher)
+	orgID := orgMemberships[0].OrganizationID
+
+	// Calculate date ranges
+	nowTime := time.Now()
+	weekStartTime := nowTime.AddDate(0, 0, -7)
+	monthStartTime := nowTime.AddDate(0, -1, 0)
+
+	now := pgtype.Timestamptz{Time: nowTime, Valid: true}
+	weekStart := pgtype.Timestamptz{Time: weekStartTime, Valid: true}
+	monthStart := pgtype.Timestamptz{Time: monthStartTime, Valid: true}
+
+	// Get stats for this week
+	inspectionsThisWeek, err := queries.GetInspectionCountByOrganizationAndDateRange(ctx,
+		database.GetInspectionCountByOrganizationAndDateRangeParams{
+			OrganizationID: orgID,
+			CreatedAt:      weekStart,
+			CreatedAt_2:    now,
+		})
+	if err != nil {
+		h.logger.Error("failed to get inspection count", slog.String("err", err.Error()))
+		inspectionsThisWeek = 0
+	}
+
+	violationsThisWeek, err := queries.GetViolationCountByOrganizationAndDateRange(ctx,
+		database.GetViolationCountByOrganizationAndDateRangeParams{
+			OrganizationID: orgID,
+			CreatedAt:      weekStart,
+			CreatedAt_2:    now,
+		})
+	if err != nil {
+		h.logger.Error("failed to get violation count", slog.String("err", err.Error()))
+		violationsThisWeek = 0
+	}
+
+	photosThisWeek, err := queries.GetPhotoCountByOrganizationAndDateRange(ctx,
+		database.GetPhotoCountByOrganizationAndDateRangeParams{
+			OrganizationID: orgID,
+			CreatedAt:      weekStart,
+			CreatedAt_2:    now,
+		})
+	if err != nil {
+		h.logger.Error("failed to get photo count", slog.String("err", err.Error()))
+		photosThisWeek = 0
+	}
+
+	reportsThisMonth, err := queries.GetReportCountByOrganizationAndDateRange(ctx,
+		database.GetReportCountByOrganizationAndDateRangeParams{
+			OrganizationID: orgID,
+			CreatedAt:      monthStart,
+			CreatedAt_2:    now,
+		})
+	if err != nil {
+		h.logger.Error("failed to get report count", slog.String("err", err.Error()))
+		reportsThisMonth = 0
+	}
+
+	// Get violation breakdown by severity
+	violationsBySeverity, err := queries.GetViolationCountBySeverityAndOrganization(ctx,
+		database.GetViolationCountBySeverityAndOrganizationParams{
+			OrganizationID: orgID,
+			CreatedAt:      weekStart,
+			CreatedAt_2:    now,
+		})
+	if err != nil {
+		h.logger.Error("failed to get violations by severity", slog.String("err", err.Error()))
+		violationsBySeverity = []database.GetViolationCountBySeverityAndOrganizationRow{}
+	}
+
+	// Build severity sub-value string
+	var criticalCount int64
+	for _, v := range violationsBySeverity {
+		if v.Severity == database.ViolationSeverityCritical {
+			criticalCount = v.Count
+			break
+		}
+	}
+	violationsSubValue := ""
+	if criticalCount > 0 {
+		violationsSubValue = fmt.Sprintf("%d critical", criticalCount)
+	}
+
+	// Get recent inspections
+	recentInspections, err := queries.GetRecentInspectionsByOrganization(ctx,
+		database.GetRecentInspectionsByOrganizationParams{
+			OrganizationID: orgID,
+			Limit:          int32(10),
+		})
+	if err != nil {
+		h.logger.Error("failed to get recent inspections", slog.String("err", err.Error()))
+		recentInspections = []database.GetRecentInspectionsByOrganizationRow{}
+	}
+
+	// Build stats cards
+	statsCards := []map[string]interface{}{
+		{
+			"Label":   "Inspections This Week",
+			"Value":   inspectionsThisWeek,
+			"Icon":    "clipboard",
+			"Color":   "blue",
+			"URL":     "/inspections",
+		},
+		{
+			"Label":    "Violations Detected",
+			"Value":    violationsThisWeek,
+			"SubValue": violationsSubValue,
+			"Icon":     "alert",
+			"Color":    "red",
+		},
+		{
+			"Label": "Reports Generated",
+			"Value": reportsThisMonth,
+			"Icon":  "document",
+			"Color": "green",
+		},
+		{
+			"Label": "Photos Analyzed",
+			"Value": photosThisWeek,
+			"Icon":  "photo",
+			"Color": "orange",
+		},
+	}
+
 	data := map[string]interface{}{
-		"IsAuthenticated": true,
-		"User":            h.getUserDisplayInfo(c, userID),
+		"IsAuthenticated":   true,
+		"User":              h.getUserDisplayInfo(c, userID),
+		"HasOrganization":   true,
+		"StatsCards":        statsCards,
+		"RecentInspections": recentInspections,
 	}
 	return c.Render(http.StatusOK, "dashboard.html", data)
 }
@@ -647,13 +796,74 @@ func (h *PageHandler) InspectionDetailPage(c echo.Context) error {
 		}
 	}
 
+	// Build photo cards data with violation counts
+	photoCards := make([]map[string]interface{}, 0, len(photos))
+	for _, photo := range photos {
+		photoIDStr := photo.ID.String()
+		photoViolations := violationsByPhoto[photoIDStr]
+
+		// Count violations by status
+		confirmedCount := 0
+		pendingCount := 0
+		for _, v := range photoViolations {
+			if v.Status == database.ViolationStatusConfirmed {
+				confirmedCount++
+			} else if v.Status == database.ViolationStatusPending {
+				pendingCount++
+			}
+		}
+
+		// Determine analysis status based on violation counts
+		analysisStatus := "uploaded"
+		if len(photoViolations) > 0 {
+			analysisStatus = "analyzed"
+		}
+
+		// Get first 2 violations for preview
+		violationsPreview := photoViolations
+		if len(violationsPreview) > 2 {
+			violationsPreview = violationsPreview[:2]
+		}
+
+		// Build thumbnail URL
+		thumbnailURL := photo.StorageUrl
+		if photo.ThumbnailUrl.Valid {
+			thumbnailURL = photo.ThumbnailUrl.String
+		}
+
+		photoCards = append(photoCards, map[string]interface{}{
+			"PhotoID":           photoIDStr,
+			"ThumbnailURL":      thumbnailURL,
+			"AnalysisStatus":    analysisStatus,
+			"ConfirmedCount":    confirmedCount,
+			"PendingCount":      pendingCount,
+			"TotalCount":        len(photoViolations),
+			"ViolationsPreview": violationsPreview,
+		})
+	}
+
+	// Count total violations by status
+	confirmedTotal := 0
+	pendingTotal := 0
+	for _, violation := range violations {
+		if violation.Status == database.ViolationStatusConfirmed {
+			confirmedTotal++
+		} else if violation.Status == database.ViolationStatusPending {
+			pendingTotal++
+		}
+	}
+
 	data := map[string]interface{}{
 		"IsAuthenticated":   true,
 		"User":              h.getUserDisplayInfo(c, userID),
 		"Inspection":        inspection,
+		"ProjectID":         project.ID.String(),
 		"ProjectName":       project.Name,
 		"ProjectLocation":   projectLocation,
-		"Photos":            photos,
+		"Photos":            photoCards,
+		"ConfirmedTotal":    confirmedTotal,
+		"PendingTotal":      pendingTotal,
+		"PhotoCount":        len(photos),
 		"ViolationsByPhoto": violationsByPhoto,
 		"SafetyCodeMap":     safetyCodeMap,
 	}

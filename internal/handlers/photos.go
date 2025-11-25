@@ -416,3 +416,220 @@ func (h *PhotoHandler) GetPhotoAnalysisStatus(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, job)
 }
+
+// DeletePhoto godoc
+// @Summary Delete a photo
+// @Description Delete a photo and its associated violations
+// @Tags photos
+// @Accept json
+// @Produce json
+// @Param photo_id path string true "Photo ID"
+// @Success 204
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/photos/{photo_id} [delete]
+func (h *PhotoHandler) DeletePhoto(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
+	photoIDStr := c.Param("photo_id")
+	photoID, err := uuid.Parse(photoIDStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid photo_id format")
+	}
+
+	// Get photo first to check authorization and get violations
+	photo, err := h.db.GetPhoto(ctx, pgtype.UUID{Bytes: photoID, Valid: true})
+	if err != nil {
+		// DELETE is idempotent - if photo doesn't exist, consider it already deleted
+		h.logger.Info("photo already deleted or does not exist",
+			slog.String("photo_id", photoID.String()))
+
+		if c.Request().Header.Get("HX-Request") == "true" {
+			// Return empty response for HTMX to swap out the element
+			return c.NoContent(http.StatusOK)
+		}
+		return c.NoContent(http.StatusNoContent)
+	}
+
+	// Authorization: verify user has access to this photo's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session", slog.String("photo_id", photoID.String()))
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, photo.ID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
+	}
+
+	// Check if photo has confirmed violations (optional: prevent deletion)
+	violations, err := h.db.ListDetectedViolations(ctx, photo.ID)
+	if err != nil {
+		h.logger.Error("failed to check violations",
+			slog.String("photo_id", photoID.String()),
+			slog.String("err", err.Error()))
+	}
+
+	// Count confirmed violations
+	confirmedCount := 0
+	for _, v := range violations {
+		if v.Status == database.ViolationStatusConfirmed {
+			confirmedCount++
+		}
+	}
+
+	// Optional: Block deletion if there are confirmed violations
+	// Uncomment to enable this protection:
+	// if confirmedCount > 0 {
+	// 	return echo.NewHTTPError(http.StatusConflict,
+	// 		fmt.Sprintf("Cannot delete photo with %d confirmed violations", confirmedCount))
+	// }
+
+	// Delete violations first (cascading delete might not be set up)
+	for _, v := range violations {
+		err = h.db.DeleteDetectedViolation(ctx, v.ID)
+		if err != nil {
+			h.logger.Error("failed to delete violation",
+				slog.String("violation_id", v.ID.String()),
+				slog.String("err", err.Error()))
+			// Continue deleting other violations
+		}
+	}
+
+	// Delete the photo
+	err = h.db.DeletePhoto(ctx, photo.ID)
+	if err != nil {
+		h.logger.Error("failed to delete photo",
+			slog.String("photo_id", photoID.String()),
+			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to delete photo")
+	}
+
+	h.logger.Info("photo deleted",
+		slog.String("photo_id", photoID.String()),
+		slog.Int("violations_deleted", len(violations)),
+	)
+
+	// TODO: Delete photo file from storage (S3/local)
+	// This should be done async to avoid blocking the response
+	// Consider adding a cleanup job to the queue
+
+	if c.Request().Header.Get("HX-Request") == "true" {
+		// Return empty response for HTMX to swap out the element
+		return c.NoContent(http.StatusOK)
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// GetPhotoStatus returns the current status of a photo for HTMX polling
+// This endpoint is used by the photo-card component to auto-refresh during analysis
+// @Summary Get photo status
+// @Description Returns the photo-card component HTML with updated status
+// @Tags photos
+// @Produce html
+// @Param photo_id path string true "Photo ID"
+// @Success 200 {string} string "HTML photo-card component"
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/photos/{photo_id}/status [get]
+func (h *PhotoHandler) GetPhotoStatus(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
+	photoIDStr := c.Param("photo_id")
+	photoID, err := uuid.Parse(photoIDStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid photo_id format")
+	}
+
+	// Get photo
+	photo, err := h.db.GetPhoto(ctx, pgtype.UUID{Bytes: photoID, Valid: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "Photo not found")
+	}
+
+	// Authorization: verify user has access to this photo's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, photo.ID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
+	}
+
+	// Get violations for this photo (excluding dismissed)
+	allViolations, err := h.db.ListDetectedViolations(ctx, photo.ID)
+	if err != nil {
+		h.logger.Error("failed to get violations", slog.String("err", err.Error()))
+		allViolations = []database.DetectedViolation{}
+	}
+
+	// Filter out dismissed violations
+	violations := make([]database.DetectedViolation, 0)
+	for _, v := range allViolations {
+		if v.Status != database.ViolationStatusDismissed {
+			violations = append(violations, v)
+		}
+	}
+
+	// Count violations by status
+	confirmedCount := 0
+	pendingCount := 0
+	for _, v := range violations {
+		if v.Status == database.ViolationStatusConfirmed {
+			confirmedCount++
+		} else if v.Status == database.ViolationStatusPending {
+			pendingCount++
+		}
+	}
+
+	// Determine analysis status based on violation counts
+	analysisStatus := "uploaded"
+	if len(violations) > 0 {
+		analysisStatus = "analyzed"
+	}
+
+	// Get first 2 violations for preview
+	violationsPreview := violations
+	if len(violationsPreview) > 2 {
+		violationsPreview = violationsPreview[:2]
+	}
+
+	// Build thumbnail URL
+	thumbnailURL := photo.StorageUrl
+	if photo.ThumbnailUrl.Valid {
+		thumbnailURL = photo.ThumbnailUrl.String
+	}
+
+	// Build photo card data
+	data := map[string]interface{}{
+		"PhotoID":           photo.ID.String(),
+		"ThumbnailURL":      thumbnailURL,
+		"AnalysisStatus":    analysisStatus,
+		"ConfirmedCount":    confirmedCount,
+		"PendingCount":      pendingCount,
+		"TotalCount":        len(violations),
+		"ViolationsPreview": violationsPreview,
+	}
+
+	// Render the photo-card component
+	return c.Render(http.StatusOK, "photo-card", data)
+}

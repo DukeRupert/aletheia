@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -372,7 +371,10 @@ func (h *ViolationHandler) DeleteViolation(c echo.Context) error {
 	violation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusNotFound, "violation not found")
+			// DELETE is idempotent - if violation doesn't exist, consider it already deleted
+			h.logger.Info("violation already deleted or does not exist",
+				slog.String("violation_id", violationID.String()))
+			return c.NoContent(http.StatusNoContent)
 		}
 		h.logger.Error("failed to get violation",
 			slog.String("violation_id", violationID.String()),
@@ -590,164 +592,131 @@ func (h *ViolationHandler) DismissViolation(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
+// SetViolationPending marks a violation as pending (undo confirm/dismiss)
+func (h *ViolationHandler) SetViolationPending(c echo.Context) error {
+	// Create context with timeout for database operations
+	ctx, cancel := context.WithTimeout(c.Request().Context(), DatabaseTimeout)
+	defer cancel()
+
+	violationIDStr := c.Param("id")
+	violationID, err := uuid.Parse(violationIDStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid violation_id format")
+	}
+
+	// Get violation first to check authorization
+	existingViolation, err := h.db.GetDetectedViolation(ctx, pgtype.UUID{Bytes: violationID, Valid: true})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "violation not found")
+		}
+		h.logger.Error("failed to get violation",
+			slog.String("violation_id", violationID.String()),
+			slog.String("err", err.Error()))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get violation")
+	}
+
+	// Authorization: verify user has access to this violation's organization
+	userID, ok := session.GetUserID(c)
+	if !ok {
+		h.logger.Error("failed to get user from session", slog.String("violation_id", violationID.String()))
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	orgID, err := getOrganizationIDFromPhoto(ctx, h.db, existingViolation.PhotoID)
+	if err != nil {
+		return err
+	}
+
+	_, err = requireOrganizationMembership(ctx, h.pool, h.logger, userID, orgID)
+	if err != nil {
+		return err
+	}
+
+	// Update violation status to pending
+	violation, err := h.db.UpdateDetectedViolationStatus(ctx, database.UpdateDetectedViolationStatusParams{
+		ID:     pgtype.UUID{Bytes: violationID, Valid: true},
+		Status: database.ViolationStatusPending,
+	})
+	if err != nil {
+		h.logger.Error("failed to set violation to pending",
+			slog.String("violation_id", violationIDStr),
+			slog.String("err", err.Error()),
+		)
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to update violation")
+	}
+
+	h.logger.Info("violation set to pending",
+		slog.String("violation_id", violationIDStr),
+	)
+
+	// If HTMX request, return updated HTML
+	if c.Request().Header.Get("HX-Request") == "true" {
+		return h.renderViolationCard(c, violation)
+	}
+
+	// Otherwise return JSON
+	resp := ViolationResponse{
+		ID:          violation.ID.String(),
+		PhotoID:     violation.PhotoID.String(),
+		Description: violation.Description,
+		Severity:    string(violation.Severity),
+		Status:      string(violation.Status),
+		CreatedAt:   violation.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	if violation.ConfidenceScore.Valid {
+		resp.ConfidenceScore = float64(violation.ConfidenceScore.Int.Int64()) / 10000.0
+	}
+
+	if violation.Location.Valid {
+		resp.Location = &violation.Location.String
+	}
+
+	if violation.SafetyCodeID.Valid {
+		safetyCodeIDStr := uuid.UUID(violation.SafetyCodeID.Bytes).String()
+		resp.SafetyCodeID = &safetyCodeIDStr
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
 // renderViolationCard renders a violation card HTML for HTMX updates
 func (h *ViolationHandler) renderViolationCard(c echo.Context, violation database.DetectedViolation) error {
 	ctx := c.Request().Context()
 
 	// Get safety code if available
-	safetyCodeText := ""
+	safetyCode := ""
 	if violation.SafetyCodeID.Valid {
-		safetyCode, err := h.db.GetSafetyCode(ctx, violation.SafetyCodeID)
+		sc, err := h.db.GetSafetyCode(ctx, violation.SafetyCodeID)
 		if err == nil {
-			safetyCodeText = safetyCode.Code + " - " + safetyCode.Description
+			safetyCode = sc.Code
 		}
 	}
 
-	// Determine background and border colors based on status and severity
-	bgColor := "#fef2f2"     // default pending
-	borderColor := "#dc2626" // default critical
-	if violation.Status == database.ViolationStatusConfirmed {
-		bgColor = "#d1fae5"
-		borderColor = "#059669"
-	} else if violation.Status == database.ViolationStatusDismissed {
-		bgColor = "#f3f4f6"
-		borderColor = "#9ca3af"
-	} else {
-		// Use severity for border color when pending
-		switch violation.Severity {
-		case database.ViolationSeverityCritical:
-			borderColor = "#dc2626"
-		case database.ViolationSeverityHigh:
-			borderColor = "#f97316"
-		case database.ViolationSeverityMedium:
-			borderColor = "#fbbf24"
-		default:
-			borderColor = "#94a3b8"
-		}
-	}
-
-	// Severity badge colors
-	severityBg := "#94a3b8"
-	severityText := "white"
-	switch violation.Severity {
-	case database.ViolationSeverityCritical:
-		severityBg = "#dc2626"
-		severityText = "white"
-	case database.ViolationSeverityHigh:
-		severityBg = "#f97316"
-		severityText = "white"
-	case database.ViolationSeverityMedium:
-		severityBg = "#fbbf24"
-		severityText = "#78350f"
-	}
-
-	// Status badge colors
-	statusBg := "#3b82f6" // pending
-	statusText := "white"
-	if violation.Status == database.ViolationStatusConfirmed {
-		statusBg = "#059669"
-	} else if violation.Status == database.ViolationStatusDismissed {
-		statusBg = "#6b7280"
-	}
-
-	// Get confidence percentage
+	// Get confidence score as float
 	confidenceFloat, _ := violation.ConfidenceScore.Float64Value()
-	confidence := fmt.Sprintf("%.0f", confidenceFloat.Float64*100)
+	confidenceScore := confidenceFloat.Float64
 
-	// Build HTML
-	html := `<div id="violation-` + violation.ID.String() + `" class="card" style="padding: var(--space-md); background: ` + bgColor + `; border-left: 4px solid ` + borderColor + `;">
-		<!-- Violation Header -->
-		<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-sm);">
-			<div style="display: flex; gap: var(--space-xs); align-items: center;">
-				<span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: ` + severityBg + `; color: ` + severityText + `;">
-					` + string(violation.Severity) + `
-				</span>
-				<span style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: ` + statusBg + `; color: ` + statusText + `;">
-					` + string(violation.Status) + `
-				</span>
-			</div>
-			<span style="font-size: 0.75rem; color: #64748b;">
-				` + confidence + `% confidence
-			</span>
-		</div>
-
-		<!-- Violation Description -->
-		<p style="font-size: 0.95rem; color: #1f2937; margin-bottom: var(--space-sm); line-height: 1.5;">
-			` + violation.Description + `
-		</p>`
-
+	// Prepare location
+	var location *string
 	if violation.Location.Valid {
-		html += `
-		<p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-sm);">
-			<strong>Location:</strong> ` + violation.Location.String + `
-		</p>`
+		location = &violation.Location.String
 	}
 
-	if safetyCodeText != "" {
-		html += `
-		<p style="font-size: 0.875rem; color: #64748b; margin-bottom: var(--space-md);">
-			<strong>Safety Code:</strong> ` + safetyCodeText + `
-		</p>`
+	// Build data for template
+	data := map[string]interface{}{
+		"ID":              violation.ID.String(),
+		"SafetyCode":      safetyCode,
+		"Severity":        string(violation.Severity),
+		"Status":          string(violation.Status),
+		"Description":     violation.Description,
+		"Location":        location,
+		"ConfidenceScore": confidenceScore,
+		"ShowActions":     true,
 	}
 
-	// Action buttons based on status
-	if violation.Status == database.ViolationStatusPending {
-		html += `
-		<!-- Action Buttons -->
-		<div style="display: flex; gap: var(--space-sm); margin-top: var(--space-md);">
-			<button
-				hx-post="/api/violations/` + violation.ID.String() + `/confirm"
-				hx-target="#violation-` + violation.ID.String() + `"
-				hx-swap="outerHTML"
-				class="btn-primary"
-				style="flex: 1;">
-				✓ Confirm Violation
-			</button>
-			<button
-				hx-post="/api/violations/` + violation.ID.String() + `/dismiss"
-				hx-target="#violation-` + violation.ID.String() + `"
-				hx-swap="outerHTML"
-				class="btn-secondary"
-				style="flex: 1;">
-				✗ Dismiss
-			</button>
-		</div>`
-	} else if violation.Status == database.ViolationStatusConfirmed {
-		html += `
-		<div style="margin-top: var(--space-md);">
-			<p style="color: #059669; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
-				✓ Confirmed by inspector
-			</p>
-			<button
-				hx-post="/api/violations/` + violation.ID.String() + `/dismiss"
-				hx-target="#violation-` + violation.ID.String() + `"
-				hx-swap="outerHTML"
-				class="btn-secondary"
-				style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
-				Change to Dismissed
-			</button>
-		</div>`
-	} else if violation.Status == database.ViolationStatusDismissed {
-		html += `
-		<div style="margin-top: var(--space-md);">
-			<p style="color: #6b7280; font-weight: 600; font-size: 0.875rem; margin-bottom: var(--space-xs);">
-				✗ Dismissed by inspector
-			</p>
-			<button
-				hx-post="/api/violations/` + violation.ID.String() + `/confirm"
-				hx-target="#violation-` + violation.ID.String() + `"
-				hx-swap="outerHTML"
-				class="btn-primary"
-				style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
-				Change to Confirmed
-			</button>
-		</div>`
-	}
-
-	html += `
-	</div>`
-
-	return c.HTML(http.StatusOK, html)
+	return c.Render(http.StatusOK, "violation-card", data)
 }
 
 // CreateManualViolationRequest represents the request body for creating a manual violation
