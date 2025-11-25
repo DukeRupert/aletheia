@@ -315,6 +315,7 @@ func main() {
 	e.GET("/register", pageHandler.RegisterPage)
 	e.GET("/verify", pageHandler.VerifyEmailPage)
 	e.GET("/forgot-password", pageHandler.ForgotPasswordPage)
+	e.GET("/reset-password", pageHandler.ResetPasswordPage)
 
 	// Public API routes - Auth endpoints with strict rate limiting
 	logger.Debug("configuring auth endpoints with strict rate limiting")

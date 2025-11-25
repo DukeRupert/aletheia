@@ -284,6 +284,18 @@ func (h *PageHandler) ForgotPasswordPage(c echo.Context) error {
 	return c.Render(http.StatusOK, "forgot-password.html", data)
 }
 
+// ResetPasswordPage renders the reset password page
+func (h *PageHandler) ResetPasswordPage(c echo.Context) error {
+	// Check if token is provided in query string
+	token := c.QueryParam("token")
+
+	data := map[string]interface{}{
+		"IsAuthenticated": false,
+		"Token":           token,
+	}
+	return c.Render(http.StatusOK, "reset-password.html", data)
+}
+
 // ProjectsPage renders the projects list page
 func (h *PageHandler) ProjectsPage(c echo.Context) error {
 	// Create context with timeout for database operations
