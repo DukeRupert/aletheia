@@ -3,9 +3,20 @@
 {{define "title"}}Photo Review - Aletheia{{end}}
 
 {{define "content"}}
-<div class="mx-auto max-w-7xl">
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+  {{/* Breadcrumb */}}
+  {{template "breadcrumb" (dict
+    "Items" (slice
+      (dict "Label" "Dashboard" "URL" "/dashboard")
+      (dict "Label" "Projects" "URL" "/projects")
+      (dict "Label" .ProjectName "URL" (printf "/projects/%v" .ProjectID))
+      (dict "Label" "Inspection" "URL" (printf "/inspections/%v" .Inspection.ID))
+      (dict "Label" "Photo" "URL" "")
+    )
+  )}}
+
   <!-- Header -->
-  <div class="px-gutter pt-8 pb-6">
+  <div class="mt-6">
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <div>
         <h1 class="text-3xl/9 font-bold text-zinc-950 dark:text-white sm:text-4xl/10">

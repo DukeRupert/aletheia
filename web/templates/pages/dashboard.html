@@ -3,54 +3,182 @@
 {{define "title"}}Dashboard - Aletheia{{end}}
 
 {{define "content"}}
-<div class="mx-auto max-w-7xl">
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+  {{/* Job Status Bar */}}
+  {{template "job-status" (dict "JobCount" 0)}}
+
+  {{/* Page Header */}}
   {{if .User}}
     {{template "page-header" (dict "Title" "Dashboard" "Description" (printf "Welcome back, %s!" .User.Name))}}
   {{else}}
     {{template "page-header" (dict "Title" "Dashboard" "Description" "Welcome back!")}}
   {{end}}
 
-  <div class="px-gutter pb-16">
-    <div class="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      <!-- Recent Inspections Card -->
-      <div class="rounded-2xl bg-white p-8 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        {{template "subheading" (dict "Content" "Recent Inspections")}}
-        <p class="mt-2 text-base/6 text-zinc-600 dark:text-zinc-400">
-          View and manage your recent safety inspections.
-        </p>
-        <div class="mt-6">
-          <a href="/inspections">
-            {{template "button" (dict "Content" "View Inspections" "Variant" "solid" "Color" "blue")}}
-          </a>
-        </div>
+  {{if not .HasOrganization}}
+    {{/* Empty State - No Organization */}}
+    {{template "empty-state" (dict
+      "Title" "No Organization"
+      "Description" "You need to create or join an organization to get started."
+      "ActionText" "Create Organization"
+      "ActionURL" "/organizations/new"
+    )}}
+  {{else}}
+    {{/* Stats Grid */}}
+    <div class="mt-8">
+      {{template "stats-grid" (dict "Cards" .StatsCards)}}
+    </div>
+
+    {{/* Recent Inspections */}}
+    <div class="mt-12">
+      <div class="flex items-center justify-between mb-6">
+        {{template "heading" (dict "Content" "Recent Inspections" "Level" "2")}}
+        <a href="/inspections"
+           class="text-sm font-medium text-blue-600 hover:text-blue-700
+                  dark:text-blue-400 dark:hover:text-blue-300">
+          View all →
+        </a>
       </div>
 
-      <!-- Projects Card -->
-      <div class="rounded-2xl bg-white p-8 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        {{template "subheading" (dict "Content" "Projects")}}
-        <p class="mt-2 text-base/6 text-zinc-600 dark:text-zinc-400">
-          Manage your construction projects.
-        </p>
-        <div class="mt-6">
-          <a href="/projects">
-            {{template "button" (dict "Content" "View Projects" "Variant" "solid" "Color" "blue")}}
-          </a>
+      {{if .RecentInspections}}
+        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm
+                    dark:border-zinc-800 dark:bg-zinc-900">
+          <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+            <thead class="bg-zinc-50 dark:bg-zinc-800/50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500
+                                       uppercase tracking-wider dark:text-zinc-400">
+                  Project
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500
+                                       uppercase tracking-wider dark:text-zinc-400">
+                  Status
+                </th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500
+                                       uppercase tracking-wider dark:text-zinc-400">
+                  Date
+                </th>
+                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-zinc-500
+                                       uppercase tracking-wider dark:text-zinc-400">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-zinc-200 dark:bg-zinc-900 dark:divide-zinc-800">
+              {{range .RecentInspections}}
+              <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {{.ProjectName}}
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  {{template "status-badge" (dict "Status" .Status "Size" "sm")}}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-500 dark:text-zinc-400">
+                  {{.CreatedAt.Time.Format "Jan 2, 2006"}}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <a href="/inspections/{{.ID.String}}"
+                     class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                    View
+                  </a>
+                </td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
         </div>
+      {{else}}
+        {{/* Empty State - No Inspections */}}
+        <div class="rounded-lg border border-zinc-200 bg-white p-12 text-center
+                    dark:border-zinc-800 dark:bg-zinc-900">
+          <svg class="mx-auto h-12 w-12 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          <h3 class="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            No inspections yet
+          </h3>
+          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            Create a project and start your first inspection.
+          </p>
+          <div class="mt-6">
+            <a href="/projects/new">
+              {{template "button" (dict "Content" "Create Project" "Variant" "solid" "Color" "blue")}}
+            </a>
+          </div>
+        </div>
+      {{end}}
+    </div>
+
+    {{/* Quick Actions */}}
+    <div class="mt-12 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      {{/* Projects Card */}}
+      <div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm
+                  dark:border-zinc-800 dark:bg-zinc-900">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Projects
+          </h3>
+        </div>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+          Manage your construction projects and sites.
+        </p>
+        <a href="/projects">
+          {{template "button" (dict "Content" "View Projects" "Variant" "outline" "Size" "sm")}}
+        </a>
       </div>
 
-      <!-- Organizations Card -->
-      <div class="rounded-2xl bg-white p-8 ring-1 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        {{template "subheading" (dict "Content" "Organizations")}}
-        <p class="mt-2 text-base/6 text-zinc-600 dark:text-zinc-400">
+      {{/* Organizations Card */}}
+      <div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm
+                  dark:border-zinc-800 dark:bg-zinc-900">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+            <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Organizations
+          </h3>
+        </div>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
           Manage your organizations and team members.
         </p>
-        <div class="mt-6">
-          <a href="/organizations">
-            {{template "button" (dict "Content" "View Organizations" "Variant" "solid" "Color" "blue")}}
-          </a>
+        <a href="/organizations">
+          {{template "button" (dict "Content" "View Organizations" "Variant" "outline" "Size" "sm")}}
+        </a>
+      </div>
+
+      {{/* Safety Codes Card */}}
+      <div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm
+                  dark:border-zinc-800 dark:bg-zinc-900">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
+            <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Safety Codes
+          </h3>
         </div>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+          Browse OSHA safety codes and regulations.
+        </p>
+        <a href="/safety-codes">
+          {{template "button" (dict "Content" "View Codes" "Variant" "outline" "Size" "sm")}}
+        </a>
       </div>
     </div>
-  </div>
+  {{end}}
 </div>
 {{end}}

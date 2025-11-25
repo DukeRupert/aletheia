@@ -1,0 +1,38 @@
+{{/*
+  Stats Grid Component - Dashboard Statistics Display
+
+  Usage:
+    {{template "stats-grid" (dict "Cards" .StatsCards)}}
+
+  Parameters:
+    - Cards: Array of stat card objects with the following properties:
+      - Label: Display label (required)
+      - Value: Numeric value to display (required)
+      - Icon: Icon name (clipboard, alert, document, photo, check, users, building, chart)
+      - Color: Color theme (blue, red, green, orange, zinc) default: "blue"
+      - SubValue: Optional subtitle/additional context
+      - Trend: Optional trend direction ("up", "down")
+      - TrendValue: Optional trend value (e.g., "+15%")
+      - URL: Optional link destination
+
+  Example:
+    statsCards := []map[string]interface{}{
+      {
+        "Label":       "Inspections This Week",
+        "Value":       12,
+        "Icon":        "clipboard",
+        "Color":       "blue",
+        "Trend":       "up",
+        "TrendValue":  "+15%",
+        "URL":         "/inspections",
+      },
+    }
+*/}}
+
+{{define "stats-grid"}}
+<div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+  {{range .Cards}}
+    {{template "stats-card" .}}
+  {{end}}
+</div>
+{{end}}

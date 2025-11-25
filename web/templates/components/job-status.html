@@ -1,0 +1,197 @@
+{{/*
+  Job Status Component - Displays persistent background job progress indicator
+
+  Usage:
+    {{template "job-status" (dict
+      "JobCount" 3
+      "JobType" "photo_analysis"
+      "EstimatedTime" 45
+      "CompletedCount" 2
+    )}}
+
+  Parameters:
+    - JobCount: Total number of active jobs (required)
+    - JobType: Type of job - "photo_analysis", "report_generation", "notification_email" (optional)
+    - EstimatedTime: Estimated seconds remaining (optional)
+    - CompletedCount: Number of completed jobs (optional, for batch progress)
+    - ShowDetails: Boolean to show detailed progress (default: false)
+
+  Notes:
+    - If JobCount is 0, component renders empty div (stops polling)
+    - Component should be placed in base layout with HTMX polling
+    - Polls every 5 seconds when jobs are active
+*/}}
+
+{{define "job-status"}}
+{{if gt .JobCount 0}}
+  {{/* Active jobs - show status bar */}}
+  <div id="job-status-bar"
+       class="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg
+              border-b border-blue-700 animate-in slide-in-from-top duration-300"
+       hx-get="/api/jobs/status"
+       hx-trigger="every 5s"
+       hx-swap="outerHTML"
+       role="status"
+       aria-live="polite">
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3">
+        <div class="flex items-center gap-3 flex-1 min-w-0">
+          {{/* Spinner */}}
+          <div class="flex-shrink-0">
+            <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+
+          {{/* Status text */}}
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium">
+              {{if eq .JobType "photo_analysis"}}
+                {{if gt .JobCount 1}}
+                  Analyzing {{.JobCount}} photos
+                {{else}}
+                  Analyzing photo
+                {{end}}
+              {{else if eq .JobType "report_generation"}}
+                Generating report
+              {{else if eq .JobType "notification_email"}}
+                Sending notification{{if gt .JobCount 1}}s{{end}}
+              {{else}}
+                {{/* Generic fallback */}}
+                {{.JobCount}} background job{{if gt .JobCount 1}}s{{end}} running
+              {{end}}
+
+              {{/* Show progress if batch job */}}
+              {{if and .CompletedCount (gt .JobCount 1)}}
+                <span class="text-blue-200">
+                  ({{.CompletedCount}}/{{add .CompletedCount .JobCount}} complete)
+                </span>
+              {{end}}
+            </p>
+
+            {{/* Estimated time */}}
+            {{if .EstimatedTime}}
+              <p class="text-xs text-blue-200 mt-0.5">
+                Estimated {{.EstimatedTime}} second{{if gt .EstimatedTime 1}}s{{end}} remaining
+              </p>
+            {{end}}
+          </div>
+        </div>
+
+        {{/* Progress bar (if detailed progress available) */}}
+        {{if and .ShowDetails .CompletedCount}}
+          <div class="hidden sm:flex items-center gap-3 flex-shrink-0 ml-4">
+            <div class="w-32 bg-blue-700 rounded-full h-2 overflow-hidden">
+              {{$total := add .CompletedCount .JobCount}}
+              {{$percent := 0}}
+              {{if gt $total 0}}
+                {{$percent = div (mul .CompletedCount 100) $total}}
+              {{end}}
+              <div class="bg-white h-full transition-all duration-300"
+                   style="width: {{$percent}}%"></div>
+            </div>
+            <span class="text-xs font-medium whitespace-nowrap">
+              {{$percent}}%
+            </span>
+          </div>
+        {{end}}
+
+        {{/* Dismiss button (optional - only show for non-critical jobs) */}}
+        {{if and (not .ShowDetails) (or (eq .JobType "notification_email") (eq .JobType ""))}}
+          <button type="button"
+                  class="flex-shrink-0 ml-4 p-1 rounded hover:bg-blue-700 transition-colors"
+                  onclick="document.getElementById('job-status-bar').style.display='none'"
+                  aria-label="Dismiss notification">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        {{end}}
+      </div>
+
+      {{/* Detailed job list (optional) */}}
+      {{if and .ShowDetails .Jobs}}
+        <div class="pb-3 space-y-2">
+          {{range .Jobs}}
+            <div class="flex items-center gap-2 text-xs bg-blue-700 rounded px-3 py-1.5">
+              {{if eq .Status "running"}}
+                <svg class="animate-spin h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              {{else if eq .Status "completed"}}
+                <svg class="h-3 w-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+              {{else if eq .Status "failed"}}
+                <svg class="h-3 w-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+              {{end}}
+              <span class="flex-1 truncate">{{.Description}}</span>
+            </div>
+          {{end}}
+        </div>
+      {{end}}
+    </div>
+  </div>
+
+{{else}}
+  {{/* No active jobs - render empty div to stop polling */}}
+  <div id="job-status-bar" class="hidden"></div>
+{{end}}
+{{end}}
+
+{{/*
+  Compact Job Status Indicator - For inline use in pages
+
+  Usage:
+    {{template "job-status-compact" (dict
+      "Message" "Analyzing photo..."
+      "ShowSpinner" true
+    )}}
+
+  Use this for inline status indicators (not the persistent top bar)
+*/}}
+{{define "job-status-compact"}}
+<div class="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+  {{if ne .ShowSpinner false}}
+    <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  {{end}}
+  <span>{{.Message}}</span>
+</div>
+{{end}}
+
+{{/*
+  Job Status Icon - Reusable status icon component
+
+  Usage:
+    {{template "job-status-icon" (dict "Status" "running")}}
+
+  Status values: running, completed, failed, pending
+*/}}
+{{define "job-status-icon"}}
+{{if eq .Status "running"}}
+  <svg class="animate-spin h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+{{else if eq .Status "completed"}}
+  <svg class="h-4 w-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+  </svg>
+{{else if eq .Status "failed"}}
+  <svg class="h-4 w-4 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+  </svg>
+{{else if eq .Status "pending"}}
+  <svg class="h-4 w-4 text-zinc-400" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+  </svg>
+{{end}}
+{{end}}

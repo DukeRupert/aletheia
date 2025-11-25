@@ -3,7 +3,15 @@
 {{define "title"}}Projects - Aletheia{{end}}
 
 {{define "content"}}
-<div class="mx-auto max-w-7xl">
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+  {{/* Breadcrumb */}}
+  {{template "breadcrumb" (dict
+    "Items" (slice
+      (dict "Label" "Dashboard" "URL" "/dashboard")
+      (dict "Label" "Projects" "URL" "")
+    )
+  )}}
+
   {{template "page-header" (dict
     "Title" "Projects"
     "Description" "Manage construction projects and safety inspections"

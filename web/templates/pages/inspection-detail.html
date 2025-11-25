@@ -1,274 +1,303 @@
 {{template "base" .}}
 
-{{define "title"}}Inspection #{{.Inspection.ID}} - Aletheia{{end}}
+{{define "title"}}{{.ProjectName}} - Inspection{{end}}
 
 {{define "content"}}
-<div class="mx-auto max-w-7xl">
-  <!-- Header with Status Badge -->
-  <div class="px-gutter pt-8 pb-6">
-    <div class="flex items-start justify-between gap-4 flex-wrap">
-      <div>
-        <h1 class="text-3xl/9 font-bold text-zinc-950 dark:text-white sm:text-4xl/10">
-          Inspection #{{.Inspection.ID}}
-        </h1>
-        <p class="mt-2 text-sm/6 text-zinc-600 dark:text-zinc-400">
-          <span class="font-medium">Project:</span> {{.ProjectName}}
-          {{if .ProjectLocation}}
-            <span class="mx-2 text-zinc-400">•</span>
-            <span class="font-medium">Location:</span> {{.ProjectLocation}}
-          {{end}}
-        </p>
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+  {{/* Job Status Bar */}}
+  {{template "job-status" (dict "JobCount" 0)}}
+
+  {{/* Breadcrumb */}}
+  {{template "breadcrumb" (dict
+    "Items" (slice
+      (dict "Label" "Dashboard" "URL" "/dashboard")
+      (dict "Label" "Projects" "URL" "/projects")
+      (dict "Label" .ProjectName "URL" (printf "/projects/%s" .ProjectID))
+      (dict "Label" "Inspection" "URL" "")
+    )
+  )}}
+
+  {{/* Status Banner */}}
+  {{if eq .Inspection.Status "draft"}}
+    <div class="mt-6 rounded-lg bg-zinc-50 border-l-4 border-zinc-400 p-4
+                dark:bg-zinc-900 dark:border-zinc-600">
+      <div class="flex items-center gap-3">
+        <svg class="h-5 w-5 text-zinc-500 dark:text-zinc-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        <div class="flex-1">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100">
+            Draft Inspection
+          </p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">
+            Upload photos to begin. Inspection will automatically move to "In Progress" when first photo is added.
+          </p>
+        </div>
       </div>
-      <div>
-        {{if eq .Inspection.Status "draft"}}
-          {{template "badge" (dict "Content" .Inspection.Status "Color" "zinc")}}
-        {{else if eq .Inspection.Status "in_progress"}}
-          {{template "badge" (dict "Content" .Inspection.Status "Color" "blue")}}
-        {{else if eq .Inspection.Status "completed"}}
-          {{template "badge" (dict "Content" .Inspection.Status "Color" "green")}}
-        {{else}}
-          {{template "badge" (dict "Content" .Inspection.Status "Color" "yellow")}}
+    </div>
+  {{else if eq .Inspection.Status "in_progress"}}
+    <div class="mt-6 rounded-lg bg-blue-50 border-l-4 border-blue-600 p-4
+                dark:bg-blue-950/20 dark:border-blue-500">
+      <div class="flex items-center gap-3">
+        <div class="animate-pulse h-3 w-3 rounded-full bg-blue-600 flex-shrink-0"></div>
+        <div class="flex-1">
+          <p class="font-semibold text-blue-900 dark:text-blue-100">
+            Inspection In Progress
+          </p>
+          <p class="text-sm text-blue-700 dark:text-blue-300">
+            {{if gt .PhotoCount 0}}
+              {{.PhotoCount}} photo{{if gt .PhotoCount 1}}s{{end}} uploaded
+              {{if gt .PendingTotal 0}}
+                • {{.PendingTotal}} violation{{if gt .PendingTotal 1}}s{{end}} pending review
+              {{end}}
+              {{if gt .ConfirmedTotal 0}}
+                • {{.ConfirmedTotal}} confirmed
+              {{end}}
+            {{else}}
+              No photos yet. Upload your first photo to begin the inspection.
+            {{end}}
+          </p>
+        </div>
+        {{if and (gt .PhotoCount 0) (eq .PendingTotal 0)}}
+          <button hx-patch="/api/inspections/{{.Inspection.ID}}"
+                  hx-vals='{"status": "completed"}'
+                  hx-confirm="Mark this inspection as completed? You can still make changes afterwards."
+                  class="flex-shrink-0 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2
+                         text-sm font-semibold text-white hover:bg-blue-500 transition-colors
+                         dark:bg-blue-500 dark:hover:bg-blue-400">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            Mark Complete
+          </button>
         {{end}}
       </div>
     </div>
-  </div>
-
-  <div class="px-gutter pb-16">
-    <div class="space-y-8">
-      <!-- Inspection Details Card -->
-      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white">
-          Inspection Details
-        </h2>
-
-        <dl class="mt-6 grid gap-6 sm:grid-cols-3">
-          <div>
-            <dt class="text-sm/6 font-medium text-zinc-950 dark:text-white">Inspector ID</dt>
-            <dd class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">{{.Inspection.InspectorID}}</dd>
-          </div>
-          <div>
-            <dt class="text-sm/6 font-medium text-zinc-950 dark:text-white">Created</dt>
-            <dd class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">{{.Inspection.CreatedAt.Time.Format "January 2, 2006 at 3:04 PM"}}</dd>
-          </div>
-          <div>
-            <dt class="text-sm/6 font-medium text-zinc-950 dark:text-white">Last Updated</dt>
-            <dd class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">{{.Inspection.UpdatedAt.Time.Format "January 2, 2006 at 3:04 PM"}}</dd>
-          </div>
-        </dl>
+  {{else if eq .Inspection.Status "completed"}}
+    <div class="mt-6 rounded-lg bg-green-50 border-l-4 border-green-600 p-4
+                dark:bg-green-950/20 dark:border-green-500">
+      <div class="flex items-center gap-3">
+        <svg class="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <div class="flex-1">
+          <p class="font-semibold text-green-900 dark:text-green-100">
+            Inspection Completed
+          </p>
+          <p class="text-sm text-green-700 dark:text-green-300">
+            {{.PhotoCount}} photo{{if gt .PhotoCount 1}}s{{end}}
+            • {{.ConfirmedTotal}} confirmed violation{{if ne .ConfirmedTotal 1}}s{{end}}
+            {{if gt .PendingTotal 0}}
+              • {{.PendingTotal}} still pending review
+            {{end}}
+          </p>
+        </div>
       </div>
+    </div>
+  {{end}}
 
-      <!-- Photos Section -->
-      <div class="rounded-3xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div class="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h2 class="text-lg/7 font-semibold text-zinc-950 dark:text-white">Photos</h2>
-            <p class="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">{{len .Photos}} photo(s) uploaded</p>
-          </div>
-          <label for="photo-upload" class="cursor-pointer">
-            {{template "button" (dict
-              "Content" "Add Photo"
-              "Variant" "solid"
-              "Color" "blue"
-              "Icon" "<svg class=\"size-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 4v16m8-8H4\"></path></svg>"
-            )}}
-          </label>
-        </div>
+  {{/* Page Header with Status and Actions */}}
+  <div class="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+    <div class="flex-1">
+      {{template "page-header" (dict
+        "Title" (printf "%s - Inspection" .ProjectName)
+        "Description" .ProjectLocation
+      )}}
 
-        <!-- Upload Form (Hidden) -->
-        <form
-          hx-post="/api/upload"
-          hx-encoding="multipart/form-data"
-          hx-target="#photo-list"
-          hx-swap="afterbegin"
-          id="upload-form"
-          class="hidden">
-          <input type="hidden" name="inspection_id" value="{{.Inspection.ID}}">
-          <input
-            type="file"
-            id="photo-upload"
-            name="image"
-            accept="image/jpeg,image/png,image/webp"
-            onchange="document.getElementById('upload-form').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))">
-        </form>
-
-        <!-- Upload Status -->
-        <div id="upload-status" class="mt-6 hidden">
-          <div class="flex items-center gap-3 rounded-lg bg-blue-50 px-4 py-3 text-sm/6 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-            <svg class="size-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+      {{/* Status and Stats Summary */}}
+      <div class="mt-4 flex flex-wrap items-center gap-4">
+        {{/* Status Dropdown */}}
+        <div class="relative" x-data="{ open: false }">
+          <button
+            @click="open = !open"
+            @click.away="open = false"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2
+                   text-sm font-medium shadow-sm hover:bg-zinc-50
+                   dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700">
+            <span>Status:</span>
+            {{if eq .Inspection.Status "draft"}}
+              {{template "status-badge" (dict "Status" "draft" "Size" "sm")}}
+            {{else if eq .Inspection.Status "in_progress"}}
+              {{template "status-badge" (dict "Status" "in_progress" "Size" "sm")}}
+            {{else if eq .Inspection.Status "completed"}}
+              {{template "status-badge" (dict "Status" "completed" "Size" "sm")}}
+            {{end}}
+            <svg class="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
-            Uploading photo...
+          </button>
+
+          {{/* Status Dropdown Menu */}}
+          <div
+            x-show="open"
+            x-cloak
+            class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-lg border border-zinc-200
+                   bg-white shadow-lg ring-1 ring-black/5
+                   dark:border-zinc-700 dark:bg-zinc-800">
+            <div class="py-1" role="menu">
+              <button
+                hx-patch="/api/inspections/{{.Inspection.ID}}"
+                hx-vals='{"status": "draft"}'
+                hx-target="closest .relative"
+                hx-swap="outerHTML"
+                @click="open = false"
+                class="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100
+                       dark:text-zinc-300 dark:hover:bg-zinc-700">
+                {{template "status-badge" (dict "Status" "draft" "Size" "sm")}}
+              </button>
+              <button
+                hx-patch="/api/inspections/{{.Inspection.ID}}"
+                hx-vals='{"status": "in_progress"}'
+                hx-target="closest .relative"
+                hx-swap="outerHTML"
+                @click="open = false"
+                class="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100
+                       dark:text-zinc-300 dark:hover:bg-zinc-700">
+                {{template "status-badge" (dict "Status" "in_progress" "Size" "sm")}}
+              </button>
+              <button
+                hx-patch="/api/inspections/{{.Inspection.ID}}"
+                hx-vals='{"status": "completed"}'
+                hx-target="closest .relative"
+                hx-swap="outerHTML"
+                @click="open = false"
+                class="block w-full px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100
+                       dark:text-zinc-300 dark:hover:bg-zinc-700">
+                {{template "status-badge" (dict "Status" "completed" "Size" "sm")}}
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Photo Grid -->
-        <div id="photo-list" class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {{range .Photos}}
-            <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-950/5 dark:bg-zinc-800/50 dark:ring-white/10">
-              <!-- Photo Thumbnail -->
-              <a href="/photos/{{.ID.String}}" class="group block">
-                <img
-                  src="{{if .ThumbnailUrl.Valid}}{{.ThumbnailUrl.String}}{{else}}{{.StorageUrl}}{{end}}"
-                  alt="Inspection photo"
-                  class="aspect-[4/3] w-full rounded-lg object-cover ring-1 ring-zinc-950/10 dark:ring-white/20 group-hover:opacity-90 transition-opacity">
-              </a>
-
-              <!-- Timestamp -->
-              <p class="mt-3 text-xs/5 text-zinc-500 dark:text-zinc-400">
-                {{.CreatedAt.Time.Format "Jan 2, 3:04 PM"}}
-              </p>
-
-              {{$violations := index $.ViolationsByPhoto (.ID.String)}}
-              {{if $violations}}
-                <!-- Violations Section -->
-                <div class="mt-3 rounded-lg border-l-4 p-3
-                  {{if eq (index $violations 0).Status "confirmed"}}bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500
-                  {{else if eq (index $violations 0).Status "dismissed"}}bg-zinc-100 border-zinc-400 dark:bg-zinc-800 dark:border-zinc-600
-                  {{else}}bg-red-50 border-red-600 dark:bg-red-950/30 dark:border-red-500{{end}}">
-
-                  <p class="text-sm/6 font-semibold mb-3
-                    {{if eq (index $violations 0).Status "confirmed"}}text-green-700 dark:text-green-400
-                    {{else if eq (index $violations 0).Status "dismissed"}}text-zinc-600 dark:text-zinc-400
-                    {{else}}text-red-700 dark:text-red-400{{end}}">
-                    {{len $violations}} Violation(s) Detected
-                  </p>
-
-                  <!-- Individual Violations -->
-                  <div class="space-y-2">
-                    {{range $violations}}
-                      <div class="rounded-lg bg-white p-3 dark:bg-zinc-900">
-                        <!-- Safety Code Citation -->
-                        {{if .SafetyCodeID.Valid}}
-                          <div class="mb-2">
-                            <span class="inline-flex items-center gap-1 rounded-md bg-blue-900 px-2 py-1 text-xs font-bold text-white font-mono">
-                              📋 {{index $.SafetyCodeMap (.SafetyCodeID.String)}}
-                            </span>
-                          </div>
-                        {{end}}
-
-                        <!-- Badges Row -->
-                        <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
-                          <div class="flex items-center gap-1.5">
-                            <!-- Severity Badge -->
-                            {{if eq .Severity "critical"}}
-                              {{template "badge" (dict "Content" .Severity "Color" "red" "Size" "xs")}}
-                            {{else if eq .Severity "high"}}
-                              {{template "badge" (dict "Content" .Severity "Color" "orange" "Size" "xs")}}
-                            {{else if eq .Severity "medium"}}
-                              {{template "badge" (dict "Content" .Severity "Color" "yellow" "Size" "xs")}}
-                            {{else}}
-                              {{template "badge" (dict "Content" .Severity "Color" "zinc" "Size" "xs")}}
-                            {{end}}
-
-                            <!-- Status Badge -->
-                            {{if eq .Status "confirmed"}}
-                              {{template "badge" (dict "Content" .Status "Color" "green" "Size" "xs")}}
-                            {{else if eq .Status "dismissed"}}
-                              {{template "badge" (dict "Content" .Status "Color" "zinc" "Size" "xs")}}
-                            {{else}}
-                              {{template "badge" (dict "Content" .Status "Color" "blue" "Size" "xs")}}
-                            {{end}}
-                          </div>
-
-                          <!-- Confidence Score -->
-                          <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                            {{printf "%.0f%%" (mul .ConfidenceScore 100)}} confidence
-                          </span>
-                        </div>
-
-                        <!-- Description -->
-                        <p class="text-sm/5 text-zinc-700 dark:text-zinc-300">
-                          {{.Description}}
-                        </p>
-
-                        <!-- Location -->
-                        {{if .Location.Valid}}
-                          <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                            📍 Location: {{.Location.String}}
-                          </p>
-                        {{end}}
-                      </div>
-                    {{end}}
-                  </div>
-                </div>
-              {{end}}
-
-              <!-- Context Input (Collapsible) -->
-              <div x-data="{ showContext: false }" class="mt-3">
-                <button
-                  @click="showContext = !showContext"
-                  type="button"
-                  class="flex w-full items-center justify-between rounded-lg border border-zinc-950/10 bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
-                  <span>Add Context (optional)</span>
-                  <svg x-show="!showContext" class="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                  <svg x-show="showContext" x-cloak class="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                  </svg>
-                </button>
-                <div x-show="showContext" x-collapse x-cloak class="mt-2">
-                  {{template "textarea" (dict
-                    "Name" "context"
-                    "ID" (printf "context-%s" (.ID.String))
-                    "Rows" 3
-                    "Placeholder" "e.g., Check for missing PPE on workers near heavy equipment..."
-                    "Class" "text-xs"
-                  )}}
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="mt-3 flex gap-2">
-                <button
-                  hx-post="/api/photos/analyze"
-                  hx-include="#context-{{.ID.String}}"
-                  hx-vals='{"photo_id": "{{.ID.String}}"}'
-                  hx-target="closest .rounded-xl"
-                  hx-swap="outerHTML"
-                  class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400">
-                  Analyze
-                </button>
-                <button
-                  hx-delete="/api/photos/{{.ID.String}}"
-                  hx-confirm="Are you sure you want to delete this photo?"
-                  hx-target="closest .rounded-xl"
-                  hx-swap="outerHTML swap:1s"
-                  class="rounded-lg border border-zinc-950/10 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
-                  Delete
-                </button>
-              </div>
-            </div>
-          {{else}}
-            <div class="col-span-full text-center py-12">
-              <p class="text-sm text-zinc-500 dark:text-zinc-400">No photos uploaded yet.</p>
-            </div>
+        {{/* Violation Stats */}}
+        <div class="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+          {{if gt .ConfirmedTotal 0}}
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2 w-2 rounded-full bg-red-500"></span>
+              <strong class="font-medium text-zinc-900 dark:text-zinc-100">{{.ConfirmedTotal}}</strong>
+              confirmed violation{{if ne .ConfirmedTotal 1}}s{{end}}
+            </span>
+          {{end}}
+          {{if gt .PendingTotal 0}}
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2 w-2 rounded-full bg-yellow-500"></span>
+              <strong class="font-medium text-zinc-900 dark:text-zinc-100">{{.PendingTotal}}</strong>
+              pending review
+            </span>
+          {{end}}
+          {{if and (eq .ConfirmedTotal 0) (eq .PendingTotal 0)}}
+            <span class="text-green-600 dark:text-green-400">
+              No violations detected
+            </span>
           {{end}}
         </div>
       </div>
+    </div>
 
-      <!-- Actions -->
-      <div class="flex gap-4 flex-wrap">
-        <a href="/projects/{{.Inspection.ProjectID}}/inspections">
-          {{template "button" (dict "Content" "Back to Inspections" "Variant" "outline")}}
-        </a>
-        <a href="/projects/{{.Inspection.ProjectID}}">
-          {{template "button" (dict "Content" "View Project" "Variant" "outline")}}
-        </a>
-      </div>
+    {{/* Primary Actions */}}
+    <div class="flex flex-wrap gap-3">
+      {{/* Add Photo Button */}}
+      <label for="photo-upload" class="cursor-pointer">
+        {{template "button" (dict
+          "Content" "Add Photo"
+          "Variant" "outline"
+          "Size" "md"
+        )}}
+      </label>
+
+      {{/* Analyze All Photos Button */}}
+      {{if gt .PhotoCount 0}}
+        <button
+          hx-post="/api/inspections/{{.Inspection.ID}}/analyze-all"
+          hx-confirm="This will analyze all photos that haven't been analyzed yet. Continue?"
+          hx-target="#photo-grid"
+          hx-swap="outerHTML"
+          class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2
+                 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50
+                 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+          Analyze All Photos
+        </button>
+      {{end}}
+
+      {{/* Generate Report Button (only when completed) */}}
+      {{if eq .Inspection.Status "completed"}}
+        <button
+          hx-post="/api/inspections/{{.Inspection.ID}}/generate-report"
+          hx-target="#reports-section"
+          hx-swap="beforeend"
+          class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2
+                 text-sm font-semibold text-white shadow-sm hover:bg-blue-500
+                 dark:bg-blue-500 dark:hover:bg-blue-400">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Generate Report
+        </button>
+      {{end}}
     </div>
   </div>
+
+  {{/* Hidden Upload Form */}}
+  <form
+    hx-post="/api/upload"
+    hx-encoding="multipart/form-data"
+    hx-target="#photo-grid"
+    hx-swap="afterbegin"
+    id="upload-form"
+    class="hidden">
+    <input type="hidden" name="inspection_id" value="{{.Inspection.ID}}">
+    <input
+      type="file"
+      id="photo-upload"
+      name="image"
+      accept="image/jpeg,image/png,image/webp"
+      multiple
+      onchange="this.form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))">
+  </form>
+
+  {{/* Photo Grid */}}
+  <div id="photo-grid" class="mt-8 grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    {{if .Photos}}
+      {{range .Photos}}
+        {{template "photo-card" .}}
+      {{end}}
+    {{else}}
+      {{/* Empty State */}}
+      {{template "empty-state" (dict
+        "Title" "No Photos Yet"
+        "Description" "Upload photos to begin the inspection. Photos will be automatically analyzed for safety violations."
+        "ActionText" "Add Photo"
+        "ActionOnClick" "document.getElementById('photo-upload').click()"
+      )}}
+    {{end}}
+  </div>
+
+  {{/* Reports Section (if inspection is completed) */}}
+  {{if eq .Inspection.Status "completed"}}
+    <div id="reports-section" class="mt-12">
+      <div class="flex items-center justify-between mb-6">
+        {{template "heading" (dict "Content" "Generated Reports" "Level" 2)}}
+      </div>
+      {{/* Reports will be added here via HTMX when generated */}}
+    </div>
+  {{end}}
 </div>
 
 <script>
   // Show upload status when form is submitted
-  document.getElementById('upload-form').addEventListener('htmx:beforeRequest', function() {
-    document.getElementById('upload-status').style.display = 'block';
+  document.getElementById('upload-form')?.addEventListener('htmx:beforeRequest', function() {
+    // Could add a loading indicator here
   });
 
-  // Hide upload status and reset form when complete
-  document.getElementById('upload-form').addEventListener('htmx:afterRequest', function(event) {
-    document.getElementById('upload-status').style.display = 'none';
+  // Reset form when complete
+  document.getElementById('upload-form')?.addEventListener('htmx:afterRequest', function(event) {
     if (event.detail.successful) {
       document.getElementById('photo-upload').value = '';
     }

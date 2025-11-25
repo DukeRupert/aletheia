@@ -1,0 +1,234 @@
+{{/*
+  Breadcrumb Component - Navigation breadcrumb trail
+
+  Usage:
+    {{template "breadcrumb" (dict "Items" items)}}
+
+  Parameters:
+    - Items: Array of breadcrumb items (required)
+
+  Item object structure:
+    {
+      "Label": "Projects",
+      "URL": "/projects",
+      "Active": false
+    }
+
+  Example:
+    {{$items := slice
+      (dict "Label" "Dashboard" "URL" "/dashboard")
+      (dict "Label" "Projects" "URL" "/projects")
+      (dict "Label" "Main Street Building" "URL" "/projects/123")
+      (dict "Label" "Inspection #456" "Active" true)
+    }}
+    {{template "breadcrumb" (dict "Items" $items)}}
+
+  Notes:
+    - Last item with Active: true is not clickable (current page)
+    - If no Active flag, last item is automatically treated as current
+    - Mobile: Shows only last 2 items
+    - Accessible with aria-label and proper hierarchy
+*/}}
+
+{{define "breadcrumb"}}
+{{if .Items}}
+<nav aria-label="Breadcrumb" class="flex mb-6">
+  <ol class="flex items-center space-x-2 text-sm">
+    {{range $index, $item := .Items}}
+      {{$isLast := eq $index (sub (len $.Items) 1)}}
+      {{$isActive := or $item.Active $isLast}}
+
+      <li class="flex items-center">
+        {{/* Hide earlier items on mobile, show only last 2 */}}
+        {{if gt $index (sub (len $.Items) 3)}}
+          {{/* Desktop: Show all, Mobile: Show last 2 */}}
+          <div class="flex items-center {{if lt $index (sub (len $.Items) 2)}}hidden sm:flex{{end}}">
+        {{else if eq $index 0}}
+          {{/* Always show first item */}}
+          <div class="flex items-center">
+        {{else}}
+          {{/* Hide middle items on mobile */}}
+          <div class="hidden sm:flex items-center">
+        {{end}}
+
+          {{/* Separator (not for first item) */}}
+          {{if gt $index 0}}
+            <svg class="flex-shrink-0 w-5 h-5 text-zinc-400 dark:text-zinc-500 mr-2"
+                 fill="currentColor"
+                 viewBox="0 0 20 20"
+                 aria-hidden="true">
+              <path fill-rule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clip-rule="evenodd"/>
+            </svg>
+          {{end}}
+
+          {{/* Breadcrumb item */}}
+          {{if $isActive}}
+            {{/* Current page - not clickable */}}
+            <span class="font-medium text-zinc-950 dark:text-white"
+                  aria-current="page">
+              {{$item.Label}}
+            </span>
+          {{else}}
+            {{/* Link to other page */}}
+            <a href="{{$item.URL}}"
+               class="font-medium text-zinc-600 hover:text-zinc-900
+                      dark:text-zinc-400 dark:hover:text-zinc-100
+                      transition-colors">
+              {{$item.Label}}
+            </a>
+          {{end}}
+
+        </div>
+      </li>
+
+      {{/* Mobile ellipsis for hidden middle items */}}
+      {{if and (eq $index 0) (gt (len $.Items) 3)}}
+        <li class="flex items-center sm:hidden">
+          <svg class="flex-shrink-0 w-5 h-5 text-zinc-400 dark:text-zinc-500 mr-2"
+               fill="currentColor"
+               viewBox="0 0 20 20"
+               aria-hidden="true">
+            <path fill-rule="evenodd"
+                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                  clip-rule="evenodd"/>
+          </svg>
+          <span class="text-zinc-400 dark:text-zinc-500">...</span>
+        </li>
+      {{end}}
+    {{end}}
+  </ol>
+</nav>
+{{end}}
+{{end}}
+
+{{/*
+  Breadcrumb with Action - Breadcrumb with action button on the right
+
+  Usage:
+    {{template "breadcrumb-with-action" (dict
+      "Items" items
+      "ActionLabel" "New Inspection"
+      "ActionURL" "/inspections/new"
+      "ActionIcon" true
+    )}}
+
+  Useful for page headers where you want breadcrumb + primary action
+*/}}
+{{define "breadcrumb-with-action"}}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+  {{/* Breadcrumb */}}
+  <div class="flex-1 min-w-0">
+    {{template "breadcrumb" (dict "Items" .Items)}}
+  </div>
+
+  {{/* Action button */}}
+  {{if .ActionLabel}}
+  <div class="flex-shrink-0">
+    <a href="{{.ActionURL}}"
+       class="inline-flex items-center justify-center gap-x-2 rounded-lg border
+              text-base/6 font-semibold transition-colors
+              px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)]
+              sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)]
+              sm:text-sm/6
+              border-transparent bg-blue-600 text-white hover:bg-blue-700
+              dark:bg-blue-500 dark:hover:bg-blue-600
+              focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-500">
+      {{if .ActionIcon}}
+        <svg class="w-5 h-5 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+      {{end}}
+      {{.ActionLabel}}
+    </a>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{/*
+  Compact Breadcrumb - Minimal version for tight spaces
+
+  Usage:
+    {{template "breadcrumb-compact" (dict "Items" items)}}
+
+  Shows: First item > ... > Last item (always)
+  Good for mobile headers or constrained layouts
+*/}}
+{{define "breadcrumb-compact"}}
+{{if .Items}}
+<nav aria-label="Breadcrumb" class="flex">
+  <ol class="flex items-center space-x-2 text-sm">
+    {{$itemCount := len .Items}}
+    {{range $index, $item := .Items}}
+      {{$isFirst := eq $index 0}}
+      {{$isLast := eq $index (sub $itemCount 1)}}
+      {{$isActive := or $item.Active $isLast}}
+
+      {{/* Show only first and last items */}}
+      {{if or $isFirst $isLast}}
+        <li class="flex items-center">
+          {{/* Separator */}}
+          {{if not $isFirst}}
+            <svg class="flex-shrink-0 w-5 h-5 text-zinc-400 dark:text-zinc-500 mr-2"
+                 fill="currentColor"
+                 viewBox="0 0 20 20"
+                 aria-hidden="true">
+              <path fill-rule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clip-rule="evenodd"/>
+            </svg>
+          {{end}}
+
+          {{/* Item */}}
+          {{if $isActive}}
+            <span class="font-medium text-zinc-950 dark:text-white truncate max-w-[200px]"
+                  aria-current="page">
+              {{$item.Label}}
+            </span>
+          {{else}}
+            <a href="{{$item.URL}}"
+               class="font-medium text-zinc-600 hover:text-zinc-900
+                      dark:text-zinc-400 dark:hover:text-zinc-100
+                      transition-colors truncate max-w-[200px]">
+              {{$item.Label}}
+            </a>
+          {{end}}
+        </li>
+
+        {{/* Ellipsis between first and last */}}
+        {{if and $isFirst (gt $itemCount 2)}}
+          <li class="flex items-center">
+            <svg class="flex-shrink-0 w-5 h-5 text-zinc-400 dark:text-zinc-500 mr-2"
+                 fill="currentColor"
+                 viewBox="0 0 20 20"
+                 aria-hidden="true">
+              <path fill-rule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clip-rule="evenodd"/>
+            </svg>
+            <span class="text-zinc-400 dark:text-zinc-500">...</span>
+          </li>
+        {{end}}
+      {{end}}
+    {{end}}
+  </ol>
+</nav>
+{{end}}
+{{end}}
+
+{{/*
+  Helper: Create breadcrumb items from context
+
+  Usage in handler:
+    breadcrumbs := CreateBreadcrumbs(
+      BreadcrumbItem{Label: "Dashboard", URL: "/dashboard"},
+      BreadcrumbItem{Label: "Projects", URL: "/projects"},
+      BreadcrumbItem{Label: projectName, URL: fmt.Sprintf("/projects/%s", projectID)},
+      BreadcrumbItem{Label: fmt.Sprintf("Inspection #%s", inspectionID), Active: true},
+    )
+
+  Then in template:
+    {{template "breadcrumb" (dict "Items" .Breadcrumbs)}}
+*/}}
