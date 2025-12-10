@@ -34,10 +34,10 @@ test-cleanup:
 	@docker exec -i aletheia-db psql -U postgres -d postgres -c "DELETE FROM users WHERE email LIKE '%@example.com' OR email LIKE '%test%';" > /dev/null 2>&1 || true
 	@echo "Test cleanup complete"
 
-.PHONY: test-handlers
-test-handlers:
-	@echo "Running handler tests..."
-	@go test ./internal/handlers/ -v
+.PHONY: test-http
+test-http:
+	@echo "Running HTTP handler tests..."
+	@go test ./http/ -v
 
 # Docker commands
 .PHONY: docker-build
@@ -62,19 +62,19 @@ docker-push:
 
 .PHONY: docker-compose-up
 docker-compose-up:
-	docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+	docker compose -f deploy/docker-compose.prod.yml --env-file .env.prod up -d
 
 .PHONY: docker-compose-down
 docker-compose-down:
-	docker compose -f docker-compose.prod.yml down
+	docker compose -f deploy/docker-compose.prod.yml down
 
 .PHONY: docker-compose-logs
 docker-compose-logs:
-	docker compose -f docker-compose.prod.yml logs -f
+	docker compose -f deploy/docker-compose.prod.yml logs -f
 
 .PHONY: docker-compose-restart
 docker-compose-restart:
-	docker compose -f docker-compose.prod.yml restart
+	docker compose -f deploy/docker-compose.prod.yml restart
 
 # Deployment helpers
 .PHONY: deploy-files
@@ -85,7 +85,7 @@ deploy-files:
 		echo "   # Edit .env.prod with production values"; \
 		exit 1; \
 	fi
-	./deploy.sh
+	./scripts/deploy.sh
 
 .PHONY: deploy-ssh
 deploy-ssh:
