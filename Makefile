@@ -1,10 +1,10 @@
 .PHONY: build
 build:
-	go build -o bin/aletheia ./cmd
+	go build -o bin/aletheiad ./cmd/aletheiad
 
 .PHONY: dev
 dev:
-	go run ./cmd/main.go
+	go run ./cmd/aletheiad
 
 .PHONY: migrate-up
 migrate-up:
