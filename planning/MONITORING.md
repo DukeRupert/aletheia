@@ -18,7 +18,7 @@ docker compose -f docker-compose.monitoring.yml logs -f
 
 - **Prometheus**: http://localhost:9090
 - **Grafana**: http://localhost:3000 (login: `admin` / `admin`)
-- **Aletheia Metrics**: http://localhost:1323/metrics
+- **Aletheia Metrics**: http://localhost:8080/metrics
 
 ### 3. Configure Grafana
 
@@ -265,12 +265,12 @@ curl -X POST http://localhost:9090/-/reload
 
 **Solution**: Make sure Aletheia is running and accessible:
 ```bash
-curl http://localhost:1323/metrics
+curl http://localhost:8080/metrics
 ```
 
 If running in Docker, verify `host.docker.internal` works:
 ```bash
-docker exec aletheia-prometheus wget -O- http://host.docker.internal:1323/metrics
+docker exec aletheia-prometheus wget -O- http://host.docker.internal:8080/metrics
 ```
 
 ### No metrics showing up

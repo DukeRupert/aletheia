@@ -27,10 +27,10 @@ The audit logging system is implemented but not yet integrated into handlers. He
 
 ### 1. Enable Scheduled Cleanup Job
 
-In `cmd/main.go` (lines 185-203), uncomment the cleanup job:
+In `cmd/aletheiad/main.go`, add a cleanup job:
 
 ```go
-// Uncomment this block to enable daily cleanup at 2 AM
+// Enable daily cleanup at 2 AM
 go func() {
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
@@ -51,52 +51,28 @@ go func() {
 
 **Retention period**: 2555 days (7 years) - common compliance requirement
 
-### 2. Update Handler Constructors
+### 2. Add AuditLogger to Server
 
-Add `auditLogger` parameter to handlers that need audit logging:
-
-**Example for AuthHandler:**
+Add `auditLogger` field to the `http.Server` struct:
 
 ```go
-// Before
-authHandler := handlers.NewAuthHandler(pool, logger, emailService)
-
-// After
-authHandler := handlers.NewAuthHandler(pool, logger, emailService, auditLogger)
-```
-
-**Handlers that need audit logging:**
-- `authHandler` - user registration, login, logout, password changes
-- `orgHandler` - organization CRUD, member management
-- `projectHandler` - project CRUD
-- `inspectionHandler` - inspection CRUD, status changes
-- `safetyCodeHandler` - safety code CRUD
-- `photoHandler` - photo uploads, deletions
-- `violationHandler` - violation confirmations, dismissals, manual creation
-
-### 3. Update Handler Structs
-
-Add `auditLogger` field to handler structs:
-
-```go
-type AuthHandler struct {
-	db          *pgxpool.Pool
-	logger      *slog.Logger
-	emailService email.EmailService
-	auditLogger *audit.AuditLogger  // Add this field
-}
-
-func NewAuthHandler(db *pgxpool.Pool, logger *slog.Logger, emailService email.EmailService, auditLogger *audit.AuditLogger) *AuthHandler {
-	return &AuthHandler{
-		db:          db,
-		logger:      logger,
-		emailService: emailService,
-		auditLogger: auditLogger,  // Store the audit logger
-	}
+// In http/server.go
+type Server struct {
+	// ... existing fields ...
+	auditLogger *audit.AuditLogger
 }
 ```
 
-### 4. Add Audit Logging Calls in Handler Methods
+**Handler methods that need audit logging:**
+- Auth handlers - user registration, login, logout, password changes
+- Organization handlers - organization CRUD, member management
+- Project handlers - project CRUD
+- Inspection handlers - inspection CRUD, status changes
+- Safety code handlers - safety code CRUD
+- Photo handlers - photo uploads, deletions
+- Violation handlers - violation confirmations, dismissals, manual creation
+
+### 3. Add Audit Logging Calls in Handler Methods
 
 **After creating a resource:**
 
@@ -193,10 +169,10 @@ err := auditLogger.ExportAuditLog(ctx, filter, &buf)
 
 ### 6. Remove Unused Variable Suppression
 
-In `cmd/main.go` (line 284), remove this line once audit logging is integrated:
+Once audit logging is integrated, remove any unused variable suppressions in `cmd/aletheiad/main.go`:
 
 ```go
-_ = auditLogger  // Delete this line
+_ = auditLogger  // Delete this line when integrated
 ```
 
 ### Benefits

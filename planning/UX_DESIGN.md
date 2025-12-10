@@ -666,6 +666,6 @@ Ready to generate report with:
 
 ## References
 
-- `/home/dukerupert/Repos/aletheia/CLAUDE.md` - Project architecture and tech stack
-- `/home/dukerupert/Repos/aletheia/STYLE_GUIDE.md` - Design system and styling guidelines
-- `/home/dukerupert/Repos/aletheia/web/README.md` - Template patterns and usage
+- `CLAUDE.md` - Project architecture and tech stack
+- `planning/CATALYST_MIGRATION_GUIDE.md` - Design system and styling guidelines (Tailwind CSS v4 + Catalyst)
+- `web/README.md` - Template patterns and usage

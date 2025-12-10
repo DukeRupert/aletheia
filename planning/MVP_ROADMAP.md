@@ -118,7 +118,6 @@ A construction safety inspection platform using AI to detect safety violations f
 > **Note:** Phase 8 (Reporting) has been deferred until after the UI is built. PDF generation is easier when HTML templates are already created.
 
 See [UI_ROADMAP.md](./UI_ROADMAP.md) for detailed frontend implementation plan.
-See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for original minimal styling guidelines.
 See [CATALYST_MIGRATION_GUIDE.md](./CATALYST_MIGRATION_GUIDE.md) for UI refinement with Catalyst design system.
 
 **Tech Stack:**

@@ -33,7 +33,7 @@ JWT_SECRET=<generate with: openssl rand -base64 64>
 ENVIRONMENT=prod
 LOG_LEVEL=info
 SERVER_HOST=0.0.0.0
-SERVER_PORT=1323
+SERVER_PORT=8080
 
 # Storage (S3 recommended for production)
 STORAGE_PROVIDER=s3
@@ -122,7 +122,7 @@ docker compose -f docker-compose.prod.yml logs -f
 
 ```bash
 # Run database migrations
-docker exec -it aletheia-app ./aletheia -migrate-up
+docker exec -it aletheia-app ./aletheiad -migrate-up
 ```
 
 ## Step 6: Verify Deployment
@@ -135,7 +135,7 @@ docker exec -it aletheia-app ./aletheia -migrate-up
 2. **Test the application:**
    ```bash
    # From VPS
-   curl http://localhost:1323/health
+   curl http://localhost:8080/health
 
    # From your local machine
    curl https://aletheia.angmar.dev
@@ -188,7 +188,7 @@ docker compose -f docker-compose.prod.yml logs app
 
 **Port already in use:**
 ```bash
-sudo netstat -tlnp | grep 1323
+sudo netstat -tlnp | grep 8080
 ```
 
 **Caddy issues:**
@@ -201,7 +201,7 @@ sudo journalctl -u caddy -f
 ```bash
 docker compose -f docker-compose.prod.yml down -v
 docker compose -f docker-compose.prod.yml up -d
-docker exec -it aletheia-app ./aletheia -migrate-up
+docker exec -it aletheia-app ./aletheiad -migrate-up
 ```
 
 ## Security Checklist
